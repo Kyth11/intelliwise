@@ -165,3 +165,51 @@ h3 {
 .btn-close {
     filter: brightness(0) invert(1);
 }
+#stats-cards .card {
+    min-height: 100px;
+}
+
+#announcements-section ul.list-group {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+#schedule-section table {
+    font-size: 0.8rem;
+}
+
+#tuition-section p {
+    margin: 0.3rem 0;
+}
+
+/* Sort arrows on table headers */
+.table thead th.sorted-asc::after,
+.table thead th.sorted-desc::after {
+    content: '';
+    display: inline-block;
+    margin-left: 6px;
+    border: 5px solid transparent;
+}
+.table thead th.sorted-asc::after {
+    border-bottom-color: #2a5298;
+}
+.table thead th.sorted-desc::after {
+    border-top-color: #2a5298;
+}
+
+/* Compact search inputs inside card headers */
+.card .form-control.form-control-sm {
+    min-width: 220px;
+}
+
+/* Badge tweak for day labels */
+.badge.bg-light.text-dark {
+    border: 1px solid rgba(0,0,0,.15) !important;
+    font-weight: 500;
+}
+
+.dropdownheader {
+    font-weight: bold;
+    font-style: italic;
+    color: #2a5298;
+}

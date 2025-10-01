@@ -1,6 +1,5 @@
 <?php
 
-
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
@@ -14,30 +13,43 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
-    $table->id();
-    $table->string('name');
-    $table->string('username')->unique();
-    $table->string('password');
-    $table->enum('role', ['admin', 'faculty', 'guardian']);
+            $table->id();
+            $table->string('name'); // Full name
+            $table->string('username')->unique(); // For login
+            $table->string('password');
+            $table->enum('role', ['admin', 'faculty', 'guardian']); // Role check
 
-    $table->unsignedBigInteger('faculty_id')->nullable();
-    $table->unsignedBigInteger('guardian_id')->nullable();
-    $table->foreign('faculty_id')->references('id')->on('faculty')->onDelete('set null')->onUpdate('cascade');
-    $table->foreign('guardian_id')->references('id')->on('guardian')->onDelete('set null')->onUpdate('cascade');
-    $table->timestamps();
+            // Foreign keys to faculty and guardian tables
+            $table->unsignedBigInteger('faculty_id')->nullable();
+            $table->unsignedBigInteger('guardian_id')->nullable();
+
+            $table->foreign('faculty_id')
+                  ->references('id')
+                  ->on('faculties')
+                  ->onDelete('set null')
+                  ->onUpdate('cascade');
+
+            $table->foreign('guardian_id')
+                  ->references('id')
+                  ->on('guardians')
+                  ->onDelete('set null')
+                  ->onUpdate('cascade');
+
+            $table->timestamps();
         });
 
+        // Insert default accounts
         DB::table('users')->insert([
             [
-                'name' => 'AdminDefault',
+                'name' => 'Default Admin',
                 'username' => 'admin',
-                'password' => bcrypt('admin123'), // Hash the password
+                'password' => bcrypt('admin123'), // Hashed password
                 'role' => 'admin',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
             [
-                'name' => 'FacultyDefault',
+                'name' => 'Default Faculty',
                 'username' => 'faculty',
                 'password' => bcrypt('faculty123'),
                 'role' => 'faculty',
@@ -45,7 +57,7 @@ return new class extends Migration
                 'updated_at' => now(),
             ],
             [
-                'name' => 'GuardianDefault',
+                'name' => 'Default Guardian',
                 'username' => 'guardian',
                 'password' => bcrypt('guardian123'),
                 'role' => 'guardian',
@@ -53,7 +65,6 @@ return new class extends Migration
                 'updated_at' => now(),
             ],
         ]);
-
     }
 
     /**
@@ -62,6 +73,5 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('users');
-
     }
 };

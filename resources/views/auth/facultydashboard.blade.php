@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+     <link rel="icon" type="image/png" href="{{ asset('images/intelliwise.png') }}">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Faculty Dashboard</title>
+  <title>IGCA - Faculty Dashboard</title>
   <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Bootstrap Icons -->
@@ -15,7 +16,7 @@
   <!-- Sidebar -->
   <div class="sidebar" id="sidebar">
       <img src="{{ asset('images/Intelliwise.png') }}" alt="Logo" id="logo">
-      <h4>Faculty Dashboard</h4>
+      <h4>Faculty Panel</h4>
       <a href="#" data-section="dashboard"><i class="bi bi-speedometer2"></i><span> Dashboard</span></a>
       <a href="#" data-section="students"><i class="bi bi-people"></i><span> Students</span></a>
       <a href="#" data-section="assignments"><i class="bi bi-journal-text"></i><span> Assignments</span></a>

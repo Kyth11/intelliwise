@@ -13,7 +13,7 @@ class LoginController extends Controller
      */
     public function showLoginForm()
     {
-        return view('auth.login'); // resources/views/auth/login.blade.php
+        return view('auth.login');
     }
 
     /**
@@ -26,16 +26,15 @@ class LoginController extends Controller
             'password' => 'required|string',
         ]);
 
-        // Try to login using the "users" table
         if (Auth::attempt($request->only('username', 'password'))) {
-            $request->session()->regenerate(); // 🔒 Prevent session fixation
+            $request->session()->regenerate();
             $user = Auth::user();
 
             // Redirect based on role
             return match ($user->role) {
                 'admin'    => redirect()->route('admin.dashboard'),
-                'faculty'  => redirect()->route('faculty.dashboard'),
-                'guardian' => redirect()->route('guardian.dashboard'),
+                'faculty'  => redirect()->route('faculties.dashboard'),
+                'guardian' => redirect()->route('guardians.dashboard'),
                 default    => redirect()->route('home'),
             };
         }

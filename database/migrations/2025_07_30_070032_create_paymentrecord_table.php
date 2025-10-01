@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('transaction_id')->nullable(); // For tracking payment transactions
             $table->unsignedBigInteger('guardian_id');
             $table->unsignedBigInteger('payment_id');
-            $table->foreign('guardian_id')->references('id')->on('guardian')->onDelete('cascade')->onUpdate('cascade');
+            $table->foreign('guardian_id')->references('id')->on('guardians')->onDelete('cascade')->onUpdate('cascade');
             $table->foreign('payment_id')->references('id')->on('payments')->onDelete('cascade')->onUpdate('cascade');
             $table->timestamps();
         });

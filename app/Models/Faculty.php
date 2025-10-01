@@ -2,14 +2,11 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Faculty extends Model
 {
-    use HasFactory;
-
-    protected $table = 'faculty'; // or 'faculties' if that's your table name
+    protected $table = 'faculties';
 
     protected $fillable = [
         'f_firstname',
@@ -20,9 +17,12 @@ class Faculty extends Model
         'f_email',
     ];
 
-    // Relationship to User
     public function user()
     {
         return $this->hasOne(User::class, 'faculty_id');
     }
+    public function schedules() {
+    return $this->hasMany(Schedule::class);
+}
+
 }

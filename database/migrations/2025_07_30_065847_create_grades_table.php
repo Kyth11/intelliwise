@@ -20,11 +20,11 @@ return new class extends Migration {
             $table->unsignedBigInteger('gradelvl_id')->nullable();
             $table->unsignedBigInteger('faculty_id')->nullable();
 
-            $table->foreign('faculty_id')->references('id')->on('faculty')->onDelete('set null')->onUpdate('cascade');
+            $table->foreign('faculty_id')->references('id')->on('faculties')->onDelete('set null')->onUpdate('cascade');
             $table->foreign('students_id')->references('id')->on('students')->onDelete('cascade')->onUpdate('cascade');
             $table->foreign('subjects_id')->references('id')->on('subjects')->onDelete('cascade')->onUpdate('cascade');
-            $table->foreign('schoolyr_id')->references('id')->on('schoolyr')->onDelete('cascade')->onUpdate('cascade');
-            $table->foreign('gradelvl_id')->references('id')->on('gradelvl')->onDelete('set null')->onUpdate('cascade');
+            $table->foreign('schoolyr_id')->references('id')->on('schoolyrs')->onDelete('cascade')->onUpdate('cascade');
+            $table->foreign('gradelvl_id')->references('id')->on('gradelvls')->onDelete('set null')->onUpdate('cascade');
             $table->timestamps();
         });
     }

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link rel="icon" type="image/png" href="{{ asset('images/intelliwise.png') }}">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Guardian Dashboard</title>
+  <title>IGCA - Guardian Dashboard</title>
   <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Bootstrap Icons -->
@@ -15,7 +16,7 @@
   <!-- Sidebar -->
   <div class="sidebar" id="sidebar">
       <img src="{{ asset('images/Intelliwise.png') }}" alt="Logo" id="logo">
-      <h4>Guardian Dashboard</h4>
+      <h4>Guardian Panel</h4>
       <a href="#" data-section="dashboard"><i class="bi bi-speedometer2"></i><span> Dashboard</span></a>
       <a href="#" data-section="children"><i class="bi bi-person-lines-fill"></i><span> Children</span></a>
       <a href="#" data-section="reports"><i class="bi bi-card-checklist"></i><span> Reports</span></a>

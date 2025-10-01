@@ -18,9 +18,7 @@ return new class extends Migration
             $table->enum('payment_status', ['Paid', 'Unpaid', 'Partial'])->default('Unpaid');
             $table->decimal('balance', 10, 2)->default(0);
             $table->unsignedBigInteger('tuition_id');
-            $table->unsignedBigInteger('students_id');
-            $table->foreign('tuition_id')->references('id')->on('tuition')->onDelete('cascade')->onUpdate('cascade');
-            $table->foreign('students_id')->references('id')->on('students')->onDelete('cascade')->onUpdate('cascade');
+            $table->foreign('tuition_id')->references('id')->on('tuitions')->onDelete('cascade')->onUpdate('cascade');
 
             $table->timestamps();
         });

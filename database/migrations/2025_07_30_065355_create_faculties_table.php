@@ -11,11 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('schoolyr', function (Blueprint $table) {
+        Schema::create('faculties', function (Blueprint $table) {
             $table->id();
-            $table->string('school_year'); // Added column for school year
-            $table->date('start_date'); // Added column for start date
-            $table->date('end_date'); // Added column for end date
+            $table->string('f_firstname');
+            $table->string('f_lastname');
+            $table->string('f_middlename')->nullable();
+            $table->string('f_address');
+            $table->string('f_contact');
+            $table->string('f_email')->nullable();
             $table->timestamps();
         });
     }
@@ -25,6 +28,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('schoolyr');
+        Schema::dropIfExists('faculties');
     }
 };

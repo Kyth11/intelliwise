@@ -1,186 +1,295 @@
-<!DOCTYPE html>
-<html lang="en">
+@extends('layouts.admin')
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard</title>
+@section('title', 'Dashboard')
 
-    <!-- Bootstrap -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('css/dash.css') }}">
-</head>
+@section('content')
+    <!-- Local styles for header + top-right enroll card + table toggles -->
+    <style>
+        /* Scope to this page only */
+        #dashboard-header {
+            display: flex;
+            align-items: start;
+            justify-content: space-between;
+            gap: 1rem;
+        }
 
-<body>
-    <div class="dashboard-wrapper">
-        <!-- Sidebar -->
-        <div class="sidebar" id="sidebar">
-            <img src="{{ asset('images/Intelliwise.png') }}" alt="Logo" id="logo">
-            <h4>Admin Dashboard</h4>
-            <a href="#" class="sidebar-link active" data-section="dashboard"><i class="bi bi-speedometer2"></i><span>
-                    Dashboard</span></a>
-            <a href="#" class="sidebar-link" data-section="students"><i class="bi bi-people"></i><span>
-                    Students</span></a>
-            <a href="#" class="sidebar-link" data-section="faculty"><i class="bi bi-person-badge"></i><span>
-                    Faculty</span></a>
-            <a href="#" class="sidebar-link" data-section="settings"><i class="bi bi-gear"></i><span>
-                    Settings</span></a>
-            <a href="#" class="sidebar-link" data-section="accounts"><i class="bi bi-person-gear"></i><span>
-                    Manage Accounts</span></a>
-            <a href="{{ route('login') }}"><i class="bi bi-box-arrow-right"></i><span> Logout</span></a>
+        #dashboard-header .intro {
+            min-width: 0;
+            /* prevents overflow in flex */
+        }
+
+        /* The small action card on the right */
+        #dashboard-header .enroll-card {
+            min-width: 260px;
+            max-width: 320px;
+            border: 1px solid rgba(0, 0, 0, .075);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
+        }
+
+        #dashboard-header .enroll-card .btn {
+            width: 100%;
+        }
+
+        /* Toggle area under tables/lists */
+        .table-toggle-wrap,
+        .list-toggle-wrap {
+            text-align: center;
+        }
+
+        /* Responsive: stack on small screens */
+        @media (max-width: 768px) {
+            #dashboard-header {
+                flex-direction: column;
+            }
+
+            #dashboard-header .enroll-card {
+                width: 100%;
+                max-width: none;
+                order: 2;
+                /* show after intro text on mobile */
+            }
+
+            #dashboard-header .intro {
+                order: 1;
+            }
+        }
+    </style>
+
+    <div class="card section p-4">
+        <!-- Header row with top-right enroll card -->
+        <div id="dashboard-header" class="mb-3">
+            <div class="intro">
+                <h4>Welcome, {{ Auth::check() ? Auth::user()->name : 'Faculty' }}!</h4>
+                <p>Here’s a quick overview of the system.</p>
+            </div>
+
+            <!-- Enroll Student (top-right) -->
+            <div class="card enroll-card p-3 text-center">
+                <h6 class="mb-1">Enroll a Student</h6>
+                <p class="text-muted mb-3">Add a new student to the system.</p>
+                <a href="#" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#enrollModal">
+                    <i class="bi bi-person-plus me-2"></i> Enroll Now
+                </a>
+            </div>
         </div>
 
-        <!-- Content -->
-        <div class="content" id="content">
-            <!-- Default: Dashboard -->
-            <div id="dashboard-section" class="section ">
-                <!-- Topbar -->
-                <div class="topbar">
-                   <h3 class="mb-0">
-              Welcome,
-              @if(Auth::check())
-                  {{ Auth::user()->name }}
-              @else
-                  Faculty
-              @endif
-              !
-          </h3>
+        <!-- Dashboard Cards -->
+        <div class="row mt-2" id="stats-cards">
+            <div class="col-md-3 mb-3">
+                <div class="card p-3 text-center shadow-sm">
+                    <h6>Total Students</h6>
+                    <h3>{{ $students->count() }}</h3>
                 </div>
-
-                <!-- Dashboard Cards -->
-                <div class="row">
-                    <div class="col-md-4 mb-4 ">
-                        <div class="card p-4 text-center">
-                            <h5>Total Students</h5>
-                            <h2>{{ $students->count() }}</h2>
-                        </div>
-                    </div>
-                    <div class="col-md-4 mb-4">
-                        <div class="card p-4 text-center">
-                            <h5>Total Teachers</h5>
-                            <h2>3</h2>
-                        </div>
-                    </div>
-                    <div class="col-md-4 mb-4">
-                        <div class="card p-4 text-center">
-                            <h5>System Users</h5>
-                            <h2>4</h2>
-                        </div>
-                    </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card p-3 text-center shadow-sm">
+                    <h6>Total Teachers</h6>
+                    <h3>{{ $faculties->count() }}</h3>
                 </div>
-
-                <!-- Announcements -->
-                <div class="card p-4 mb-4">
-                    <h5>Announcements</h5>
-                    <p>No announcements yet.</p>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card p-3 text-center shadow-sm">
+                    <h6>System Users</h6>
+                    <h3>{{ $guardians->count() + $faculties->count() }}</h3>
                 </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card p-3 text-center shadow-sm">
+                    <h6>Active Announcements</h6>
+                    <h3>{{ $announcements->count() }}</h3>
+                </div>
+            </div>
+        </div>
 
-                <!-- Enroll Student Section -->
-                <div class="card p-4 text-center">
-                    <h5>Enroll a Student</h5>
-                    <p>You can add a new student to the system.</p>
-                    <a href="#" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#enrollModal">
-                        <i class="bi bi-person-plus me-2"></i> Enroll Now
-                    </a>
+        <!-- Announcements -->
+        <div class="card mt-4 p-4" id="announcements-section">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5>Announcements</h5>
+                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addAnnouncementModal">
+                    <i class="bi bi-megaphone me-1"></i> Add
+                </button>
+            </div>
+
+            @if($announcements->isEmpty())
+                <p class="text-muted">No announcements yet.</p>
+            @else
+                <ul class="list-group" id="announcementsList">
+                    @foreach($announcements as $a)
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ $a->title ?? 'Untitled' }}</strong>
+                                @if($a->content)
+                                    — {{ $a->content }}
+                                @endif
+                                <br>
+
+                                <small class="text-muted d-block">
+                                    @if($a->date_of_event)
+                                        <span class="me-3">Event: {{ $a->date_of_event->format('Y-m-d') }}</span>
+                                    @endif
+                                    @if($a->deadline)
+                                        <span class="me-3">Deadline: {{ $a->deadline->format('Y-m-d') }}</span>
+                                    @endif
+                                    <span class="me-3">
+                                        For: {{ $a->gradelvl?->grade_level ?? 'All Grade Levels' }}
+                                    </span>
+                                    <span>Posted: {{ $a->created_at->format('Y-m-d g:i A') }}</span>
+                                </small>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <!-- EDIT -->
+                                <button class="btn btn-sm btn-warning" data-bs-toggle="modal"
+                                    data-bs-target="#editAnnouncementModal{{ $a->id }}">
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+
+                                <!-- DELETE (native submit + confirm) -->
+                                <form action="{{ route('announcements.destroy', $a->id) }}" method="POST" class="d-inline"
+                                    onsubmit="return confirm('Delete this announcement?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-sm btn-danger">
+                                        <i class="bi bi-archive"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </li>
+
+                        {{-- Per-row edit modal --}}
+                        @include('auth.admindashboard.partials.edit-announcement-modal', ['a' => $a, 'gradelvls' => $gradelvls])
+                    @endforeach
+                </ul>
+
+                <!-- Show more/less for announcements -->
+                <div id="announcementsToggle" class="list-toggle-wrap mt-2"></div>
+            @endif
+        </div>
+
+        <!-- Schedule Notes -->
+        <div class="card mt-4 p-4" id="schedule-section">
+            <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Schedule Notes</h5>
+                <div class="d-flex align-items-center gap-2">
+                    <input type="text" id="scheduleSearch" class="form-control form-control-sm"
+                        placeholder="Search schedule...">
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addScheduleModal">
+                        <i class="bi bi-plus-circle me-1"></i> Add Schedule
+                    </button>
                 </div>
             </div>
 
-            <!-- Students Section -->
-            <div id="students-section" class="card section d-none">
-                <h4>Manage Students</h4>
-                <p>Here you can view and manage student records.</p>
-
-                <div class="card p-4">
-                    @if (session('success'))
-                        <div class="alert alert-success alert-dismissible fade show" role="alert">
-                            {{ session('success') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    @endif
-
-                    @if (session('error'))
-                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                            {{ session('error') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    @endif
-
-                    <table class="table table-bordered table-striped">
-                        <thead class="table-primary">
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped searchable-sortable" id="scheduleTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th data-type="text">Day</th>
+                            <th data-type="text">Time</th>
+                            <th data-type="text">Subject</th>
+                            <th data-type="text">Room</th>
+                            <th data-type="text">Section</th>
+                            <th data-type="text">Grade Level</th>
+                            <th data-type="text">School Year</th>
+                            <th data-type="text">Faculty</th>
+                            <th data-type="text">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($schedules as $schedule)
                             <tr>
-                                <th>Student No.</th>
-                                <th>Full Name</th>
-                                <th>Grade Level</th>
-                                <th>Birthdate</th>
-                                <th>Address</th>
-                                <th>Contact</th>
-                                <th>Email</th>
-                                <th>Guardian</th>
-                                <th>Guardian Email</th>
-                                <th>Tuition</th>
-                                <th>Payment Status</th>
-                                <th>Enrollment Status</th>
-                                <th>Date Enrolled</th>
-                                <th>Tools</th> <!-- NEW -->
+                                <td><span class="badge bg-light text-dark border">{{ $schedule->day }}</span></td>
+                                <td>{{ $schedule->class_start }} - {{ $schedule->class_end }}</td>
+                                <td>{{ $schedule->subject->subject_name ?? '-' }}</td>
+                                <td>{{ $schedule->room->room_number ?? '-' }}</td>
+                                <td>{{ $schedule->section->section_name ?? '-' }}</td>
+                                <td>{{ $schedule->gradelvl->grade_level ?? '-' }}</td>
+                                <td>{{ $schedule->school_year ?? '—' }}</td>
+                                <td>{{ $schedule->faculty->user->name ?? '—' }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-warning" data-bs-toggle="modal"
+                                        data-bs-target="#editScheduleModal{{ $schedule->id }}">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+                                    <form action="{{ route('schedules.destroy', $schedule->id) }}" method="POST" class="d-inline"
+                                        onsubmit="return confirm('Delete this schedule record?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-danger">
+                                            <i class="bi bi-archive"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="9" class="text-center">No schedules available.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+            <div id="scheduleToggle" class="table-toggle-wrap mt-2"></div>
+        </div>
+
+        <!-- Tuition Details Section -->
+        <div class="card mt-4 p-4" id="tuition-section">
+            <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Tuition & Fees</h5>
+                <div class="d-flex align-items-center gap-2">
+                    <input type="text" id="tuitionSearch" class="form-control form-control-sm"
+                        placeholder="Search tuition...">
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addTuitionModal">
+                        <i class="bi bi-plus-circle me-1"></i> Add Tuition
+                    </button>
+                </div>
+            </div>
+
+            @if($tuitions->isEmpty())
+                <p class="text-muted">No tuition fees set yet.</p>
+            @else
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped searchable-sortable" id="tuitionTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th data-type="text">Grade Level</th>
+                                <th data-type="number">Monthly (₱)</th>
+                                <th data-type="number">Yearly (₱)</th>
+                                <th data-type="number">Misc (₱)</th>
+                                <th data-type="text">Optional Desc</th>
+                                <th data-type="number">Optional (₱)</th>
+                                <th data-type="number">Total (₱)</th>
+                                <th data-type="text">School Year</th>
+                                <th data-type="text">Updated</th>
+                                <th data-type="text">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse ($students as $student)
+                            @foreach($tuitions as $t)
                                 <tr>
-                                    <td>{{ $student->id }}</td>
+                                    <td>{{ $t->grade_level }}</td>
+                                    <td>{{ number_format((float) $t->monthly_fee, 2) }}</td>
+                                    <td>{{ number_format((float) $t->yearly_fee, 2) }}</td>
                                     <td>
-                                        {{ $student->s_firstname }}
-                                        @if ($student->s_middlename)
-                                            {{ $student->s_middlename }}
-                                        @endif
-                                        {{ $student->s_lastname }}
+                                        @if(is_null($t->misc_fee)) — @else {{ number_format((float) $t->misc_fee, 2) }} @endif
                                     </td>
-                                    <td>{{ $student->s_gradelvl }}</td>
-                                    <td>{{ $student->s_birthdate }}</td>
-                                    <td>{{ $student->s_address }}</td>
-                                    <td>{{ $student->s_contact }}</td>
-                                    <td>{{ $student->s_email ?? '-' }}</td>
+                                    <td>{{ $t->optional_fee_desc ?? '—' }}</td>
                                     <td>
-                                        {{ $student->s_guardianfirstname }} {{ $student->s_guardianlastname }}
-                                        ({{ $student->s_guardiancontact }})
+                                        @if(is_null($t->optional_fee_amount)) — @else
+                                        {{ number_format((float) $t->optional_fee_amount, 2) }} @endif
                                     </td>
-                                    <td>{{ $student->s_guardianemail ?? '-' }}</td>
-                                    <td>{{ $student->s_tuition_sum ?? '-' }}</td>
-                                    <td>{{ $student->payment_status ?? '-' }}</td>
-                                    <td>
-                                        @if ($student->enrollment_status == 'Enrolled')
-                                            <span class="badge bg-success">Enrolled</span>
-                                        @else
-                                            <span class="badge bg-secondary">Not Enrolled</span>
-                                        @endif
-                                    </td>
-                                    <td>{{ $student->created_at->format('Y-m-d') }}</td>
-                                    <td>
-                                        <!-- Edit Button -->
+                                    <td>{{ number_format((float) $t->total_yearly, 2) }}</td>
+                                    <td>{{ $t->school_year ?? '—' }}</td>
+                                    <td>{{ $t->updated_at?->format('Y-m-d') ?? '—' }}</td>
+
+                                    <td class="text-nowrap">
                                         <button class="btn btn-sm btn-warning" data-bs-toggle="modal"
-                                            data-bs-target="#editStudentModal" data-id="{{ $student->id }}"
-                                            data-firstname="{{ $student->s_firstname }}"
-                                            data-middlename="{{ $student->s_middlename }}"
-                                            data-lastname="{{ $student->s_lastname }}"
-                                            data-gradelvl="{{ $student->s_gradelvl }}"
-                                            data-birthdate="{{ $student->s_birthdate }}"
-                                            data-address="{{ $student->s_address }}"
-                                            data-contact="{{ $student->s_contact }}" data-email="{{ $student->s_email }}"
-                                            data-guardianfirstname="{{ $student->s_guardianfirstname }}"
-                                            data-guardianlastname="{{ $student->s_guardianlastname }}"
-                                            data-guardiancontact="{{ $student->s_guardiancontact }}"
-                                            data-guardianemail="{{ $student->s_guardianemail }}"
-                                            data-tuition="{{ $student->s_tuition_sum }}"
-                                            data-status="{{ $student->enrollment_status }}"
-                                            data-payment="{{ $student->payment_status }}">
+                                            data-bs-target="#editTuitionModal{{ $t->id }}">
                                             <i class="bi bi-pencil-square"></i>
                                         </button>
 
-                                        <!-- Archive Button -->
-                                        <form action="{{ route('students.destroy', $student->id) }}" method="POST"
-                                            class="d-inline">
+                                        <!-- DELETE (native submit + confirm) -->
+                                        <form action="{{ route('tuitions.destroy', $t->id) }}" method="POST" class="d-inline"
+                                            onsubmit="return confirm('Delete this tuition record?');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-sm btn-danger">
@@ -189,441 +298,245 @@
                                         </form>
                                     </td>
                                 </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="14" class="text-center">No students found.</td>
-                                </tr>
-                            @endforelse
+
+                                {{-- Include per-row edit modal so $t exists inside --}}
+                                @include('auth.admindashboard.partials.edit-tuition-modal', ['t' => $t, 'schoolyrs' => $schoolyrs])
+                            @endforeach
                         </tbody>
                     </table>
                 </div>
-            </div>
+                <div id="tuitionToggle" class="table-toggle-wrap mt-2"></div>
+            @endif
+        </div>
+    </div>
 
-
-
-            <!-- Faculty Section -->
-            <div id="faculty-section" class=" card section d-none">
-                <h4>Faculty Management</h4>
-                <p>Here you can view and manage faculty details.</p>
-            </div>
-
-            <!-- Settings Section -->
-            <div id="settings-section" class="card section d-none">
-                <h4>System Settings</h4>
-                <p>Manage system preferences and configurations here.</p>
-            </div>
-
-            <!-- Accounts Section -->
-            <div id="accounts-section" class="card section d-none p-4">
-                <h4>Manage Accounts</h4>
-                <p>Here you can add, edit, or delete system users.</p>
-
-                <div class="d-flex gap-2 mb-3">
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFacultyModal">
-                        <i class="bi bi-person-badge me-2"></i> Add Faculty Account
-                    </button>
-                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addGuardianModal">
-                        <i class="bi bi-people-fill me-2"></i> Add Guardian Account
-                    </button>
-                </div>
-
-                {{-- Success/Error Messages --}}
-                @if (session('success'))
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        {{ session('success') }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                @endif
-                @if (session('error'))
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        {{ session('error') }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                @endif
-            </div>
-
-            <!-- Add Faculty Modal -->
-            <div class="modal fade" id="addFacultyModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <form action="{{ route('faculty.store') }}" method="POST">
-                            @csrf
-                            <div class="modal-header">
-                                <h5 class="modal-title">Add Faculty Account</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <div class="row g-3">
-                                    <div class="col-md-4">
-                                        <input type="text" name="f_firstname" class="form-control"
-                                            placeholder="First Name" required>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <input type="text" name="f_middlename" class="form-control"
-                                            placeholder="Middle Name">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <input type="text" name="f_lastname" class="form-control"
-                                            placeholder="Last Name" required>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <input type="text" name="f_address" class="form-control" placeholder="Address"
-                                            required>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <input type="text" name="f_contact" class="form-control"
-                                            placeholder="Contact Number" required>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <input type="email" name="f_email" class="form-control" placeholder="Email"
-                                            required>
-                                    </div>
-
-                                    <!-- LOGIN DETAILS -->
-                                    <div class="col-md-6">
-                                        <input type="text" name="username" class="form-control" placeholder="Username"
-                                            required>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <input type="password" name="password" class="form-control"
-                                            placeholder="Password" required>
-                                    </div>
-
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-2"></i>
-                                    Save</button>
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            </div>
-                        </form>
-                    </div>
+    {{-- Edit Schedule Modals (one per schedule) --}}
+    @foreach($schedules as $schedule)
+        <div class="modal fade" id="editScheduleModal{{ $schedule->id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    @include('auth.admindashboard.partials.edit-schedule-modal', ['schedule' => $schedule])
                 </div>
             </div>
+        </div>
+    @endforeach
 
-            <!-- Add Guardian Modal -->
-            <div class="modal fade" id="addGuardianModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <form action="{{ route('guardian.store') }}" method="POST">
-                            @csrf
-                            <div class="modal-header">
-                                <h5 class="modal-title">Add Guardian Account</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <div class="row g-3">
-                                    <div class="col-md-4">
-                                        <input type="text" name="g_firstname" class="form-control"
-                                            placeholder="First Name" required>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <input type="text" name="g_middlename" class="form-control"
-                                            placeholder="Middle Name">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <input type="text" name="g_lastname" class="form-control"
-                                            placeholder="Last Name" required>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <input type="text" name="g_address" class="form-control" placeholder="Address"
-                                            required>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <input type="text" name="g_contact" class="form-control"
-                                            placeholder="Contact Number" required>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <input type="email" name="g_email" class="form-control" placeholder="Email"
-                                            required>
-                                    </div>
+    {{-- Include Modals --}}
+    @include('auth.admindashboard.partials.enroll-student-modal')
+    @include('auth.admindashboard.partials.add-announcement-modal')
+    @include('auth.admindashboard.partials.add-schedule-modal')
+    @include('auth.admindashboard.partials.add-tuition-modal') {{-- ensure this uses route("tuitions.store") --}}
+@endsection
 
-                                    <!-- LOGIN DETAILS -->
-                                    <div class="col-md-6">
-                                        <input type="text" name="username" class="form-control" placeholder="Username"
-                                            required>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <input type="password" name="password" class="form-control"
-                                            placeholder="Password" required>
-                                    </div>
+@push('scripts')
 
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-2"></i>
-                                    Save</button>
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
+{{-- SweetAlert2 for delete confirmations (optional)
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    // Single, unified delete confirm to match your global design
+    document.querySelectorAll('.delete-btn').forEach(button => {
+        button.addEventListener('click', function () {
+            const form = this.closest('form.delete-form');
+            if (!form) return;
 
-            <!-- Enroll Student Modal -->
-            <div class=" modal fade" id="enrollModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <form action="{{ route('students.store') }}" method="POST">
-                            @csrf
-                            <div class="modal-header">
-                                <h5 class="modal-title">Enroll New Student</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-
-                            <div class="modal-body">
-                                {{-- Success/Error Messages --}}
-                                @if (session('success'))
-                                    <div class="alert alert-success">{{ session('success') }}</div>
-                                @endif
-                                @if (session('error'))
-                                    <div class="alert alert-danger">{{ session('error') }}</div>
-                                @endif
-                                @if ($errors->any())
-                                    <div class="alert alert-danger">
-                                        <ul class="mb-0">
-                                            @foreach ($errors->all() as $error)
-                                                <li>{{ $error }}</li>
-                                            @endforeach
-                                        </ul>
-                                    </div>
-                                @endif
-
-                                <div class="row g-3">
-                                    <h6>Student Information</h6>
-                                    <div class="col-md-4"><input type="text" name="s_firstname" class="form-control"
-                                            placeholder="First Name" required></div>
-                                    <div class="col-md-4"><input type="text" name="s_middlename" class="form-control"
-                                            placeholder="Middle Name"></div>
-                                    <div class="col-md-4"><input type="text" name="s_lastname" class="form-control"
-                                            placeholder="Last Name" required></div>
-                                    <div class="col-md-6"><input type="date" name="s_birthdate" class="form-control"
-                                            required></div>
-                                    <div class="col-md-6"><input type="text" name="s_address" class="form-control"
-                                            placeholder="Address" required></div>
-                                    <div class="col-md-6"><input type="text" name="s_contact" class="form-control"
-                                            placeholder="Contact Number" required></div>
-                                    <div class="col-md-6"><input type="email" name="s_email" class="form-control"
-                                            placeholder="Email (optional)"></div>
-
-                                    <h6 class="mt-3">Guardian Information</h6>
-                                    <div class="col-md-4"><input type="text" name="s_guardianfirstname"
-                                            class="form-control" placeholder="First Name" required></div>
-                                    <div class="col-md-4"><input type="text" name="s_guardianlastname"
-                                            class="form-control" placeholder="Last Name" required></div>
-                                    <div class="col-md-4"><input type="text" name="s_guardiancontact"
-                                            class="form-control" placeholder="Contact Number" required></div>
-                                    <div class="col-md-6"><input type="email" name="s_guardianemail"
-                                            class="form-control" placeholder="Email (optional)"></div>
-
-                                    <h6 class="mt-3">Enrollment Details</h6>
-                                    <div class="col-md-6">
-                                        <select name="s_gradelvl" class="form-control">
-                                            <option value="">Select Grade Level</option>
-                                            <option value="Pre-Schooler">Pre-Schooler</option>
-                                            <option value="Nursery">Nursery</option>
-                                            <option value="Kindergarten">Kindergarten</option>
-                                            <option value="Grade 1">Grade 1</option>
-                                            <option value="Grade 2">Grade 2</option>
-                                            <option value="Grade 3">Grade 3</option>
-                                            <option value="Grade 4">Grade 4</option>
-                                            <option value="Grade 5">Grade 5</option>
-                                            <option value="Grade 6">Grade 6</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <select name="enrollment_status" class="form-control">
-                                            <option value="Enrolled">Enrolled</option>
-                                            <option value="Not Enrolled" selected>Not Enrolled</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="modal-footer">
-                                <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-2"></i>
-                                    Save
-                                    Student</button>
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-            <!-- Edit Student Modal -->
-            <div class="modal fade" id="editStudentModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <form id="editStudentForm" method="POST">
-                            @csrf
-                            @method('PUT')
-                            <div class="modal-header">
-                                <h5 class="modal-title">Edit Student</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-
-                            <div class="modal-body">
-                                <div class="row g-3">
-                                    <h6>Student Information</h6>
-                                    <div class="col-md-4"><input type="text" id="edit_firstname" name="s_firstname"
-                                            class="form-control" required></div>
-                                    <div class="col-md-4"><input type="text" id="edit_middlename" name="s_middlename"
-                                            class="form-control"></div>
-                                    <div class="col-md-4"><input type="text" id="edit_lastname" name="s_lastname"
-                                            class="form-control" required></div>
-                                    <div class="col-md-6"><input type="date" id="edit_birthdate" name="s_birthdate"
-                                            class="form-control" required></div>
-                                    <div class="col-md-6"><input type="text" id="edit_address" name="s_address"
-                                            class="form-control" required></div>
-                                    <div class="col-md-6"><input type="text" id="edit_contact" name="s_contact"
-                                            class="form-control" required></div>
-                                    <div class="col-md-6"><input type="email" id="edit_email" name="s_email"
-                                            class="form-control"></div>
-
-                                    <h6 class="mt-3">Guardian Information</h6>
-                                    <div class="col-md-4"><input type="text" id="edit_guardianfirstname"
-                                            name="s_guardianfirstname" class="form-control" required></div>
-                                    <div class="col-md-4"><input type="text" id="edit_guardianlastname"
-                                            name="s_guardianlastname" class="form-control" required></div>
-                                    <div class="col-md-4"><input type="text" id="edit_guardiancontact"
-                                            name="s_guardiancontact" class="form-control" required></div>
-                                    <div class="col-md-6"><input type="email" id="edit_guardianemail"
-                                            name="s_guardianemail" class="form-control"></div>
-
-                                    <h6 class="mt-3">Enrollment Details</h6>
-                                    <div class="col-md-6">
-                                        <select id="edit_gradelvl" name="s_gradelvl" class="form-control">
-                                            <option value="Pre-Schooler">Pre-Schooler</option>
-                                            <option value="Nursery">Nursery</option>
-                                            <option value="Kindergarten">Kindergarten</option>
-                                            <option value="Grade 1">Grade 1</option>
-                                            <option value="Grade 2">Grade 2</option>
-                                            <option value="Grade 3">Grade 3</option>
-                                            <option value="Grade 4">Grade 4</option>
-                                            <option value="Grade 5">Grade 5</option>
-                                            <option value="Grade 6">Grade 6</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6"><input type="text" id="edit_tuition" name="s_tuition_sum"
-                                            class="form-control"></div>
-                                    <div class="col-md-6">
-                                        <select id="edit_status" name="enrollment_status" class="form-control">
-                                            <option value="Enrolled">Enrolled</option>
-                                            <option value="Not Enrolled">Not Enrolled</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6"><input type="text" id="edit_payment" name="payment_status"
-                                            class="form-control"></div>
-                                </div>
-                            </div>
-
-                            <div class="modal-footer">
-                                <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-2"></i>
-                                    Save
-                                    Changes</button>
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
+            const message = this.dataset.confirm || 'Are you sure you want to delete this item?';
+            Swal.fire({
+                title: 'Are you sure?',
+                text: message,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, proceed',
+                reverseButtons: true,
+                background: '#fff',
+                backdrop: false,
+                allowOutsideClick: true,
+                allowEscapeKey: true
+            }).then((result) => {
+                if (result.isConfirmed) form.submit();
+            });
+        });
+    });
+</script> --}}
 
 
-            <!-- Bootstrap JS -->
-            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-            <script>
-                const editStudentModal = document.getElementById('editStudentModal');
-                editStudentModal.addEventListener('show.bs.modal', event => {
-                    const button = event.relatedTarget;
+<!-- Optional: Bootstrap JS and dependencies (Popper) -->
+<script>
 
-                    // Get data attributes
-                    const id = button.getAttribute('data-id');
-                    const firstname = button.getAttribute('data-firstname');
-                    const middlename = button.getAttribute('data-middlename');
-                    const lastname = button.getAttribute('data-lastname');
-                    const gradelvl = button.getAttribute('data-gradelvl');
-                    const birthdate = button.getAttribute('data-birthdate');
-                    const address = button.getAttribute('data-address');
-                    const contact = button.getAttribute('data-contact');
-                    const email = button.getAttribute('data-email');
-                    const guardianfirstname = button.getAttribute('data-guardianfirstname');
-                    const guardianlastname = button.getAttribute('data-guardianlastname');
-                    const guardiancontact = button.getAttribute('data-guardiancontact');
-                    const guardianemail = button.getAttribute('data-guardianemail');
-                    const tuition = button.getAttribute('data-tuition');
-                    const status = button.getAttribute('data-status');
-                    const payment = button.getAttribute('data-payment');
+        function attachTableFeatures(tableId, searchInputId, opts = {}) {
+            const maxVisible = opts.maxVisible ?? 5;
+            const toggleWrapId = opts.toggleId || null;
 
-                    // Fill form
-                    document.getElementById('editStudentForm').action = `/students/${id}`;
-                    document.getElementById('edit_firstname').value = firstname;
-                    document.getElementById('edit_middlename').value = middlename;
-                    document.getElementById('edit_lastname').value = lastname;
-                    document.getElementById('edit_gradelvl').value = gradelvl;
-                    document.getElementById('edit_birthdate').value = birthdate;
-                    document.getElementById('edit_address').value = address;
-                    document.getElementById('edit_contact').value = contact;
-                    document.getElementById('edit_email').value = email;
-                    document.getElementById('edit_guardianfirstname').value = guardianfirstname;
-                    document.getElementById('edit_guardianlastname').value = guardianlastname;
-                    document.getElementById('edit_guardiancontact').value = guardiancontact;
-                    document.getElementById('edit_guardianemail').value = guardianemail;
-                    document.getElementById('edit_tuition').value = tuition;
-                    document.getElementById('edit_status').value = status;
-                    document.getElementById('edit_payment').value = payment;
+            const table = document.getElementById(tableId);
+            if (!table) return;
+
+            const tbody = table.querySelector('tbody');
+            const headers = table.querySelectorAll('thead th');
+            const searchInput = document.getElementById(searchInputId);
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+
+            let collapsed = true; // default collapsed
+            let currentSort = { index: null, dir: 'asc', type: 'text' };
+
+            // Sorting
+            headers.forEach((th, idx) => {
+                th.style.cursor = 'pointer';
+                th.dataset.sortDir = 'none';
+                th.addEventListener('click', () => {
+                    const type = th.dataset.type || 'text';
+                    const dir = (th.dataset.sortDir === 'asc') ? 'desc' : 'asc';
+                    headers.forEach(h => { h.dataset.sortDir = 'none'; h.classList.remove('sorted-asc', 'sorted-desc'); });
+                    th.dataset.sortDir = dir;
+                    th.classList.add(dir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+                    currentSort = { index: idx, dir, type };
+                    applySort();
+                    applyFilterAndSlice();
                 });
-            </script>
-            <script>
-                setTimeout(() => {
-                    let alert = document.querySelector('.alert');
-                    if (alert) {
-                        let bsAlert = new bootstrap.Alert(alert);
-                        bsAlert.close();
-                    }
-                }, 3000); // hides after 3 seconds
-            </script>
+            });
 
+            function compareValues(a, b, type, dir) {
+                const m = dir === 'asc' ? 1 : -1;
+                if (type === 'number') {
+                    const n1 = parseFloat(String(a).replace(/[^0-9.\-]/g, '')) || 0;
+                    const n2 = parseFloat(String(b).replace(/[^0-9.\-]/g, '')) || 0;
+                    return (n1 === n2 ? 0 : (n1 > n2 ? 1 : -1)) * m;
+                }
+                const s1 = String(a).toLowerCase(), s2 = String(b).toLowerCase();
+                return (s1 === s2 ? 0 : (s1 > s2 ? 1 : -1)) * m;
+            }
 
-            <script>
-                // Sidebar toggle
-                const sidebar = document.getElementById('sidebar');
-                const logo = document.getElementById('logo');
-                logo.addEventListener('click', () => {
-                    sidebar.classList.toggle('collapsed');
+            function applySort() {
+                const { index, dir, type } = currentSort;
+                if (index === null) return;
+                rows.sort((a, b) => {
+                    const A = a.children[index]?.innerText.trim() ?? '';
+                    const B = b.children[index]?.innerText.trim() ?? '';
+                    return compareValues(A, B, type, dir);
+                });
+                rows.forEach(r => tbody.appendChild(r));
+            }
+
+            // Search + slice logic
+            function applyFilterAndSlice() {
+                const q = (searchInput ? searchInput.value.trim().toLowerCase() : '');
+                let visibleMatches = 0;
+                let totalMatches = 0;
+
+                rows.forEach((row) => {
+                    const matches = row.innerText.toLowerCase().includes(q);
+                    row.dataset.match = matches ? '1' : '0';
                 });
 
-                // Section switching
-                const links = document.querySelectorAll('.sidebar-link');
-                const sections = document.querySelectorAll('.section');
+                const matchedRows = rows.filter(r => r.dataset.match === '1');
+                totalMatches = matchedRows.length;
 
-                links.forEach(link => {
-                    link.addEventListener('click', (e) => {
-                        e.preventDefault();
-
-                        // Remove active from all
-                        links.forEach(l => l.classList.remove('active'));
-                        link.classList.add('active');
-
-                        // Hide all sections
-                        sections.forEach(sec => sec.classList.add('d-none'));
-
-                        // Show the selected section
-                        const sectionId = link.getAttribute('data-section') + "-section";
-                        document.getElementById(sectionId).classList.remove('d-none');
+                if (!q && collapsed) {
+                    // show only first maxVisible
+                    matchedRows.forEach((row, idx) => {
+                        row.style.display = idx < maxVisible ? '' : 'none';
+                        if (idx < maxVisible) visibleMatches++;
                     });
+                } else {
+                    // show all matches
+                    matchedRows.forEach(row => { row.style.display = ''; });
+                    visibleMatches = matchedRows.length;
+                }
+
+                // hide all non-matching
+                rows.filter(r => r.dataset.match === '0').forEach(r => r.style.display = 'none');
+
+                updateToggle(totalMatches, visibleMatches, q.length > 0);
+            }
+
+            // Toggle button
+            function updateToggle(totalMatches, visibleMatches, isSearching) {
+                if (!toggleWrapId) return;
+                const wrap = document.getElementById(toggleWrapId);
+                if (!wrap) return;
+
+                wrap.innerHTML = '';
+
+                // If searching, or there are <= maxVisible matches, no need to show toggle
+                if (isSearching || totalMatches <= (collapsed ? maxVisible : 0)) return;
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn btn-outline-secondary btn-sm';
+
+                if (collapsed) {
+                    const remaining = Math.max(totalMatches - visibleMatches, 0);
+                    btn.innerHTML = `<i class="bi bi-chevron-down me-1"></i> Show more (${remaining})`;
+                } else {
+                    btn.innerHTML = `<i class="bi bi-chevron-up me-1"></i> Show less`;
+                }
+
+                btn.addEventListener('click', () => {
+                    collapsed = !collapsed;
+                    applyFilterAndSlice();
                 });
 
-                // Auto-open enroll modal if validation errors exist
-                @if (session('modal') == 'enrollModal' || $errors->any())
-                    var enrollModal = new bootstrap.Modal(document.getElementById('enrollModal'));
-                    enrollModal.show();
-                @endif
+                wrap.appendChild(btn);
+            }
 
+            // Hook up search
+            if (searchInput) {
+                searchInput.addEventListener('input', () => {
+                    applyFilterAndSlice();
+                });
+            }
 
+            // Initial render
+            applyFilterAndSlice();
+        }
 
+        /**
+         * Simple show more/less for lists (e.g., announcements)
+         */
+        function attachListShowMore(listId, toggleWrapId, maxVisible = 5) {
+            const ul = document.getElementById(listId);
+            const wrap = document.getElementById(toggleWrapId);
+            if (!ul || !wrap) return;
 
-            </script>
+            const items = Array.from(ul.querySelectorAll('li'));
+            if (items.length <= maxVisible) {
+                wrap.innerHTML = '';
+                return; // nothing to collapse
+            }
 
-</body>
+            let collapsed = true;
 
-</html>
+            function render() {
+                items.forEach((li, idx) => {
+                    li.style.display = (collapsed && idx >= maxVisible) ? 'none' : '';
+                });
+                wrap.innerHTML = '';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn btn-outline-secondary btn-sm';
+                if (collapsed) {
+                    btn.innerHTML = `<i class="bi bi-chevron-down me-1"></i> Show more (${items.length - maxVisible})`;
+                } else {
+                    btn.innerHTML = `<i class="bi bi-chevron-up me-1"></i> Show less`;
+                }
+                btn.addEventListener('click', () => {
+                    collapsed = !collapsed;
+                    render();
+                });
+                wrap.appendChild(btn);
+            }
+
+            render();
+        }
+
+        // ===== Initialize features on DOM ready =====
+        document.addEventListener('DOMContentLoaded', function () {
+            // Tables: search + sort + show more/less
+            attachTableFeatures('scheduleTable', 'scheduleSearch', { maxVisible: 5, toggleId: 'scheduleToggle' });
+            attachTableFeatures('tuitionTable', 'tuitionSearch', { maxVisible: 5, toggleId: 'tuitionToggle' });
+
+            // Announcements list (optional show more/less)
+            attachListShowMore('announcementsList', 'announcementsToggle', 5);
+        });
+    </script>
+@endpush
