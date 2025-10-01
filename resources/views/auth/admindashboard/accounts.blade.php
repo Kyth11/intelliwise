@@ -129,25 +129,23 @@
 
     {{-- SweetAlert2 --}}
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         document.querySelectorAll('.delete-btn').forEach(button => {
             button.addEventListener('click', function () {
                 const form = this.closest('form');
                 Swal.fire({
-                    title: 'Are you sure?',
-                    text: "This announcement will be deleted!",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    cancelButtonColor: '#3085d6',
-                    confirmButtonText: 'Yes, delete it!',
-                    reverseButtons: true,
-                    // Floating style
-                    background: '#fff', // modal background
-                    backdrop: false, // disable dark overlay
-                    allowOutsideClick: true, // optional: allow clicking outside to dismiss
-                    allowEscapeKey: true
+                title: 'Are you sure to delete this account?',
+                text: "You can't undo this action.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, proceed',
+                reverseButtons: true,
+                background: '#fff',
+                backdrop: false,
+                allowOutsideClick: true,
+                allowEscapeKey: true
                 }).then((result) => {
                     if (result.isConfirmed) {
                         form.submit();

@@ -1,11 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <link rel="icon" type="image/png" href="{{ asset('images/intelliwise.png') }}">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    {{-- Apply saved theme ASAP to avoid FOUC --}}
+    <script>
+        (function(){
+            try {
+                var t = localStorage.getItem('theme') || 'light';
+                if (t === 'dark') {
+                    document.documentElement.classList.add('theme-dark');
+                }
+            } catch(e) {}
+        })();
+    </script>
+
     <title>@yield('title', 'IGCA - Admin Dashboard')</title>
+    @stack('styles')
 
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -14,7 +27,7 @@
     <link rel="stylesheet" href="{{ asset('css/dash.css') }}">
 </head>
 
-<body>
+<body class="{{ (session('theme') === 'dark') ? 'theme-dark' : '' }}">
     <div class="dashboard-wrapper">
         <!-- Sidebar -->
         <div class="sidebar" id="sidebar">
@@ -91,6 +104,14 @@
                 localStorage.setItem('sidebar-collapsed', sidebar.classList.contains('collapsed'));
             });
         });
+
+        // Apply saved theme to body as well (head script sets html class)
+        (function(){
+            try {
+                var t = localStorage.getItem('theme') || 'light';
+                document.body.classList.toggle('theme-dark', t === 'dark');
+            } catch(e){}
+        })();
     </script>
 
     <!-- Auto-dismiss Flash Messages -->
@@ -100,7 +121,9 @@
                 let alert = new bootstrap.Alert(alertEl);
                 alert.close();
             });
-        }, 3000); // 3 seconds
+        }, 2000);
     </script>
+
+    @stack('scripts')
 </body>
 </html>

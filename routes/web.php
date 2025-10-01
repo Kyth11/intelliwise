@@ -67,8 +67,17 @@ Route::middleware(['auth'])->group(function () {
         // (Optional) Backward-compatible alias so old Blade calls to route('tuition.destroy') still work:
         Route::delete('/tuition/{id}',  [AdminDashboardController::class, 'destroyTuition'])->name('tuition.destroy');
 
-        // Other
+        // Settings
         Route::get('/settings', [AdminDashboardController::class, 'settings'])->name('admin.settings');
+
+        // Settings actions: Admin accounts
+        Route::post('/settings/admins', [AdminDashboardController::class, 'storeAdmin'])->name('admin.settings.admins.store');
+        Route::delete('/settings/admins/{id}', [AdminDashboardController::class, 'destroyAdmin'])->name('admin.settings.admins.destroy');
+
+        // Settings actions: School Year
+        Route::post('/settings/school-year', [AdminDashboardController::class, 'storeSchoolYear'])->name('admin.settings.schoolyear.store');
+
+        // Accounts overview
         Route::get('/accounts', [AdminDashboardController::class, 'accounts'])->name('admin.accounts');
     });
 

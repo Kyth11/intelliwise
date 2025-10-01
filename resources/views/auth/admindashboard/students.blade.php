@@ -128,18 +128,18 @@
             button.addEventListener('click', function () {
                 const form = this.closest('form');
                 Swal.fire({
-                    title: 'Archive this student?',
-                    text: "You can restore them from backups if you’ve implemented it.",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    cancelButtonColor: '#3085d6',
-                    confirmButtonText: 'Yes, archive',
-                    reverseButtons: true,
-                    background: '#fff',
-                    backdrop: false,
-                    allowOutsideClick: true,
-                    allowEscapeKey: true
+                title: 'Are you sure to delete this student record?',
+                text: "You can't undo this action.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, proceed',
+                reverseButtons: true,
+                background: '#fff',
+                backdrop: false,
+                allowOutsideClick: true,
+                allowEscapeKey: true
                 }).then((result) => {
                     if (result.isConfirmed) form.submit();
                 });
@@ -147,3 +147,4 @@
         });
     </script>
 @endsection
+

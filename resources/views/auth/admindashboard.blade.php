@@ -2,56 +2,32 @@
 
 @section('title', 'Dashboard')
 
+@push('styles')
+    {{-- DataTables + Bootstrap 5 CSS --}}
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+@endpush
+
 @section('content')
-    <!-- Local styles for header + top-right enroll card + table toggles -->
+    <!-- Local styles for header + top-right enroll card -->
     <style>
-        /* Scope to this page only */
         #dashboard-header {
             display: flex;
             align-items: start;
             justify-content: space-between;
             gap: 1rem;
         }
-
-        #dashboard-header .intro {
-            min-width: 0;
-            /* prevents overflow in flex */
-        }
-
-        /* The small action card on the right */
+        #dashboard-header .intro { min-width: 0; }
         #dashboard-header .enroll-card {
-            min-width: 260px;
-            max-width: 320px;
-            border: 1px solid rgba(0, 0, 0, .075);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
+            min-width: 260px; max-width: 320px;
+            border: 1px solid rgba(0,0,0,.075);
+            box-shadow: 0 2px 8px rgba(0,0,0,.06);
         }
-
-        #dashboard-header .enroll-card .btn {
-            width: 100%;
-        }
-
-        /* Toggle area under tables/lists */
-        .table-toggle-wrap,
-        .list-toggle-wrap {
-            text-align: center;
-        }
-
-        /* Responsive: stack on small screens */
+        #dashboard-header .enroll-card .btn { width: 100%; }
+        .table-toggle-wrap, .list-toggle-wrap { text-align: center; }
         @media (max-width: 768px) {
-            #dashboard-header {
-                flex-direction: column;
-            }
-
-            #dashboard-header .enroll-card {
-                width: 100%;
-                max-width: none;
-                order: 2;
-                /* show after intro text on mobile */
-            }
-
-            #dashboard-header .intro {
-                order: 1;
-            }
+            #dashboard-header { flex-direction: column; }
+            #dashboard-header .enroll-card { width: 100%; max-width: none; order: 2; }
+            #dashboard-header .intro { order: 1; }
         }
     </style>
 
@@ -118,11 +94,8 @@
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             <div>
                                 <strong>{{ $a->title ?? 'Untitled' }}</strong>
-                                @if($a->content)
-                                    — {{ $a->content }}
-                                @endif
+                                @if($a->content) — {{ $a->content }} @endif
                                 <br>
-
                                 <small class="text-muted d-block">
                                     @if($a->date_of_event)
                                         <span class="me-3">Event: {{ $a->date_of_event->format('Y-m-d') }}</span>
@@ -130,9 +103,7 @@
                                     @if($a->deadline)
                                         <span class="me-3">Deadline: {{ $a->deadline->format('Y-m-d') }}</span>
                                     @endif
-                                    <span class="me-3">
-                                        For: {{ $a->gradelvl?->grade_level ?? 'All Grade Levels' }}
-                                    </span>
+                                    <span class="me-3">For: {{ $a->gradelvl?->grade_level ?? 'All Grade Levels' }}</span>
                                     <span>Posted: {{ $a->created_at->format('Y-m-d g:i A') }}</span>
                                 </small>
                             </div>
@@ -140,16 +111,18 @@
                             <div class="d-flex gap-2">
                                 <!-- EDIT -->
                                 <button class="btn btn-sm btn-warning" data-bs-toggle="modal"
-                                    data-bs-target="#editAnnouncementModal{{ $a->id }}">
+                                        data-bs-target="#editAnnouncementModal{{ $a->id }}">
                                     <i class="bi bi-pencil-square"></i>
                                 </button>
 
-                                <!-- DELETE (native submit + confirm) -->
-                                <form action="{{ route('announcements.destroy', $a->id) }}" method="POST" class="d-inline"
-                                    onsubmit="return confirm('Delete this announcement?');">
+                                <!-- DELETE (SweetAlert2) -->
+                                <form action="{{ route('announcements.destroy', $a->id) }}"
+                                      method="POST"
+                                      class="d-inline js-confirm-delete"
+                                      data-confirm="Delete this announcement?">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-danger">
+                                    <button type="submit" class="btn btn-sm btn-danger js-delete-btn" aria-label="Delete announcement">
                                         <i class="bi bi-archive"></i>
                                     </button>
                                 </form>
@@ -171,8 +144,7 @@
             <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
                 <h5 class="mb-0">Schedule Notes</h5>
                 <div class="d-flex align-items-center gap-2">
-                    <input type="text" id="scheduleSearch" class="form-control form-control-sm"
-                        placeholder="Search schedule...">
+                    <input type="text" id="scheduleSearch" class="form-control form-control-sm" placeholder="Search schedule...">
                     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addScheduleModal">
                         <i class="bi bi-plus-circle me-1"></i> Add Schedule
                     </button>
@@ -180,18 +152,18 @@
             </div>
 
             <div class="table-responsive">
-                <table class="table table-bordered table-striped searchable-sortable" id="scheduleTable">
+                <table class="table table-bordered table-striped" id="scheduleTable">
                     <thead class="table-light">
                         <tr>
-                            <th data-type="text">Day</th>
-                            <th data-type="text">Time</th>
-                            <th data-type="text">Subject</th>
-                            <th data-type="text">Room</th>
-                            <th data-type="text">Section</th>
-                            <th data-type="text">Grade Level</th>
-                            <th data-type="text">School Year</th>
-                            <th data-type="text">Faculty</th>
-                            <th data-type="text">Action</th>
+                            <th>Day</th>
+                            <th>Time</th>
+                            <th>Subject</th>
+                            <th>Room</th>
+                            <th>Section</th>
+                            <th>Grade Level</th>
+                            <th>School Year</th>
+                            <th>Faculty</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -205,30 +177,29 @@
                                 <td>{{ $schedule->gradelvl->grade_level ?? '-' }}</td>
                                 <td>{{ $schedule->school_year ?? '—' }}</td>
                                 <td>{{ $schedule->faculty->user->name ?? '—' }}</td>
-                                <td>
+                                <td class="text-nowrap">
                                     <button class="btn btn-sm btn-warning" data-bs-toggle="modal"
-                                        data-bs-target="#editScheduleModal{{ $schedule->id }}">
+                                            data-bs-target="#editScheduleModal{{ $schedule->id }}">
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
-                                    <form action="{{ route('schedules.destroy', $schedule->id) }}" method="POST" class="d-inline"
-                                        onsubmit="return confirm('Delete this schedule record?');">
+                                    <form action="{{ route('schedules.destroy', $schedule->id) }}"
+                                          method="POST"
+                                          class="d-inline js-confirm-delete"
+                                          data-confirm="Delete this schedule record?">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-danger">
+                                        <button type="submit" class="btn btn-sm btn-danger js-delete-btn" aria-label="Delete schedule">
                                             <i class="bi bi-archive"></i>
                                         </button>
                                     </form>
                                 </td>
                             </tr>
                         @empty
-                            <tr>
-                                <td colspan="9" class="text-center">No schedules available.</td>
-                            </tr>
+                            <tr><td colspan="9" class="text-center">No schedules available.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
-            <div id="scheduleToggle" class="table-toggle-wrap mt-2"></div>
         </div>
 
         <!-- Tuition Details Section -->
@@ -236,8 +207,7 @@
             <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
                 <h5 class="mb-0">Tuition & Fees</h5>
                 <div class="d-flex align-items-center gap-2">
-                    <input type="text" id="tuitionSearch" class="form-control form-control-sm"
-                        placeholder="Search tuition...">
+                    <input type="text" id="tuitionSearch" class="form-control form-control-sm" placeholder="Search tuition...">
                     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addTuitionModal">
                         <i class="bi bi-plus-circle me-1"></i> Add Tuition
                     </button>
@@ -248,19 +218,19 @@
                 <p class="text-muted">No tuition fees set yet.</p>
             @else
                 <div class="table-responsive">
-                    <table class="table table-bordered table-striped searchable-sortable" id="tuitionTable">
+                    <table class="table table-bordered table-striped" id="tuitionTable">
                         <thead class="table-light">
                             <tr>
-                                <th data-type="text">Grade Level</th>
-                                <th data-type="number">Monthly (₱)</th>
-                                <th data-type="number">Yearly (₱)</th>
-                                <th data-type="number">Misc (₱)</th>
-                                <th data-type="text">Optional Desc</th>
-                                <th data-type="number">Optional (₱)</th>
-                                <th data-type="number">Total (₱)</th>
-                                <th data-type="text">School Year</th>
-                                <th data-type="text">Updated</th>
-                                <th data-type="text">Actions</th>
+                                <th>Grade Level</th>
+                                <th>Monthly (₱)</th>
+                                <th>Yearly (₱)</th>
+                                <th>Misc (₱)</th>
+                                <th>Optional Desc</th>
+                                <th>Optional (₱)</th>
+                                <th>Total (₱)</th>
+                                <th>School Year</th>
+                                <th>Updated</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -269,30 +239,25 @@
                                     <td>{{ $t->grade_level }}</td>
                                     <td>{{ number_format((float) $t->monthly_fee, 2) }}</td>
                                     <td>{{ number_format((float) $t->yearly_fee, 2) }}</td>
-                                    <td>
-                                        @if(is_null($t->misc_fee)) — @else {{ number_format((float) $t->misc_fee, 2) }} @endif
-                                    </td>
+                                    <td>@if(is_null($t->misc_fee)) — @else {{ number_format((float) $t->misc_fee, 2) }} @endif</td>
                                     <td>{{ $t->optional_fee_desc ?? '—' }}</td>
-                                    <td>
-                                        @if(is_null($t->optional_fee_amount)) — @else
-                                        {{ number_format((float) $t->optional_fee_amount, 2) }} @endif
-                                    </td>
+                                    <td>@if(is_null($t->optional_fee_amount)) — @else {{ number_format((float) $t->optional_fee_amount, 2) }} @endif</td>
                                     <td>{{ number_format((float) $t->total_yearly, 2) }}</td>
                                     <td>{{ $t->school_year ?? '—' }}</td>
                                     <td>{{ $t->updated_at?->format('Y-m-d') ?? '—' }}</td>
-
                                     <td class="text-nowrap">
                                         <button class="btn btn-sm btn-warning" data-bs-toggle="modal"
-                                            data-bs-target="#editTuitionModal{{ $t->id }}">
+                                                data-bs-target="#editTuitionModal{{ $t->id }}">
                                             <i class="bi bi-pencil-square"></i>
                                         </button>
 
-                                        <!-- DELETE (native submit + confirm) -->
-                                        <form action="{{ route('tuitions.destroy', $t->id) }}" method="POST" class="d-inline"
-                                            onsubmit="return confirm('Delete this tuition record?');">
+                                        <form action="{{ route('tuitions.destroy', $t->id) }}"
+                                              method="POST"
+                                              class="d-inline js-confirm-delete"
+                                              data-confirm="Delete this tuition record?">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-danger">
+                                            <button type="submit" class="btn btn-sm btn-danger js-delete-btn" aria-label="Delete tuition">
                                                 <i class="bi bi-archive"></i>
                                             </button>
                                         </form>
@@ -305,7 +270,6 @@
                         </tbody>
                     </table>
                 </div>
-                <div id="tuitionToggle" class="table-toggle-wrap mt-2"></div>
             @endif
         </div>
     </div>
@@ -325,24 +289,28 @@
     @include('auth.admindashboard.partials.enroll-student-modal')
     @include('auth.admindashboard.partials.add-announcement-modal')
     @include('auth.admindashboard.partials.add-schedule-modal')
-    @include('auth.admindashboard.partials.add-tuition-modal') {{-- ensure this uses route("tuitions.store") --}}
+    @include('auth.admindashboard.partials.add-tuition-modal')
 @endsection
 
 @push('scripts')
+    {{-- jQuery + DataTables + Bootstrap 5 adapter --}}
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
-{{-- SweetAlert2 for delete confirmations (optional)
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-    // Single, unified delete confirm to match your global design
-    document.querySelectorAll('.delete-btn').forEach(button => {
-        button.addEventListener('click', function () {
-            const form = this.closest('form.delete-form');
-            if (!form) return;
+    {{-- SweetAlert2 --}}
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-            const message = this.dataset.confirm || 'Are you sure you want to delete this item?';
+    <script>
+    // -----------------------------
+    // SweetAlert2 delete (reliable)
+    // -----------------------------
+    (function () {
+        function confirmDelete(form, msg, btn) {
+            if (!window.Swal) { form.submit(); return; }
             Swal.fire({
-                title: 'Are you sure?',
-                text: message,
+                title: 'Are you sure to delete this record?',
+                text: "You can't undo this action.",
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#d33',
@@ -353,190 +321,93 @@
                 backdrop: false,
                 allowOutsideClick: true,
                 allowEscapeKey: true
-            }).then((result) => {
-                if (result.isConfirmed) form.submit();
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    if (btn) btn.disabled = true;
+                    form.submit();
+                }
             });
+        }
+
+        // Primary: clicking the red delete buttons
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('.js-delete-btn');
+            if (!btn) return;
+            const form = btn.closest('form.js-confirm-delete');
+            if (!form) return;
+            e.preventDefault();
+            confirmDelete(form, form.dataset.confirm, btn);
         });
+
+        // Fallback: hitting Enter inside the form
+        document.addEventListener('submit', function (e) {
+            const form = e.target.closest('form.js-confirm-delete');
+            if (!form) return;
+            // prevent default unless we came from confirmed path
+            e.preventDefault();
+            const btn = form.querySelector('.js-delete-btn') || form.querySelector('[type="submit"]');
+            confirmDelete(form, form.dataset.confirm, btn);
+        }, true);
+    })();
+    </script>
+
+    <script>
+    // -----------------------------------
+    // DataTables for #scheduleTable & #tuitionTable
+    // - Uses external inputs for search
+    // - Shows 5 rows/page by default (like your maxVisible)
+    // -----------------------------------
+    $(function () {
+        const scheduleDT = $('#scheduleTable').DataTable({
+            dom: 'lrtip',           // hide built-in search box; keep length, table, info, pagination
+            pageLength: 5,
+            lengthMenu: [[5,10,25,50,-1], [5,10,25,50,'All']],
+            order: [],              // keep your original order
+            columnDefs: [
+                { targets: -1, orderable: false } // actions column unsortable
+            ]
+        });
+        $('#scheduleSearch').on('input', function(){ scheduleDT.search(this.value).draw(); });
+
+        const tuitionDT = $('#tuitionTable').DataTable({
+            dom: 'lrtip',
+            pageLength: 5,
+            lengthMenu: [[5,10,25,50,-1], [5,10,25,50,'All']],
+            order: [],
+            columnDefs: [
+                { targets: -1, orderable: false } // actions column unsortable
+            ]
+        });
+        $('#tuitionSearch').on('input', function(){ tuitionDT.search(this.value).draw(); });
     });
-</script> --}}
+    </script>
 
+    <script>
+    // -----------------------------------
+    // Show more/less for Announcements UL
+    // -----------------------------------
+    (function attachListShowMore(listId, toggleWrapId, maxVisible = 10) {
+        const ul = document.getElementById(listId);
+        const wrap = document.getElementById(toggleWrapId);
+        if (!ul || !wrap) return;
 
-<!-- Optional: Bootstrap JS and dependencies (Popper) -->
-<script>
+        const items = Array.from(ul.querySelectorAll('li'));
+        if (items.length <= maxVisible) { wrap.innerHTML = ''; return; }
 
-        function attachTableFeatures(tableId, searchInputId, opts = {}) {
-            const maxVisible = opts.maxVisible ?? 5;
-            const toggleWrapId = opts.toggleId || null;
-
-            const table = document.getElementById(tableId);
-            if (!table) return;
-
-            const tbody = table.querySelector('tbody');
-            const headers = table.querySelectorAll('thead th');
-            const searchInput = document.getElementById(searchInputId);
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-
-            let collapsed = true; // default collapsed
-            let currentSort = { index: null, dir: 'asc', type: 'text' };
-
-            // Sorting
-            headers.forEach((th, idx) => {
-                th.style.cursor = 'pointer';
-                th.dataset.sortDir = 'none';
-                th.addEventListener('click', () => {
-                    const type = th.dataset.type || 'text';
-                    const dir = (th.dataset.sortDir === 'asc') ? 'desc' : 'asc';
-                    headers.forEach(h => { h.dataset.sortDir = 'none'; h.classList.remove('sorted-asc', 'sorted-desc'); });
-                    th.dataset.sortDir = dir;
-                    th.classList.add(dir === 'asc' ? 'sorted-asc' : 'sorted-desc');
-                    currentSort = { index: idx, dir, type };
-                    applySort();
-                    applyFilterAndSlice();
-                });
-            });
-
-            function compareValues(a, b, type, dir) {
-                const m = dir === 'asc' ? 1 : -1;
-                if (type === 'number') {
-                    const n1 = parseFloat(String(a).replace(/[^0-9.\-]/g, '')) || 0;
-                    const n2 = parseFloat(String(b).replace(/[^0-9.\-]/g, '')) || 0;
-                    return (n1 === n2 ? 0 : (n1 > n2 ? 1 : -1)) * m;
-                }
-                const s1 = String(a).toLowerCase(), s2 = String(b).toLowerCase();
-                return (s1 === s2 ? 0 : (s1 > s2 ? 1 : -1)) * m;
-            }
-
-            function applySort() {
-                const { index, dir, type } = currentSort;
-                if (index === null) return;
-                rows.sort((a, b) => {
-                    const A = a.children[index]?.innerText.trim() ?? '';
-                    const B = b.children[index]?.innerText.trim() ?? '';
-                    return compareValues(A, B, type, dir);
-                });
-                rows.forEach(r => tbody.appendChild(r));
-            }
-
-            // Search + slice logic
-            function applyFilterAndSlice() {
-                const q = (searchInput ? searchInput.value.trim().toLowerCase() : '');
-                let visibleMatches = 0;
-                let totalMatches = 0;
-
-                rows.forEach((row) => {
-                    const matches = row.innerText.toLowerCase().includes(q);
-                    row.dataset.match = matches ? '1' : '0';
-                });
-
-                const matchedRows = rows.filter(r => r.dataset.match === '1');
-                totalMatches = matchedRows.length;
-
-                if (!q && collapsed) {
-                    // show only first maxVisible
-                    matchedRows.forEach((row, idx) => {
-                        row.style.display = idx < maxVisible ? '' : 'none';
-                        if (idx < maxVisible) visibleMatches++;
-                    });
-                } else {
-                    // show all matches
-                    matchedRows.forEach(row => { row.style.display = ''; });
-                    visibleMatches = matchedRows.length;
-                }
-
-                // hide all non-matching
-                rows.filter(r => r.dataset.match === '0').forEach(r => r.style.display = 'none');
-
-                updateToggle(totalMatches, visibleMatches, q.length > 0);
-            }
-
-            // Toggle button
-            function updateToggle(totalMatches, visibleMatches, isSearching) {
-                if (!toggleWrapId) return;
-                const wrap = document.getElementById(toggleWrapId);
-                if (!wrap) return;
-
-                wrap.innerHTML = '';
-
-                // If searching, or there are <= maxVisible matches, no need to show toggle
-                if (isSearching || totalMatches <= (collapsed ? maxVisible : 0)) return;
-
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'btn btn-outline-secondary btn-sm';
-
-                if (collapsed) {
-                    const remaining = Math.max(totalMatches - visibleMatches, 0);
-                    btn.innerHTML = `<i class="bi bi-chevron-down me-1"></i> Show more (${remaining})`;
-                } else {
-                    btn.innerHTML = `<i class="bi bi-chevron-up me-1"></i> Show less`;
-                }
-
-                btn.addEventListener('click', () => {
-                    collapsed = !collapsed;
-                    applyFilterAndSlice();
-                });
-
-                wrap.appendChild(btn);
-            }
-
-            // Hook up search
-            if (searchInput) {
-                searchInput.addEventListener('input', () => {
-                    applyFilterAndSlice();
-                });
-            }
-
-            // Initial render
-            applyFilterAndSlice();
+        let collapsed = true;
+        function render() {
+            items.forEach((li, idx) => { li.style.display = (collapsed && idx >= maxVisible) ? 'none' : ''; });
+            wrap.innerHTML = '';
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-outline-secondary btn-sm';
+            btn.innerHTML = collapsed
+                ? `<i class="bi bi-chevron-down me-1"></i> Show more (${items.length - maxVisible})`
+                : `<i class="bi bi-chevron-up me-1"></i> Show less`;
+            btn.addEventListener('click', () => { collapsed = !collapsed; render(); });
+            wrap.appendChild(btn);
         }
-
-        /**
-         * Simple show more/less for lists (e.g., announcements)
-         */
-        function attachListShowMore(listId, toggleWrapId, maxVisible = 5) {
-            const ul = document.getElementById(listId);
-            const wrap = document.getElementById(toggleWrapId);
-            if (!ul || !wrap) return;
-
-            const items = Array.from(ul.querySelectorAll('li'));
-            if (items.length <= maxVisible) {
-                wrap.innerHTML = '';
-                return; // nothing to collapse
-            }
-
-            let collapsed = true;
-
-            function render() {
-                items.forEach((li, idx) => {
-                    li.style.display = (collapsed && idx >= maxVisible) ? 'none' : '';
-                });
-                wrap.innerHTML = '';
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'btn btn-outline-secondary btn-sm';
-                if (collapsed) {
-                    btn.innerHTML = `<i class="bi bi-chevron-down me-1"></i> Show more (${items.length - maxVisible})`;
-                } else {
-                    btn.innerHTML = `<i class="bi bi-chevron-up me-1"></i> Show less`;
-                }
-                btn.addEventListener('click', () => {
-                    collapsed = !collapsed;
-                    render();
-                });
-                wrap.appendChild(btn);
-            }
-
-            render();
-        }
-
-        // ===== Initialize features on DOM ready =====
-        document.addEventListener('DOMContentLoaded', function () {
-            // Tables: search + sort + show more/less
-            attachTableFeatures('scheduleTable', 'scheduleSearch', { maxVisible: 5, toggleId: 'scheduleToggle' });
-            attachTableFeatures('tuitionTable', 'tuitionSearch', { maxVisible: 5, toggleId: 'tuitionToggle' });
-
-            // Announcements list (optional show more/less)
-            attachListShowMore('announcementsList', 'announcementsToggle', 5);
-        });
+        render();
+    })('announcementsList','announcementsToggle', 10);
     </script>
 @endpush
