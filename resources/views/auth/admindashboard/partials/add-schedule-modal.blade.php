@@ -61,30 +61,6 @@
                     </div>
 
                     <div class="col-md-4">
-                        <label class="form-label">Room</label>
-                        <select name="room_id" class="form-select" required>
-                            <option value="" class="dropdownheader">-- Select Room --</option>
-                            @foreach($rooms as $room)
-                                <option value="{{ $room->id }}" {{ old('room_id') == $room->id ? 'selected' : '' }}>
-                                    {{ $room->room_number }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="col-md-4">
-                        <label class="form-label">Section</label>
-                        <select name="section_id" class="form-select">
-                            <option value="" class="dropdownheader">-- Select Section --</option>
-                            @foreach($sections as $section)
-                                <option value="{{ $section->id }}" {{ old('section_id') == $section->id ? 'selected' : '' }}>
-                                    {{ $section->section_name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="col-md-4">
                         <label class="form-label">Grade Level</label>
                         <select name="gradelvl_id" class="form-select">
                             <option value="" class="dropdownheader">Select Grade Level</option>

@@ -23,7 +23,8 @@
             box-shadow: 0 2px 8px rgba(0,0,0,.06);
         }
         #dashboard-header .enroll-card .btn { width: 100%; }
-        .table-toggle-wrap, .list-toggle-wrap { text-align: center; }
+        .list-toggle-wrap { text-align: center; }
+
         @media (max-width: 768px) {
             #dashboard-header { flex-direction: column; }
             #dashboard-header .enroll-card { width: 100%; max-width: none; order: 2; }
@@ -43,8 +44,12 @@
             <div class="card enroll-card p-3 text-center">
                 <h6 class="mb-1">Enroll a Student</h6>
                 <p class="text-muted mb-3">Add a new student to the system.</p>
-                <a href="#" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#enrollModal">
+                {{-- Link to printable enrollment page --}}
+                <a href="{{ route('students.create') }}" class="btn btn-primary">
                     <i class="bi bi-person-plus me-2"></i> Enroll Now
+                </a>
+                <a href="{{ route('admin.finances') }}" class="btn btn-outline-secondary mt-2">
+                    <i class="bi bi-cash-coin me-2"></i> Go to Finances
                 </a>
             </div>
         </div>
@@ -103,7 +108,11 @@
                                     @if($a->deadline)
                                         <span class="me-3">Deadline: {{ $a->deadline->format('Y-m-d') }}</span>
                                     @endif
-                                    <span class="me-3">For: {{ $a->gradelvl?->grade_level ?? 'All Grade Levels' }}</span>
+                                    <span class="me-3">
+                                        For:
+                                        @php $names = $a->gradelvls->pluck('grade_level')->filter()->values(); @endphp
+                                        {{ $names->isNotEmpty() ? $names->implode(', ') : 'All Grade Levels' }}
+                                    </span>
                                     <span>Posted: {{ $a->created_at->format('Y-m-d g:i A') }}</span>
                                 </small>
                             </div>
@@ -111,15 +120,13 @@
                             <div class="d-flex gap-2">
                                 <!-- EDIT -->
                                 <button class="btn btn-sm btn-warning" data-bs-toggle="modal"
-                                        data-bs-target="#editAnnouncementModal{{ $a->id }}">
+                                    data-bs-target="#editAnnouncementModal{{ $a->id }}">
                                     <i class="bi bi-pencil-square"></i>
                                 </button>
 
                                 <!-- DELETE (SweetAlert2) -->
-                                <form action="{{ route('announcements.destroy', $a->id) }}"
-                                      method="POST"
-                                      class="d-inline js-confirm-delete"
-                                      data-confirm="Delete this announcement?">
+                                <form action="{{ route('announcements.destroy', $a->id) }}" method="POST"
+                                    class="d-inline js-confirm-delete" data-confirm="Delete this announcement?">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-danger js-delete-btn" aria-label="Delete announcement">
@@ -158,8 +165,6 @@
                             <th>Day</th>
                             <th>Time</th>
                             <th>Subject</th>
-                            <th>Room</th>
-                            <th>Section</th>
                             <th>Grade Level</th>
                             <th>School Year</th>
                             <th>Faculty</th>
@@ -167,110 +172,35 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($schedules as $schedule)
-                            <tr>
-                                <td><span class="badge bg-light text-dark border">{{ $schedule->day }}</span></td>
-                                <td>{{ $schedule->class_start }} - {{ $schedule->class_end }}</td>
-                                <td>{{ $schedule->subject->subject_name ?? '-' }}</td>
-                                <td>{{ $schedule->room->room_number ?? '-' }}</td>
-                                <td>{{ $schedule->section->section_name ?? '-' }}</td>
-                                <td>{{ $schedule->gradelvl->grade_level ?? '-' }}</td>
-                                <td>{{ $schedule->school_year ?? '—' }}</td>
-                                <td>{{ $schedule->faculty->user->name ?? '—' }}</td>
-                                <td class="text-nowrap">
-                                    <button class="btn btn-sm btn-warning" data-bs-toggle="modal"
-                                            data-bs-target="#editScheduleModal{{ $schedule->id }}">
-                                        <i class="bi bi-pencil-square"></i>
-                                    </button>
-                                    <form action="{{ route('schedules.destroy', $schedule->id) }}"
-                                          method="POST"
-                                          class="d-inline js-confirm-delete"
-                                          data-confirm="Delete this schedule record?">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-danger js-delete-btn" aria-label="Delete schedule">
-                                            <i class="bi bi-archive"></i>
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="9" class="text-center">No schedules available.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Tuition Details Section -->
-        <div class="card mt-4 p-4" id="tuition-section">
-            <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
-                <h5 class="mb-0">Tuition & Fees</h5>
-                <div class="d-flex align-items-center gap-2">
-                    <input type="text" id="tuitionSearch" class="form-control form-control-sm" placeholder="Search tuition...">
-                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addTuitionModal">
-                        <i class="bi bi-plus-circle me-1"></i> Add Tuition
-                    </button>
-                </div>
-            </div>
-
-            @if($tuitions->isEmpty())
-                <p class="text-muted">No tuition fees set yet.</p>
-            @else
-                <div class="table-responsive">
-                    <table class="table table-bordered table-striped" id="tuitionTable">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Grade Level</th>
-                                <th>Monthly (₱)</th>
-                                <th>Yearly (₱)</th>
-                                <th>Misc (₱)</th>
-                                <th>Optional Desc</th>
-                                <th>Optional (₱)</th>
-                                <th>Total (₱)</th>
-                                <th>School Year</th>
-                                <th>Updated</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($tuitions as $t)
+                        @if($schedules->isNotEmpty())
+                            @foreach($schedules as $schedule)
                                 <tr>
-                                    <td>{{ $t->grade_level }}</td>
-                                    <td>{{ number_format((float) $t->monthly_fee, 2) }}</td>
-                                    <td>{{ number_format((float) $t->yearly_fee, 2) }}</td>
-                                    <td>@if(is_null($t->misc_fee)) — @else {{ number_format((float) $t->misc_fee, 2) }} @endif</td>
-                                    <td>{{ $t->optional_fee_desc ?? '—' }}</td>
-                                    <td>@if(is_null($t->optional_fee_amount)) — @else {{ number_format((float) $t->optional_fee_amount, 2) }} @endif</td>
-                                    <td>{{ number_format((float) $t->total_yearly, 2) }}</td>
-                                    <td>{{ $t->school_year ?? '—' }}</td>
-                                    <td>{{ $t->updated_at?->format('Y-m-d') ?? '—' }}</td>
+                                    <td><span class="badge bg-light text-dark border">{{ $schedule->day }}</span></td>
+                                    <td>{{ $schedule->class_start }} - {{ $schedule->class_end }}</td>
+                                    <td>{{ $schedule->subject->subject_name ?? '-' }}</td>
+                                    <td>{{ $schedule->gradelvl->grade_level ?? '-' }}</td>
+                                    <td>{{ $schedule->school_year ?? '—' }}</td>
+                                    <td>{{ $schedule->faculty->user->name ?? '—' }}</td>
                                     <td class="text-nowrap">
                                         <button class="btn btn-sm btn-warning" data-bs-toggle="modal"
-                                                data-bs-target="#editTuitionModal{{ $t->id }}">
+                                            data-bs-target="#editScheduleModal{{ $schedule->id }}">
                                             <i class="bi bi-pencil-square"></i>
                                         </button>
-
-                                        <form action="{{ route('tuitions.destroy', $t->id) }}"
-                                              method="POST"
-                                              class="d-inline js-confirm-delete"
-                                              data-confirm="Delete this tuition record?">
+                                        <form action="{{ route('schedules.destroy', $schedule->id) }}" method="POST"
+                                            class="d-inline js-confirm-delete" data-confirm="Delete this schedule record?">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-danger js-delete-btn" aria-label="Delete tuition">
+                                            <button type="submit" class="btn btn-sm btn-danger js-delete-btn" aria-label="Delete schedule">
                                                 <i class="bi bi-archive"></i>
                                             </button>
                                         </form>
                                     </td>
                                 </tr>
-
-                                {{-- Include per-row edit modal so $t exists inside --}}
-                                @include('auth.admindashboard.partials.edit-tuition-modal', ['t' => $t, 'schoolyrs' => $schoolyrs])
                             @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
+                        @endif
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -286,15 +216,14 @@
     @endforeach
 
     {{-- Include Modals --}}
-    @include('auth.admindashboard.partials.enroll-student-modal')
     @include('auth.admindashboard.partials.add-announcement-modal')
     @include('auth.admindashboard.partials.add-schedule-modal')
-    @include('auth.admindashboard.partials.add-tuition-modal')
 @endsection
 
 @push('scripts')
     {{-- jQuery + DataTables + Bootstrap 5 adapter --}}
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"
+        integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
@@ -302,112 +231,87 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
-    // -----------------------------
-    // SweetAlert2 delete (reliable)
-    // -----------------------------
-    (function () {
-        function confirmDelete(form, msg, btn) {
-            if (!window.Swal) { form.submit(); return; }
-            Swal.fire({
-                title: 'Are you sure to delete this record?',
-                text: "You can't undo this action.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Yes, proceed',
-                reverseButtons: true,
-                background: '#fff',
-                backdrop: false,
-                allowOutsideClick: true,
-                allowEscapeKey: true
-            }).then((res) => {
-                if (res.isConfirmed) {
-                    if (btn) btn.disabled = true;
-                    form.submit();
-                }
+        // SweetAlert2 delete
+        (function () {
+            function confirmDelete(form, msg, btn) {
+                if (!window.Swal) { form.submit(); return; }
+                Swal.fire({
+                    title: 'Are you sure to delete this record?',
+                    text: "You can't undo this action.",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Yes, proceed',
+                    reverseButtons: true,
+                    background: '#fff',
+                    backdrop: false,
+                    allowOutsideClick: true,
+                    allowEscapeKey: true
+                }).then((res) => {
+                    if (res.isConfirmed) {
+                        if (btn) btn.disabled = true;
+                        form.submit();
+                    }
+                });
+            }
+            document.addEventListener('click', function (e) {
+                const btn = e.target.closest('.js-delete-btn');
+                if (!btn) return;
+                const form = btn.closest('form.js-confirm-delete');
+                if (!form) return;
+                e.preventDefault();
+                confirmDelete(form, form.dataset.confirm, btn);
             });
-        }
-
-        // Primary: clicking the red delete buttons
-        document.addEventListener('click', function (e) {
-            const btn = e.target.closest('.js-delete-btn');
-            if (!btn) return;
-            const form = btn.closest('form.js-confirm-delete');
-            if (!form) return;
-            e.preventDefault();
-            confirmDelete(form, form.dataset.confirm, btn);
-        });
-
-        // Fallback: hitting Enter inside the form
-        document.addEventListener('submit', function (e) {
-            const form = e.target.closest('form.js-confirm-delete');
-            if (!form) return;
-            // prevent default unless we came from confirmed path
-            e.preventDefault();
-            const btn = form.querySelector('.js-delete-btn') || form.querySelector('[type="submit"]');
-            confirmDelete(form, form.dataset.confirm, btn);
-        }, true);
-    })();
+            document.addEventListener('submit', function (e) {
+                const form = e.target.closest('form.js-confirm-delete');
+                if (!form) return;
+                e.preventDefault();
+                const btn = form.querySelector('.js-delete-btn') || form.querySelector('[type="submit"]');
+                confirmDelete(form, form.dataset.confirm, btn);
+            }, true);
+        })();
     </script>
 
     <script>
-    // -----------------------------------
-    // DataTables for #scheduleTable & #tuitionTable
-    // - Uses external inputs for search
-    // - Shows 5 rows/page by default (like your maxVisible)
-    // -----------------------------------
-    $(function () {
-        const scheduleDT = $('#scheduleTable').DataTable({
-            dom: 'lrtip',           // hide built-in search box; keep length, table, info, pagination
-            pageLength: 5,
-            lengthMenu: [[5,10,25,50,-1], [5,10,25,50,'All']],
-            order: [],              // keep your original order
-            columnDefs: [
-                { targets: -1, orderable: false } // actions column unsortable
-            ]
+        // DataTables for #scheduleTable only (Tuition/Fees moved to Finances page)
+        $(function () {
+            const scheduleDT = $('#scheduleTable').DataTable({
+                dom: 'lrtip',
+                pageLength: 5,
+                lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, 'All']],
+                order: [],
+                language: { emptyTable: "No schedules available." },
+                columnDefs: [{ targets: -1, orderable: false }]
+            });
+            $('#scheduleSearch').on('input', function () { scheduleDT.search(this.value).draw(); });
         });
-        $('#scheduleSearch').on('input', function(){ scheduleDT.search(this.value).draw(); });
-
-        const tuitionDT = $('#tuitionTable').DataTable({
-            dom: 'lrtip',
-            pageLength: 5,
-            lengthMenu: [[5,10,25,50,-1], [5,10,25,50,'All']],
-            order: [],
-            columnDefs: [
-                { targets: -1, orderable: false } // actions column unsortable
-            ]
-        });
-        $('#tuitionSearch').on('input', function(){ tuitionDT.search(this.value).draw(); });
-    });
     </script>
 
     <script>
-    // -----------------------------------
-    // Show more/less for Announcements UL
-    // -----------------------------------
-    (function attachListShowMore(listId, toggleWrapId, maxVisible = 10) {
-        const ul = document.getElementById(listId);
-        const wrap = document.getElementById(toggleWrapId);
-        if (!ul || !wrap) return;
+        // Show more/less for Announcements UL
+        (function attachListShowMore(listId, toggleWrapId, maxVisible = 10) {
+            const ul = document.getElementById(listId);
+            const wrap = document.getElementById(toggleWrapId);
+            if (!ul || !wrap) return;
 
-        const items = Array.from(ul.querySelectorAll('li'));
-        if (items.length <= maxVisible) { wrap.innerHTML = ''; return; }
+            const items = Array.from(ul.querySelectorAll('li'));
+            if (items.length <= maxVisible) { wrap.innerHTML = ''; return; }
 
-        let collapsed = true;
-        function render() {
-            items.forEach((li, idx) => { li.style.display = (collapsed && idx >= maxVisible) ? 'none' : ''; });
-            wrap.innerHTML = '';
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'btn btn-outline-secondary btn-sm';
-            btn.innerHTML = collapsed
-                ? `<i class="bi bi-chevron-down me-1"></i> Show more (${items.length - maxVisible})`
-                : `<i class="bi bi-chevron-up me-1"></i> Show less`;
-            btn.addEventListener('click', () => { collapsed = !collapsed; render(); });
-            wrap.appendChild(btn);
-        }
-        render();
-    })('announcementsList','announcementsToggle', 10);
+            let collapsed = true;
+            function render() {
+                items.forEach((li, idx) => { li.style.display = (collapsed && idx >= maxVisible) ? 'none' : ''; });
+                wrap.innerHTML = '';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn btn-outline-secondary btn-sm';
+                btn.innerHTML = collapsed
+                    ? `<i class="bi bi-chevron-down me-1"></i> Show more (${items.length - maxVisible})`
+                    : `<i class="bi bi-chevron-up me-1"></i> Show less`;
+                btn.addEventListener('click', () => { collapsed = !collapsed; render(); });
+                wrap.appendChild(btn);
+            }
+            render();
+        })('announcementsList', 'announcementsToggle', 10);
     </script>
 @endpush

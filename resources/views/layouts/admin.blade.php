@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <link rel="icon" type="image/png" href="{{ asset('images/intelliwise.png') }}">
     <meta charset="UTF-8">
@@ -7,13 +8,13 @@
 
     {{-- Apply saved theme ASAP to avoid FOUC --}}
     <script>
-        (function(){
+        (function () {
             try {
                 var t = localStorage.getItem('theme') || 'light';
                 if (t === 'dark') {
                     document.documentElement.classList.add('theme-dark');
                 }
-            } catch(e) {}
+            } catch (e) { }
         })();
     </script>
 
@@ -51,7 +52,18 @@
 
             <a href="{{ route('admin.faculties') }}"
                class="sidebar-link {{ request()->routeIs('admin.faculties') ? 'active' : '' }}">
-                <i class="bi bi-person-badge"></i><span> Faculty</span>
+                <i class="bi bi-person-workspace"></i></i><span> Schedule </span>
+            </a>
+
+            <a href="{{ route('admin.grades') }}"
+               class="sidebar-link {{ request()->routeIs('admin.grades') ? 'active' : '' }}">
+                <i class="bi bi-journal-check"></i><span> Grades</span>
+            </a>
+
+            {{-- NEW: Finances --}}
+            <a href="{{ route('admin.finances') }}"
+               class="sidebar-link {{ request()->routeIs('admin.finances') ? 'active' : '' }}">
+                <i class="bi bi-cash-coin"></i><span> Finances</span>
             </a>
 
             <a href="{{ route('admin.settings') }}"
@@ -70,7 +82,8 @@
             <div class="flash-messages position-fixed top-5 start-50 translate-middle-x mt-3" style="z-index: 1050;">
                 @foreach (['success', 'error'] as $msg)
                     @if(session($msg))
-                        <div class="alert alert-{{ $msg == 'success' ? 'success' : 'danger' }} alert-dismissible fade show" role="alert">
+                        <div class="alert alert-{{ $msg == 'success' ? 'success' : 'danger' }} alert-dismissible fade show"
+                             role="alert">
                             {{ session($msg) }}
                             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
@@ -106,11 +119,11 @@
         });
 
         // Apply saved theme to body as well (head script sets html class)
-        (function(){
+        (function () {
             try {
                 var t = localStorage.getItem('theme') || 'light';
                 document.body.classList.toggle('theme-dark', t === 'dark');
-            } catch(e){}
+            } catch (e) { }
         })();
     </script>
 

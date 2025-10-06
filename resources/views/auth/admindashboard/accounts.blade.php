@@ -69,60 +69,97 @@
             </table>
         </div>
 
-        {{-- Guardian Accounts --}}
-        <div class="card mt-4 p-3">
-            <h5>Guardian Accounts</h5>
-            <table class="table table-bordered table-striped align-middle">
-                <thead class="table-success">
-                    <tr>
-                        <th>Full Name</th>
-                        <th>Contact</th>
-                        <th>Address</th>
-                        <th>Email</th>
-                        <th>Username</th>
+     {{-- Guardian Accounts --}}
+<div class="card mt-4 p-3">
+    <h5>Guardian Accounts</h5>
+    <table class="table table-bordered table-striped align-middle">
+        <thead class="table-success">
+            <tr>
+                <th>Parents / Guardian</th>
+                <th>Contact</th>
+                <th>Address</th>
+                <th>Email</th>
+                <th>Username</th>
+                <th>Created At</th>
+                <th>Tools</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse($guardians as $g)
+                @php
+                    // Build label exactly like the enroll form intent
+                    $motherFull = trim(collect([$g->m_firstname, $g->m_middlename, $g->m_lastname])->filter()->implode(' '));
+                    $fatherFull = trim(collect([$g->f_firstname, $g->f_middlename, $g->f_lastname])->filter()->implode(' '));
 
-                        <th>Created At</th>
-                        <th>Tools</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($guardians as $g)
-                        <tr>
-                            <td>{{ $g->g_firstname }} {{ $g->g_middlename }} {{ $g->g_lastname }}</td>
-                            <td>{{ $g->g_contact }}</td>
-                            <td>{{ $g->g_address }}</td>
-                            <td>{{ $g->g_email ?? '-' }}</td>
-                            <td>{{ $g->user->username ?? '-' }}</td>
+                    // Old single-guardian fields (or explicit guardian_name) support
+                    $singleGuardianFull = trim(collect([
+                        $g->guardian_name ?? null,
+                        $g->g_firstname ?? null,
+                        $g->g_middlename ?? null,
+                        $g->g_lastname ?? null
+                    ])->filter()->implode(' '));
 
-                            <td>{{ $g->created_at->format('Y-m-d') }}</td>
-                            <td>
-                                <button class="btn btn-sm btn-warning" data-bs-toggle="modal"
-                                    data-bs-target="#editGuardianModal" data-id="{{ $g->id }}"
-                                    data-firstname="{{ $g->g_firstname }}" data-middlename="{{ $g->g_middlename }}"
-                                    data-lastname="{{ $g->g_lastname }}" data-contact="{{ $g->g_contact }}"
-                                    data-address="{{ $g->g_address }}" data-email="{{ $g->g_email }}"
-                                    data-username="{{ $g->user->username ?? '' }}">
-                                    <i class="bi bi-pencil-square"></i>
-                                </button>
-                                <form action="{{ route('guardians.destroy', $g->id) }}" method="POST"
-                                    class="d-inline delete-form">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="button" class="btn btn-sm btn-danger delete-btn">
-                                        <i class="bi bi-archive"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="8" class="text-center">No guardian accounts found.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-    </div>
+                    $label = $motherFull && $fatherFull
+                                ? ($motherFull.' & '.$fatherFull)
+                                : ($motherFull ?: ($fatherFull ?: ($singleGuardianFull ?: 'Guardian #'.$g->id)));
+
+                    // Same contact/email fallback as on enroll page
+                    $displayContact = $g->g_contact ?: ($g->m_contact ?: ($g->f_contact ?: '—'));
+                    $displayEmail   = $g->g_email   ?: ($g->m_email   ?: ($g->f_email   ?: '—'));
+                    $address        = $g->g_address ?: '—';
+                    $username       = optional($g->user)->username ?? '—';
+                @endphp
+
+                <tr>
+                    <td>
+                        <div class="fw-semibold">{{ $label }}</div>
+                        @if($motherFull || $fatherFull)
+                            <div class="small text-muted">
+                                @if($motherFull) Mother: {{ $motherFull }}@endif
+                                @if($motherFull && $fatherFull) &nbsp;|&nbsp; @endif
+                                @if($fatherFull) Father: {{ $fatherFull }}@endif
+                            </div>
+                        @endif
+                    </td>
+                    <td>{{ $displayContact }}</td>
+                    <td>{{ $address }}</td>
+                    <td>{{ $displayEmail }}</td>
+                    <td>{{ $username }}</td>
+                    <td>{{ $g->created_at?->format('Y-m-d') }}</td>
+                    <td class="text-nowrap">
+                        <button class="btn btn-sm btn-warning"
+                                data-bs-toggle="modal"
+                                data-bs-target="#editGuardianModal"
+                                data-id="{{ $g->id }}"
+                                data-g_address="{{ $g->g_address }}"
+                                data-m_firstname="{{ $g->m_firstname }}" data-m_middlename="{{ $g->m_middlename }}" data-m_lastname="{{ $g->m_lastname }}"
+                                data-m_contact="{{ $g->m_contact }}" data-m_email="{{ $g->m_email }}"
+                                data-f_firstname="{{ $g->f_firstname }}" data-f_middlename="{{ $g->f_middlename }}" data-f_lastname="{{ $g->f_lastname }}"
+                                data-f_contact="{{ $g->f_contact }}" data-f_email="{{ $g->f_email }}"
+                                data-guardian_name="{{ $g->guardian_name ?? '' }}"
+                                data-g_contact="{{ $g->g_contact }}" data-g_email="{{ $g->g_email }}"
+                                data-username="{{ optional($g->user)->username ?? '' }}">
+                            <i class="bi bi-pencil-square"></i>
+                        </button>
+
+                        <form action="{{ route('guardians.destroy', $g->id) }}" method="POST" class="d-inline delete-form">
+                            @csrf
+                            @method('DELETE')
+                            <button type="button" class="btn btn-sm btn-danger delete-btn">
+                                <i class="bi bi-archive"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="7" class="text-center">No guardian accounts found.</td>
+                </tr>
+            @endforelse
+        </tbody>
+    </table>
+</div>
+
 
     {{-- Modals --}}
     @include('auth.admindashboard.partials.accounts-modals')

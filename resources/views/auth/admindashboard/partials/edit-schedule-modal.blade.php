@@ -97,32 +97,6 @@
         </div>
 
         <div class="col-md-4">
-            <label class="form-label">Room</label>
-            <select name="room_id" class="form-select" required>
-                <option value="" class="dropdownheader">-- Select Room --</option>
-                @foreach($rooms as $room)
-                    <option value="{{ $room->id }}" {{ $room->id == $schedule->room_id ? 'selected' : '' }}>
-                        {{ $room->room_number }}
-                    </option>
-                @endforeach
-            </select>
-            @error('room_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
-        </div>
-
-        <div class="col-md-4">
-            <label class="form-label">Section</label>
-            <select name="section_id" class="form-select">
-                <option value="" class="dropdownheader">-- Select Section --</option>
-                @foreach($sections as $section)
-                    <option value="{{ $section->id }}" {{ $section->id == $schedule->section_id ? 'selected' : '' }}>
-                        {{ $section->section_name }}
-                    </option>
-                @endforeach
-            </select>
-            @error('section_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
-        </div>
-
-        <div class="col-md-4">
             <label class="form-label">Grade Level</label>
             <select name="gradelvl_id" class="form-select">
                 <option value="" class="dropdownheader">-- Select Grade Level --</option>

@@ -10,26 +10,25 @@ return new class extends Migration {
         Schema::create('tuitions', function (Blueprint $table) {
             $table->id();
 
-            // Grade level stored as text
+            // Grade level stored as text (keeps your existing blades/controllers simple)
             $table->string('grade_level');
 
-            // Tuition values
-            $table->decimal('monthly_fee', 10, 2)->default(0);
-            $table->decimal('yearly_fee', 10, 2)->default(0);
+            // TUITION (split)
+            $table->decimal('tuition_monthly', 10, 2)->default(0);
+            $table->decimal('tuition_yearly', 10, 2)->default(0);  // should be monthly * 10
 
-            // Other fees
-            $table->decimal('misc_fee', 10, 2)->nullable();
-            $table->string('optional_fee_desc')->nullable();
-            $table->decimal('optional_fee_amount', 10, 2)->default(0)->nullable();
+            // FEES (split)
+            $table->decimal('misc_monthly', 10, 2)->nullable();
+            $table->decimal('misc_yearly', 10, 2)->nullable();     // should mirror misc_monthly * 10
 
-            // Total
+            $table->string('books_desc')->nullable();
+            $table->decimal('books_amount', 10, 2)->nullable();
+
+            // Computed total (tuition_yearly + misc_yearly + books_amount + grade-level optional fees)
             $table->decimal('total_yearly', 10, 2)->default(0);
 
-            // Optional School Year (FK to schoolyrs.id)
-            $table->unsignedBigInteger('school_year')->nullable();
-            $table->foreign('school_year')
-                ->references('id')->on('schoolyrs')
-                ->onDelete('cascade')->onUpdate('cascade');
+            // Keep school year as TEXT (YYYY-YYYY) to match your controllers and views today
+            $table->string('school_year', 9)->nullable(); // e.g. 2025-2026
 
             $table->timestamps();
         });

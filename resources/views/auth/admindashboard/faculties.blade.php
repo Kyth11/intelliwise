@@ -4,8 +4,8 @@
 
 @section('content')
     <div class="card section p-4">
-        <h4>Faculty Management</h4>
-        <p>Here you can view, edit, and manage faculty accounts.</p>
+        <h4>Faculty Schedule Management</h4>
+        <p>Here you can view, edit, and manage faculty schedules.</p>
 
         <div class="card mt-3 p-3">
             <table class="table table-bordered table-striped align-middle">
@@ -32,8 +32,6 @@
                                             <tr>
                                                 <th>Subject</th>
                                                 <th>Grade Level</th>
-                                                <th>Section</th>
-                                                <th>Room</th>
                                                 <th>Day / Time</th>
                                                 <th style="width: 140px;">Actions</th>
                                             </tr>
@@ -43,8 +41,7 @@
                                                 <tr>
                                                     <td>{{ $schedule->subject->subject_name ?? '-' }}</td>
                                                     <td>{{ $schedule->gradelvl->grade_level ?? '-' }}</td>
-                                                    <td>{{ $schedule->section->section_name ?? '-' }}</td>
-                                                    <td>{{ $schedule->room->room_number ?? '-' }}</td>
+
                                                     <td>{{ $schedule->day }} {{ $schedule->class_start }}-{{ $schedule->class_end }}
                                                     </td>
                                                     <td class="text-center text-nowrap">

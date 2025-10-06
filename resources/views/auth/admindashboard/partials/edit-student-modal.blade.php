@@ -48,7 +48,6 @@
                                     <option value="{{ $g->grade_level }}">{{ $g->grade_level }}</option>
                                 @endforeach
                             </select>
-
                             <label for="edit-gradelvl">Grade Level</label>
                         </div>
                     </div>
@@ -104,8 +103,7 @@
                                 placeholder="Tuition" readonly>
                             <label for="edit-tuition">Tuition (auto from grade level)</label>
                         </div>
-                        <small class="text-muted">This comes from the latest Tuition record for the chosen grade
-                            level.</small>
+                        <small class="text-muted">This comes from the latest Tuition record for the chosen grade level.</small>
                     </div>
                     <div class="col-md-6">
                         <div class="form-floating">
@@ -125,7 +123,51 @@
                             <label for="edit-status">Enrollment Status</label>
                         </div>
                     </div>
-                </div>
+
+                    <!-- STUDENT OPTIONAL FEES (multi-select) -->
+                    <div class="col-12">
+                        <label class="form-label mt-2">Student Optional Fees</label>
+                        <div class="border rounded p-2" style="max-height: 220px; overflow:auto;">
+                            @php
+                                $__fees = ($optionalFees ?? collect())->filter(function($f){
+                                    // only show student-attachable fees (scope student/both) and active
+                                    $scopeOk = !isset($f->scope) || in_array($f->scope, ['student','both']);
+                                    return $scopeOk && (property_exists($f, 'active') ? $f->active : true);
+                                });
+                            @endphp
+
+                            @forelse($__fees as $fee)
+                                <div class="form-check">
+                                    <input class="form-check-input edit-opt-fee" type="checkbox"
+                                           id="stu_fee_{{ $fee->id }}"
+                                           name="student_optional_fee_ids[]"
+                                           value="{{ $fee->id }}"
+                                           data-amount="{{ number_format($fee->amount, 2, '.', '') }}">
+                                    <label class="form-check-label" for="stu_fee_{{ $fee->id }}">
+                                        {{ $fee->name }} — ₱{{ number_format($fee->amount, 2) }}
+                                    </label>
+                                </div>
+                            @empty
+                                <div class="text-muted">No student-level optional fees available.</div>
+                            @endforelse
+                        </div>
+
+                        <div class="row g-2 mt-2">
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <input type="text" id="edit-optional-total" class="form-control" placeholder="Optional Total" readonly>
+                                    <label for="edit-optional-total">Selected Optional Total (₱)</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <input type="text" id="edit-total-due-preview" class="form-control" placeholder="Total Due" readonly>
+                                    <label for="edit-total-due-preview">Total Due (Preview) (₱)</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div><!-- /modal-body -->
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -151,10 +193,7 @@
                 ];
             }
         }
-        // drop internal key
-        foreach ($__tuitionMap as &$v) {
-            unset($v['_ts']);
-        }
+        foreach ($__tuitionMap as &$v) { unset($v['_ts']); }
         unset($v);
     }
 @endphp
@@ -162,7 +201,7 @@
 <script>
     const editStudentModal = document.getElementById('editStudentModal');
 
-    // Tuition map from server: { "Grade 1": {id: 3, total_yearly: 25000}, ... }
+    // Tuition map from server
     const TUITION_MAP = {!! json_encode($__tuitionMap ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!};
 
     function applyTuitionFromGrade(gradeLevel) {
@@ -176,24 +215,39 @@
             tuitionInput.value = '';
             tuitionIdInput.value = '';
         }
+        recalcTotals();
+    }
+
+    function recalcTotals() {
+        const base = parseFloat(document.getElementById('edit-tuition').value || '0') || 0;
+        const opt = Array.from(editStudentModal.querySelectorAll('.edit-opt-fee:checked'))
+            .reduce((sum, cb) => sum + (parseFloat(cb.dataset.amount || '0') || 0), 0);
+        const optField = document.getElementById('edit-optional-total');
+        const dueField = document.getElementById('edit-total-due-preview');
+        if (optField) optField.value = opt.toFixed(2);
+        if (dueField) dueField.value = (base + opt).toFixed(2);
     }
 
     editStudentModal.addEventListener('show.bs.modal', function (event) {
-        let button = event.relatedTarget;
+        const button = event.relatedTarget;
 
-        let id = button.getAttribute('data-id');
-        let firstname = button.getAttribute('data-firstname');
-        let middlename = button.getAttribute('data-middlename');
-        let lastname = button.getAttribute('data-lastname');
-        let gradelvl = button.getAttribute('data-gradelvl');
-        let birthdate = button.getAttribute('data-birthdate');
-        let address = button.getAttribute('data-address');
-        let contact = button.getAttribute('data-contact');
-        let email = button.getAttribute('data-email');
-        let guardian = button.getAttribute('data-guardian');
-        let guardianEmail = button.getAttribute('data-guardianemail');
-        let status = button.getAttribute('data-status');
-        let payment = button.getAttribute('data-payment');
+        const id            = button.getAttribute('data-id');
+        const firstname     = button.getAttribute('data-firstname');
+        const middlename    = button.getAttribute('data-middlename');
+        const lastname      = button.getAttribute('data-lastname');
+        const gradelvl      = button.getAttribute('data-gradelvl');
+        const birthdate     = button.getAttribute('data-birthdate');
+        const address       = button.getAttribute('data-address');
+        const contact       = button.getAttribute('data-contact');
+        const email         = button.getAttribute('data-email');
+        const guardian      = button.getAttribute('data-guardian');
+        const guardianEmail = button.getAttribute('data-guardianemail');
+        const status        = button.getAttribute('data-status');
+        const payment       = button.getAttribute('data-payment');
+
+        // Selected fee IDs (comma-separated): "1,3,5"
+        const feeIdsRaw = button.getAttribute('data-feeids') || '';
+        const feeIds = feeIdsRaw.split(',').map(s => s.trim()).filter(Boolean);
 
         // Populate fields
         editStudentModal.querySelector('#edit-id').value = id;
@@ -210,16 +264,22 @@
         editStudentModal.querySelector('#edit-status').value = status ?? 'Enrolled';
         editStudentModal.querySelector('#edit-payment').value = payment ?? 'Not Paid';
 
+        // Tick optional-fee checkboxes
+        editStudentModal.querySelectorAll('.edit-opt-fee').forEach(cb => {
+            cb.checked = feeIds.includes(cb.value);
+        });
+
         // Tuition (auto from grade level)
         applyTuitionFromGrade(gradelvl);
 
-        // When grade changes, refresh tuition mapping
-        editStudentModal.querySelector('#edit-gradelvl').addEventListener('change', function () {
+        // Reassign handlers each open
+        editStudentModal.querySelector('#edit-gradelvl').onchange = function () {
             applyTuitionFromGrade(this.value);
-        });
+        };
+        editStudentModal.querySelectorAll('.edit-opt-fee').forEach(cb => cb.onchange = recalcTotals);
 
-        // ✅ Correct form action (admin namespace)
-        let form = editStudentModal.querySelector('#editStudentForm');
+        // Correct form action (admin namespace)
+        const form = editStudentModal.querySelector('#editStudentForm');
         form.action = `/admin/students/${id}`;
     });
 </script>

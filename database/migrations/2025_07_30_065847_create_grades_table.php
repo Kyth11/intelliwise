@@ -5,33 +5,35 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('grades', function (Blueprint $table) {
             $table->id();
-            $table->integer('quarter_grade');
-            $table->integer(column: 'average_grade');
-            $table->unsignedBigInteger('students_id');
-            $table->unsignedBigInteger('subjects_id');
-            $table->unsignedBigInteger('schoolyr_id');
-            $table->unsignedBigInteger('gradelvl_id')->nullable();
-            $table->unsignedBigInteger('faculty_id')->nullable();
 
-            $table->foreign('faculty_id')->references('id')->on('faculties')->onDelete('set null')->onUpdate('cascade');
-            $table->foreign('students_id')->references('id')->on('students')->onDelete('cascade')->onUpdate('cascade');
-            $table->foreign('subjects_id')->references('id')->on('subjects')->onDelete('cascade')->onUpdate('cascade');
-            $table->foreign('schoolyr_id')->references('id')->on('schoolyrs')->onDelete('cascade')->onUpdate('cascade');
-            $table->foreign('gradelvl_id')->references('id')->on('gradelvls')->onDelete('set null')->onUpdate('cascade');
+            // Per-quarter grades (0–100)
+            $table->unsignedTinyInteger('q1')->nullable();
+            $table->unsignedTinyInteger('q2')->nullable();
+            $table->unsignedTinyInteger('q3')->nullable();
+            $table->unsignedTinyInteger('q4')->nullable();
+
+            // Final grade + DepEd remark
+            $table->unsignedTinyInteger('final_grade')->nullable();
+            $table->string('remark', 32)->nullable(); // PASSED / FAILED
+
+            // Conventional FK names
+            $table->foreignId('student_id')->constrained('students')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreignId('subject_id')->constrained('subjects')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreignId('schoolyr_id')->constrained('schoolyrs')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreignId('gradelvl_id')->nullable()->constrained('gradelvls')->nullOnDelete()->cascadeOnUpdate();
+            $table->foreignId('faculty_id')->nullable()->constrained('faculties')->nullOnDelete()->cascadeOnUpdate();
+
+            // Prevent duplicate grade rows per (student, subject, school year)
+            $table->unique(['student_id', 'subject_id', 'schoolyr_id'], 'grade_unique');
+
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('grades');

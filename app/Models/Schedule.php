@@ -21,8 +21,6 @@ class Schedule extends Model
         'faculty_id',
         'subject_id',
         'gradelvl_id',
-        'section_id',
-        'room_id',
         'school_year', // IMPORTANT
     ];
 
@@ -36,16 +34,6 @@ class Schedule extends Model
     public function subject()
     {
         return $this->belongsTo(Subjects::class, 'subject_id');
-    }
-
-    public function room()
-    {
-        return $this->belongsTo(Rooms::class, 'room_id');
-    }
-
-    public function section()
-    {
-        return $this->belongsTo(Section::class, 'section_id');
     }
 
     public function gradelvl()

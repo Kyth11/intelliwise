@@ -25,15 +25,24 @@
     <div class="d-flex justify-content-between align-items-center mb-2">
         <h4 class="mb-0">System Settings</h4>
         <div class="d-flex gap-2">
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addAdminModal">
-                <i class="bi bi-person-plus me-1"></i> Add Admin
+                    <label class="form-label">Theme</label>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary theme-chip" data-theme="light">
+                <i class="bi bi-sun"></i> Light
             </button>
-            <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addSchoolYearModal">
-                <i class="bi bi-calendar-plus me-1"></i> Add School Year
+            <button type="button" class="btn btn-outline-secondary theme-chip" data-theme="dark">
+                <i class="bi bi-moon-stars"></i> Dark
             </button>
         </div>
+        <small class="text-muted">Applies instantly and is remembered.</small>
     </div>
-    <p class="text-muted mb-3">Manage system preferences, administrators, and academic years.</p>
+
+            {{-- <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addAdminModal">
+                <i class="bi bi-person-plus me-1"></i> Add Admin
+            </button> --}}
+        </div>
+    </div>
+    <p class="text-muted mb-3">Manage system preferences, administrators.</p>
 
     {{-- Flash messages --}}
     {{-- @if(session('success'))
@@ -59,8 +68,8 @@
         </div>
     @endif --}}
 
-    <div class="row g-3">
-        {{-- Quick Actions --}}
+    {{-- <div class="row g-3">
+
         <div class="col-lg-6">
             <div class="card p-3 h-100">
                 <h6 class="mb-3">Quick Actions</h6>
@@ -77,7 +86,7 @@
                         Backup Database
                         <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Coming soon</button>
                     </li>
-                    {{-- Dark/Light Mode Toggle --}}
+
                     <li class="list-group-item d-flex justify-content-between align-items-center">
                         Theme: <span class="dropdownheader">Light / Dark</span>
                         <div class="form-check form-switch m-0">
@@ -87,16 +96,16 @@
                     </li>
                 </ul>
             </div>
-        </div>
+        </div> --}}
 
         {{-- Admin Accounts --}}
         <div class="col-lg-6">
             <div class="card p-3 h-100">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="mb-0">Admin Accounts</h6>
-                    {{-- <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addAdminModal">
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addAdminModal">
                         <i class="bi bi-person-plus me-1"></i> New Admin
-                    </button> --}}
+                    </button>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-sm align-middle mb-0">
@@ -145,14 +154,14 @@
             </div>
         </div>
 
-        {{-- School Years --}}
+        {{-- School Years
         <div class="col-12">
             <div class="card p-3">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="mb-0">School Years</h6>
-                    {{-- <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addSchoolYearModal">
+                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addSchoolYearModal">
                         <i class="bi bi-calendar-plus me-1"></i> Add School Year
-                    </button> --}}
+                    </button>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
                     @forelse($schoolyrs as $sy)
@@ -162,7 +171,7 @@
                     @endforelse
                 </div>
             </div>
-        </div>
+        </div> --}}
     </div>
 </div>
 
@@ -227,7 +236,7 @@
     </div>
 </div>
 
-{{-- Add School Year Modal --}}
+{{-- Add School Year Modal
 <div class="modal fade" id="addSchoolYearModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -251,7 +260,7 @@
             </form>
         </div>
     </div>
-</div>
+</div> --}}
 @endsection
 
 @push('scripts')

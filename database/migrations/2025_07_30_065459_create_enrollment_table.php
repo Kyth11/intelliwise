@@ -21,13 +21,11 @@ return new class extends Migration {
             $table->string('enrollment_type')->nullable(); // e.g. 'New', 'Transferee', 'Returnee'
             $table->string('remarks')->nullable(); // Additional notes
             $table->boolean('is_active')->default(true); // Active/inactive flag
-            $table->unsignedBigInteger('section_id')->nullable(); // Section assignment
             $table->unsignedBigInteger('faculty_id')->nullable();
 
             $table->foreign('student_id')->references('id')->on('students')->onDelete('cascade')->onUpdate('cascade');
             $table->foreign('schoolyr_id')->references('id')->on('schoolyrs')->onDelete('cascade')->onUpdate('cascade');
             $table->foreign('gradelvl_id')->references('id')->on('gradelvls')->onDelete('cascade')->onUpdate('cascade');
-            $table->foreign('section_id')->references('id')->on('sections')->onDelete('set null')->onUpdate('cascade');
             $table->foreign('faculty_id')->references('id')->on('faculties')->onDelete('set null')->onUpdate('cascade');
 
             $table->timestamps();

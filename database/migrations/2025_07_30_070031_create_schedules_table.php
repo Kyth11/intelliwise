@@ -20,11 +20,9 @@ return new class extends Migration {
 
             $table->unsignedBigInteger('faculty_id');
             $table->unsignedBigInteger('subject_id');
-            $table->unsignedBigInteger('room_id');
 
             // These are optional in your forms, so mark them nullable here:
             $table->unsignedBigInteger('gradelvl_id')->nullable();
-            $table->unsignedBigInteger('section_id')->nullable();
 
             // String FK to schoolyrs.school_year (YYYY-YYYY), optional
             $table->string('school_year', 9)->collation('utf8mb4_unicode_ci')->nullable();
@@ -37,9 +35,7 @@ return new class extends Migration {
 
             $table->foreign('faculty_id')->references('id')->on('faculties')->cascadeOnDelete();
             $table->foreign('subject_id')->references('id')->on('subjects')->cascadeOnDelete();
-            $table->foreign('room_id')->references('id')->on('rooms')->cascadeOnDelete();
             $table->foreign('gradelvl_id')->references('id')->on('gradelvls')->nullOnDelete();
-            $table->foreign('section_id')->references('id')->on('sections')->nullOnDelete();
 
             $table->timestamps();
 

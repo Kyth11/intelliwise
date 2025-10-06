@@ -8,18 +8,42 @@ class Tuition extends Model
 {
     protected $table = 'tuitions';
 
-    // Option A:
-    // protected $guarded = [];
-
-    // Option B (explicit):
     protected $fillable = [
         'grade_level',
-        'monthly_fee',
-        'yearly_fee',
-        'misc_fee',
-        'optional_fee_desc',
-        'optional_fee_amount',
+        // tuition
+        'tuition_monthly',
+        'tuition_yearly',
+        // misc
+        'misc_monthly',
+        'misc_yearly',
+        // books
+        'books_desc',
+        'books_amount',
+        // totals + sy
         'total_yearly',
-        'school_year',   // ← IMPORTANT
+        'school_year',
     ];
+
+    protected $casts = [
+        'tuition_monthly' => 'decimal:2',
+        'tuition_yearly'  => 'decimal:2',
+        'misc_monthly'    => 'decimal:2',
+        'misc_yearly'     => 'decimal:2',
+        'books_amount'    => 'decimal:2',
+        'total_yearly'    => 'decimal:2',
+    ];
+
+    /**
+     * Grade-level Optional Fees attached to this tuition.
+     * Pivot table: tuition_optional_fee (tuition_id, optional_fee_id)
+     */
+    public function optionalFees()
+    {
+        return $this->belongsToMany(
+            OptionalFee::class,
+            'tuition_optional_fee',
+            'tuition_id',
+            'optional_fee_id'
+        )->withTimestamps();
+    }
 }

@@ -14,19 +14,21 @@ return new class extends Migration {
             $table->string('s_lastname');
             $table->date('s_birthdate');
             $table->string('s_address');
+            $table->string('s_citizenship')->nullable(); // NEW
+            $table->string('s_religion')->nullable();    // NEW
             $table->string('s_contact')->nullable();
             $table->string('s_email')->nullable();
 
-            // Relationship: student belongs to guardians
+            // Guardian household
             $table->unsignedBigInteger('guardian_id')->nullable();
             $table->foreign('guardian_id')->references('id')->on('guardians')->onDelete('set null');
 
-            // Grade Level (both text + FK for convenience)
+            // Grade Level (free text + FK)
             $table->string('s_gradelvl')->nullable();
             $table->unsignedBigInteger('gradelvl_id')->nullable();
             $table->foreign('gradelvl_id')->references('id')->on('gradelvls')->onDelete('set null');
 
-            // Tuition (denormalized sum + FK to actual tuition row)
+            // Tuition (denormalized sum + FK)
             $table->string('s_tuition_sum')->nullable();
             $table->unsignedBigInteger('tuition_id')->nullable();
             $table->foreign('tuition_id')->references('id')->on('tuitions')->onDelete('set null');

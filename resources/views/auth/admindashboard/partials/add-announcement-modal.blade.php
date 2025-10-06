@@ -10,18 +10,6 @@
         </div>
 
         <div class="modal-body">
-          @if(session('success'))
-            <div class="alert alert-success">{{ session('success') }}</div>
-          @endif
-          @if($errors->any())
-            <div class="alert alert-danger">
-              <ul class="mb-0">
-                @foreach($errors->all() as $e)
-                  <li>{{ $e }}</li>
-                @endforeach
-              </ul>
-            </div>
-          @endif
 
           <div class="mb-3">
             <label class="form-label">Title</label>
@@ -44,16 +32,64 @@
             </div>
           </div>
 
+          {{-- Multi-grade selector (repeater) --}}
           <div class="mt-3">
-            <label class="form-label">For Grade Level (optional)</label>
-            <select name="gradelvl_id" class="form-select">
-              <option value="">— All Grade Levels —</option>
-              @foreach($gradelvls as $g)
-                <option value="{{ $g->id }}" {{ old('gradelvl_id') == $g->id ? 'selected' : '' }}>
-                  {{ $g->grade_level }}
-                </option>
+            <label class="form-label">For Grade Level(s) (optional)</label>
+
+            @php
+              // Restore previously selected values or show one empty row
+              $oldGrades = old('gradelvl_ids', [null]);
+            @endphp
+
+            <div id="gradeLevelsRepeater" class="d-flex flex-column gap-2">
+              @foreach($oldGrades as $idx => $selectedId)
+                <div class="row g-2 align-items-end grade-row">
+                  <div class="col-9">
+                    <select name="gradelvl_ids[]" class="form-select">
+                      <option value="">— All Grade Levels —</option>
+                      @foreach($gradelvls as $g)
+                        <option value="{{ $g->id }}" {{ (string)$selectedId === (string)$g->id ? 'selected' : '' }}>
+                          {{ $g->grade_level }}
+                        </option>
+                      @endforeach
+                    </select>
+                  </div>
+                  <div class="col-3 d-flex gap-2">
+                    @if($idx === 0)
+                      <button type="button" class="btn btn-outline-secondary w-100" id="addGradeRow">
+                        <i class="bi bi-plus-lg"></i>
+                      </button>
+                    @else
+                      <button type="button" class="btn btn-outline-danger w-100 removeGradeRow">
+                        <i class="bi bi-dash-lg"></i>
+                      </button>
+                    @endif
+                  </div>
+                </div>
               @endforeach
-            </select>
+            </div>
+
+            {{-- Hidden template for new rows --}}
+            <template id="gradeRowTemplate">
+              <div class="row g-2 align-items-end grade-row">
+                <div class="col-9">
+                  <select name="gradelvl_ids[]" class="form-select">
+                    <option value="">— All Grade Levels —</option>
+                    @foreach($gradelvls as $g)
+                      <option value="{{ $g->id }}">{{ $g->grade_level }}</option>
+                    @endforeach
+                  </select>
+                </div>
+                <div class="col-3 d-flex gap-2">
+                  <button type="button" class="btn btn-outline-danger w-100 removeGradeRow">
+                    <i class="bi bi-dash-lg"></i>
+                  </button>
+                </div>
+              </div>
+            </template>
+
+            @error('gradelvl_ids') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+            @error('gradelvl_ids.*') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
           </div>
         </div>
 
@@ -64,3 +100,41 @@
     </div>
   </div>
 </div>
+
+{{-- Minimal JS to add/remove grade rows + warn on duplicates --}}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const repeater = document.getElementById('gradeLevelsRepeater');
+  const addBtn   = document.getElementById('addGradeRow');
+  const tpl      = document.getElementById('gradeRowTemplate');
+
+  if (addBtn) {
+    addBtn.addEventListener('click', function () {
+      const node = tpl.content.cloneNode(true);
+      repeater.appendChild(node);
+    });
+  }
+
+  repeater.addEventListener('click', function (e) {
+    const btn = e.target.closest('.removeGradeRow');
+    if (!btn) return;
+    const row = btn.closest('.grade-row');
+    if (row) row.remove();
+  });
+
+  // Optional: prevent selecting duplicate grade levels in UI
+  repeater.addEventListener('change', function (e) {
+    if (e.target.tagName !== 'SELECT') return;
+    const all = Array.from(repeater.querySelectorAll('select[name="gradelvl_ids[]"]'))
+      .map(s => s.value).filter(Boolean);
+    const dupes = all.filter((v,i,a) => a.indexOf(v) !== i);
+    if (dupes.length) {
+      // revert the latest change
+      e.target.value = '';
+      // small nudge
+      e.target.classList.add('is-invalid');
+      setTimeout(() => e.target.classList.remove('is-invalid'), 1200);
+    }
+  });
+});
+</script>

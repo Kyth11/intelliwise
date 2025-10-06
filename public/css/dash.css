@@ -264,11 +264,11 @@ h3 {
 /* Tables: gray scheme in dark mode */
 .theme-dark .table {
     /* Bootstrap uses CSS vars internally — override them */
-    --bs-table-bg: #2f333d;              /* base row background */
-    --bs-table-color: #e5e7eb;           /* text color */
-    --bs-table-border-color: rgba(255,255,255,.12);
-    --bs-table-striped-bg: #353b47;      /* odd rows */
-    --bs-table-hover-bg: #404756;        /* hover */
+    --bs-table-bg: rgb(112, 108, 135);              /* base row background */
+    --bs-table-color: #ffffff;           /* text color */
+    --bs-table-border-color: rgba(0, 0, 0, 0.12);
+    --bs-table-striped-bg: #4a3f74;      /* odd rows */
+    --bs-table-hover-bg: #5e548a;        /* hover */
     background-color: var(--bs-table-bg);
     color: var(--bs-table-color);
 }
@@ -280,10 +280,10 @@ h3 {
 }
 
 .theme-dark .table thead {
-    background: #3a404b;                 /* header gray */
+    background: #000000;                 /* header gray */
 }
 .theme-dark .table thead th {
-    color: #f8fafc;
+    color: #000000;
     border-color: var(--bs-table-border-color);
 }
 

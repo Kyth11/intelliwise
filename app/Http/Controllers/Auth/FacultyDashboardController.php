@@ -6,8 +6,6 @@ use App\Models\User;
 use App\Models\Faculty;
 use App\Models\Schedule;
 use App\Models\Subjects;
-use App\Models\Section;
-use App\Models\Rooms;
 use App\Models\Gradelvl;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
@@ -16,31 +14,47 @@ use Illuminate\Support\Facades\Auth;
 class FacultyDashboardController extends Controller
 {
     /**
-     * Show all faculties with their schedules and assignments.
+     * Smart entry:
+     * - If the logged-in user is a FACULTY → show the faculty dashboard (auth/facultydashboard.blade.php)
+     * - Otherwise (admin)          → show the admin faculties management page (auth/admindashboard/faculties.blade.php)
      */
     public function index()
     {
+        $user = Auth::user();
+
+        // FACULTY: personal dashboard
+        if ($user && $user->role === 'faculty') {
+            $faculty = Faculty::with([
+                'user',
+                'schedules.subject',
+                'schedules.section',
+                'schedules.gradelvl',
+            ])->find($user->faculty_id);
+
+            // You can pass quick stats if your dashboard needs them; otherwise just $faculty is fine.
+            $stats = [
+                'assignments_count' => 0,   // replace if you have an assignments table
+                'students_count'    => 0,   // replace when you wire student->faculty relations
+                'messages_count'    => 0,   // replace if you track messages
+            ];
+
+            // resources/views/auth/facultydashboard.blade.php (your faculty UI)
+            return view('auth.facultydashboard', compact('faculty', 'stats'));
+        }
+
+        // ADMIN: faculties management list
         $faculties = Faculty::with([
             'user',
             'schedules.subject',
             'schedules.section',
-            'schedules.room',
-            'schedules.gradelvl'
+            'schedules.gradelvl',
         ])->get();
 
-        // needed for edit schedule modal
-        $subjects   = Subjects::all();
-        $sections   = Section::all();
-        $rooms      = Rooms::all();
-        $gradelvls  = Gradelvl::all();
+        $subjects  = Subjects::all();
+        $gradelvls = Gradelvl::all();
 
-        return view('auth.admindashboard.faculties', compact(
-            'faculties',
-            'subjects',
-            'sections',
-            'rooms',
-            'gradelvls'
-        ));
+        // resources/views/auth/admindashboard/faculties.blade.php (your existing admin page)
+        return view('auth.admindashboard.faculties', compact('faculties', 'subjects', 'gradelvls'));
     }
 
     /**
@@ -77,7 +91,7 @@ class FacultyDashboardController extends Controller
     }
 
     /**
-     * Edit faculty form.
+     * Edit faculty form (admin).
      */
     public function edit($id)
     {
@@ -92,8 +106,8 @@ class FacultyDashboardController extends Controller
     {
         $user = Auth::user();
 
-        // 🔒 If faculty role, only allow self-update
-        if ($user->role === 'faculty' && $user->faculty_id != $id) {
+        // If faculty role, only allow self-update
+        if ($user->role === 'faculty' && (int) $user->faculty_id !== (int) $id) {
             abort(403, 'Unauthorized');
         }
 
@@ -103,7 +117,7 @@ class FacultyDashboardController extends Controller
             'f_firstname' => 'required|string|max:255',
             'f_lastname'  => 'required|string|max:255',
             'f_email'     => 'nullable|email|max:255|unique:faculties,f_email,' . $faculty->id,
-            'username'    => 'required|string|max:255|unique:users,username,' . ($faculty->user->id ?? 'NULL'),
+            'username'    => 'required|string|max:255|unique:users,username,' . optional($faculty->user)->id,
             'password'    => 'nullable|string|min:6',
         ]);
 
@@ -128,8 +142,9 @@ class FacultyDashboardController extends Controller
 
         return back()->with('success', 'Faculty updated successfully!');
     }
+
     /**
-     * Update faculty schedule (admin only).
+     * Update a faculty member’s schedule (admin only).
      */
     public function updateSchedule(Request $request, $id)
     {
@@ -147,7 +162,7 @@ class FacultyDashboardController extends Controller
 
         $schedule->update([
             'subject_id'  => $request->subject_id,
-            'gradelvl_id' => $request->gradelvl_id,
+            'gradelvl_id' => $request->gradelvls_id ?? $request->gradelvl_id, // tolerate either key
             'section_id'  => $request->section_id,
             'room_id'     => $request->room_id,
             'day'         => $request->day,

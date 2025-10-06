@@ -21,16 +21,7 @@ return new class extends Migration
             ['school_year' => '2027-2028'],
             ['school_year' => '2028-2029'],
             ['school_year' => '2029-2030'],
-            ['school_year' => '2030-2031'],
-            ['school_year' => '2031-2032'],
-            ['school_year' => '2032-2033'],
-            ['school_year' => '2033-2034'],
-            ['school_year' => '2034-2035'],
-            ['school_year' => '2035-2036'],
-            ['school_year' => '2036-2037'],
-            ['school_year' => '2037-2038'],
-            ['school_year' => '2038-2039'],
-            ['school_year' => '2039-2040'],
+
         ]);
     }
 

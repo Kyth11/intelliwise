@@ -5,8 +5,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('gradelvls', function (Blueprint $table) {
@@ -16,9 +15,9 @@ return new class extends Migration
         });
 
         DB::table('gradelvls')->insert([
-            ['grade_level' => 'Pre-School'],
             ['grade_level' => 'Nursery'],
-            ['grade_level' => 'Kindergarten'],
+            ['grade_level' => 'Kindergarten 1'],
+            ['grade_level' => 'Kindergarten 2'],
             ['grade_level' => 'Grade 1'],
             ['grade_level' => 'Grade 2'],
             ['grade_level' => 'Grade 3'],
