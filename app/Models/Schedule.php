@@ -5,8 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Schoolyr;
 use App\Models\Subjects;
-use App\Models\Rooms;
-use App\Models\Section;
 use App\Models\Gradelvl;
 use App\Models\Faculty;
 
@@ -21,13 +19,11 @@ class Schedule extends Model
         'faculty_id',
         'subject_id',
         'gradelvl_id',
-        'school_year', // IMPORTANT
+        'school_year',
     ];
 
-    // RELATIONSHIPS
     public function schoolYear()
     {
-        // local key = schedules.school_year (string), owner key = schoolyrs.school_year (string PK/unique)
         return $this->belongsTo(Schoolyr::class, 'school_year', 'school_year');
     }
 

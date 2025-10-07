@@ -3,49 +3,41 @@
 @section('title', 'System Settings')
 
 @push('styles')
-    {{-- Page-specific styles (optional) --}}
-    <style>
-        /* extra emphasis on match/mismatch */
-        .form-control.is-valid {
-            border-color: #198754 !important;
-            box-shadow: 0 0 0 .2rem rgba(25, 135, 84, .25) !important;
-        }
-        .form-control.is-invalid {
-            border-color: #dc3545 !important;
-            box-shadow: 0 0 0 .2rem rgba(220, 53, 69, .25) !important;
-        }
-        .pw-hint {
-            font-size: 0.8rem;
-        }
-    </style>
+<style>
+    .theme-chip { cursor:pointer; user-select:none; }
+    .form-control.is-valid {
+        border-color: #198754 !important;
+        box-shadow: 0 0 0 .2rem rgba(25, 135, 84, .25) !important;
+    }
+    .form-control.is-invalid {
+        border-color: #dc3545 !important;
+        box-shadow: 0 0 0 .2rem rgba(220, 53, 69, .25) !important;
+    }
+    .pw-hint { font-size: .85rem; }
+</style>
 @endpush
 
 @section('content')
 <div class="card section p-4">
-    <div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
         <h4 class="mb-0">System Settings</h4>
-        <div class="d-flex gap-2">
-                    <label class="form-label">Theme</label>
-        <div class="d-flex gap-2">
-            <button type="button" class="btn btn-outline-secondary theme-chip" data-theme="light">
+
+        {{-- Theme chips (shared look with Faculty Settings) --}}
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small">Theme</span>
+            <button type="button" class="btn btn-outline-secondary btn-sm theme-chip" data-theme="light">
                 <i class="bi bi-sun"></i> Light
             </button>
-            <button type="button" class="btn btn-outline-secondary theme-chip" data-theme="dark">
+            <button type="button" class="btn btn-outline-secondary btn-sm theme-chip" data-theme="dark">
                 <i class="bi bi-moon-stars"></i> Dark
             </button>
         </div>
-        <small class="text-muted">Applies instantly and is remembered.</small>
     </div>
 
-            {{-- <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addAdminModal">
-                <i class="bi bi-person-plus me-1"></i> Add Admin
-            </button> --}}
-        </div>
-    </div>
-    <p class="text-muted mb-3">Manage system preferences, administrators.</p>
+    <p class="text-muted mb-3">Manage system preferences and administrator accounts.</p>
 
     {{-- Flash messages --}}
-    {{-- @if(session('success'))
+    @if(session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             {{ session('success') }}
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -66,40 +58,11 @@
                 @endforeach
             </ul>
         </div>
-    @endif --}}
+    @endif
 
-    {{-- <div class="row g-3">
-
-        <div class="col-lg-6">
-            <div class="card p-3 h-100">
-                <h6 class="mb-3">Quick Actions</h6>
-                <ul class="list-group">
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Change Password
-                        <a href="{{ route('login') }}" class="btn btn-sm btn-outline-secondary">Open</a>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        System Preferences
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Coming soon</button>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Backup Database
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Coming soon</button>
-                    </li>
-
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Theme: <span class="dropdownheader">Light / Dark</span>
-                        <div class="form-check form-switch m-0">
-                            <input class="form-check-input" type="checkbox" role="switch" id="themeSwitch">
-                            <label class="form-check-label" for="themeSwitch">Dark mode</label>
-                        </div>
-                    </li>
-                </ul>
-            </div>
-        </div> --}}
-
+    <div class="row g-3">
         {{-- Admin Accounts --}}
-        <div class="col-lg-6">
+        <div class="col-12">
             <div class="card p-3 h-100">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="mb-0">Admin Accounts</h6>
@@ -153,25 +116,6 @@
                 <small class="text-muted d-block mt-2">Tip: Keep at least two admins to avoid lockout.</small>
             </div>
         </div>
-
-        {{-- School Years
-        <div class="col-12">
-            <div class="card p-3">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="mb-0">School Years</h6>
-                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addSchoolYearModal">
-                        <i class="bi bi-calendar-plus me-1"></i> Add School Year
-                    </button>
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                    @forelse($schoolyrs as $sy)
-                        <span class="badge bg-light text-dark border">{{ $sy->school_year }}</span>
-                    @empty
-                        <span class="text-muted">No school years yet.</span>
-                    @endforelse
-                </div>
-            </div>
-        </div> --}}
     </div>
 </div>
 
@@ -235,32 +179,6 @@
         </div>
     </div>
 </div>
-
-{{-- Add School Year Modal
-<div class="modal fade" id="addSchoolYearModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form action="{{ route('admin.settings.schoolyear.store') }}" method="POST">
-                @csrf
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-calendar-plus me-2"></i>Add School Year</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <label class="form-label">School Year (YYYY-YYYY)</label>
-                    <input type="text" name="school_year" class="form-control" placeholder="2025-2026" pattern="^\d{4}-\d{4}$" required>
-                    <small class="text-muted">Example: 2025-2026</small>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save me-1"></i> Save Year
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div> --}}
 @endsection
 
 @push('scripts')
@@ -268,6 +186,20 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
+    // Theme chips (same behavior as faculty)
+    (function () {
+        const key = 'theme';
+        const setTheme = (t) => {
+            localStorage.setItem(key, t);
+            document.documentElement.classList.toggle('theme-dark', t === 'dark');
+            document.body.classList.toggle('theme-dark', t === 'dark');
+        };
+        setTheme(localStorage.getItem(key) || 'light');
+        document.querySelectorAll('.theme-chip').forEach(btn => {
+            btn.addEventListener('click', () => setTheme(btn.dataset.theme));
+        });
+    })();
+
     // Delete confirm (delegated)
     (function () {
         function confirmDelete(form, msg, btn) {
@@ -351,30 +283,11 @@
             msg.classList.toggle('text-success', match);
             msg.classList.toggle('text-danger', !match);
 
-            // Optional: prevent submit when mismatch
             saveBtn.disabled = !match;
         }
 
         pw.addEventListener('input', validateMatch);
         pw2.addEventListener('input', validateMatch);
-    })();
-
-    // Theme switch (persists across site)
-    (function () {
-        const key = 'theme';
-        const stored = localStorage.getItem(key) || 'light';
-        const isDark = stored === 'dark';
-
-        const switchEl = document.getElementById('themeSwitch');
-        if (switchEl) {
-            switchEl.checked = isDark;
-            switchEl.addEventListener('change', () => {
-                const dark = switchEl.checked;
-                document.body.classList.toggle('theme-dark', dark);
-                document.documentElement.classList.toggle('theme-dark', dark);
-                localStorage.setItem(key, dark ? 'dark' : 'light');
-            });
-        }
     })();
     </script>
 @endpush

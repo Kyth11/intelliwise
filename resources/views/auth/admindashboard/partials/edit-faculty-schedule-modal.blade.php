@@ -36,27 +36,7 @@
                                     </select>
                                 </div>
 
-                                <div class="col-md-6">
-                                    <label class="form-label">Section</label>
-                                    <select name="section_id" class="form-select" required>
-                                        @foreach($sections as $section)
-                                            <option value="{{ $section->id }}" {{ $schedule->section_id == $section->id ? 'selected' : '' }}>
-                                                {{ $section->section_name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
 
-                                <div class="col-md-6">
-                                    <label class="form-label">Room</label>
-                                    <select name="room_id" class="form-select" required>
-                                        @foreach($rooms as $room)
-                                            <option value="{{ $room->id }}" {{ $schedule->room_id == $room->id ? 'selected' : '' }}>
-                                                {{ $room->room_number }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
 
                                 <div class="col-md-6">
                                     <label class="form-label">Day</label>

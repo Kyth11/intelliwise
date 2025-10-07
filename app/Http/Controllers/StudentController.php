@@ -9,31 +9,26 @@ use App\Models\Tuition;
 use App\Models\Gradelvl;
 use App\Models\OptionalFee;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth; // ✅ use facade for clean IDE types
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class StudentController extends Controller
 {
     /**
-     * List students (grouped by grade level).
+     * List students (grouped by grade level) — admin view.
      */
     public function index()
     {
-        // Eager-load optionalFees so we can pre-check them in the modal
         $students  = Student::with(['guardian','optionalFees'])->get()->groupBy('s_gradelvl');
-
         $gradelvls = Gradelvl::all();
         $tuitions  = Tuition::with('optionalFees')->orderBy('updated_at', 'desc')->get();
-
-        // Master list of optional fees (Finances page source)
         $optionalFees = OptionalFee::orderBy('name')->get();
 
         $guardians = Guardian::all()->map(function ($g) {
             $mother = trim(collect([$g->m_firstname, $g->m_middlename, $g->m_lastname])->filter()->implode(' '));
             $father = trim(collect([$g->f_firstname, $g->f_middlename, $g->f_lastname])->filter()->implode(' '));
-            $label  = $mother && $father ? ($mother . ' & ' . $father)
-                    : ($mother ?: ($father ?: 'Guardian #'.$g->id));
-
+            $label  = $mother && $father ? ($mother . ' & ' . $father) : ($mother ?: ($father ?: 'Guardian #'.$g->id));
             $g->display_name    = $label;
             $g->display_contact = $g->g_contact ?: ($g->m_contact ?: ($g->f_contact ?: ''));
             return $g;
@@ -44,17 +39,15 @@ class StudentController extends Controller
         ));
     }
 
-    // ... (rest of your controller stays the same: create/store/update/destroy/resolveTuition)
     /**
-     * Show printable, standalone enrollment form page.
+     * Show enrollment form (faculty sees faculty layout; admin sees admin layout).
      */
     public function create()
     {
         $guardians = Guardian::all()->map(function ($g) {
             $mother = trim(collect([$g->m_firstname, $g->m_middlename, $g->m_lastname])->filter()->implode(' '));
             $father = trim(collect([$g->f_firstname, $g->f_middlename, $g->f_lastname])->filter()->implode(' '));
-            $label  = $mother && $father ? ($mother.' & '.$father)
-                    : ($mother ?: ($father ?: 'Guardian #'.$g->id));
+            $label  = $mother && $father ? ($mother.' & '.$father) : ($mother ?: ($father ?: 'Guardian #'.$g->id));
             $g->display_name    = $label;
             $g->display_contact = $g->g_contact ?: ($g->m_contact ?: ($g->f_contact ?: ''));
             return $g;
@@ -62,11 +55,17 @@ class StudentController extends Controller
 
         $optionalFees = OptionalFee::where('active', true)->orderBy('name')->get();
 
-        return view('auth.admindashboard.enroll-student', compact('guardians', 'optionalFees'));
+        // ✅ IDE-friendly
+        $role = Auth::user()?->role;
+        $view = $role === 'faculty'
+            ? 'auth.facultydashboard.enroll-student'
+            : 'auth.admindashboard.enroll-student';
+
+        return view($view, compact('guardians', 'optionalFees'));
     }
 
     /**
-     * Store new student. If guardian_id === 'new', create a household guardian (parents) and optional user.
+     * Store new student (works for admin & faculty; redirects correctly by role).
      */
     public function store(Request $request)
     {
@@ -78,8 +77,6 @@ class StudentController extends Controller
             's_gradelvl'    => 'required|string',
             's_citizenship' => 'nullable|string',
             's_religion'    => 'nullable|string',
-
-            // optional per-student fees
             'student_optional_fee_ids'   => ['array'],
             'student_optional_fee_ids.*' => ['integer', 'exists:optional_fees,id'],
         ]);
@@ -89,47 +86,37 @@ class StudentController extends Controller
             $guardian_id = null;
 
             if ($request->guardian_id === 'new') {
-                // At least one parent (mother or father) must be provided
                 $hasMother = $request->filled('m_firstname') || $request->filled('m_lastname');
                 $hasFather = $request->filled('f_firstname') || $request->filled('f_lastname');
-
                 if (!$hasMother && !$hasFather) {
                     return back()->with('error', 'Please provide at least Mother or Father details.')->withInput();
                 }
 
                 $request->validate([
                     'g_address'    => 'nullable|string',
-                    // Mother
                     'm_firstname'  => 'nullable|string',
                     'm_middlename' => 'nullable|string',
                     'm_lastname'   => 'nullable|string',
                     'm_contact'    => 'nullable|string',
                     'm_email'      => 'nullable|email',
-                    // Father
                     'f_firstname'  => 'nullable|string',
                     'f_middlename' => 'nullable|string',
                     'f_lastname'   => 'nullable|string',
                     'f_contact'    => 'nullable|string',
                     'f_email'      => 'nullable|email',
-                    // Login
-                    'username'     => 'nullable|string',
+                    'username'     => 'nullable|string|unique:users,username',
                     'password'     => 'nullable|string|min:6',
                 ]);
 
                 $guardian = Guardian::create([
                     'g_address'    => $request->g_address,
-                    // household contact/email fallback
                     'g_contact'    => $request->m_contact ?: ($request->f_contact ?: null),
                     'g_email'      => $request->m_email   ?: ($request->f_email   ?: null),
-
-                    // Mother
                     'm_firstname'  => $request->m_firstname,
                     'm_middlename' => $request->m_middlename,
                     'm_lastname'   => $request->m_lastname,
                     'm_contact'    => $request->m_contact,
                     'm_email'      => $request->m_email,
-
-                    // Father
                     'f_firstname'  => $request->f_firstname,
                     'f_middlename' => $request->f_middlename,
                     'f_lastname'   => $request->f_lastname,
@@ -138,7 +125,6 @@ class StudentController extends Controller
                 ]);
                 $guardian_id = $guardian->id;
 
-                // Single login for the household (parents)
                 if ($request->has('has_login')) {
                     $motherName  = trim(collect([$guardian->m_firstname, $guardian->m_lastname])->filter()->implode(' '));
                     $fatherName  = trim(collect([$guardian->f_firstname, $guardian->f_lastname])->filter()->implode(' '));
@@ -164,15 +150,12 @@ class StudentController extends Controller
                 $guardian_id = $request->guardian_id;
             }
 
-            // Resolve tuition from grade level (includes grade-level optional fees in total_yearly)
             [$tuitionId, $baseTotal] = $this->resolveTuition($request->s_gradelvl);
 
-            // Sum selected per-student optional fees
             $studentOptIds = collect($request->input('student_optional_fee_ids', []))->filter()->unique()->values();
-            $studentOptSum = 0.0;
-            if ($studentOptIds->isNotEmpty()) {
-                $studentOptSum = (float) OptionalFee::whereIn('id', $studentOptIds)->sum('amount');
-            }
+            $studentOptSum = $studentOptIds->isNotEmpty()
+                ? (float) OptionalFee::whereIn('id', $studentOptIds)->sum('amount')
+                : 0.0;
 
             $student = Student::create([
                 's_firstname'        => $request->s_firstname,
@@ -187,14 +170,13 @@ class StudentController extends Controller
                 's_gradelvl'         => $request->s_gradelvl,
                 'enrollment_status'  => $request->enrollment_status ?? 'Enrolled',
                 'payment_status'     => $request->payment_status ?? 'Not Paid',
-                's_tuition_sum'      => $baseTotal,                         // base incl. grade-level optionals
-                's_optional_total'   => round($studentOptSum, 2),           // per-student optionals
+                's_tuition_sum'      => $baseTotal,
+                's_optional_total'   => round($studentOptSum, 2),
                 's_total_due'        => round($baseTotal + $studentOptSum, 2),
                 'tuition_id'         => $tuitionId,
                 'guardian_id'        => $guardian_id,
             ]);
 
-            // Attach per-student optional fees
             if ($studentOptIds->isNotEmpty()) {
                 $attach = [];
                 foreach ($studentOptIds as $fid) {
@@ -204,10 +186,16 @@ class StudentController extends Controller
             }
 
             DB::commit();
-            return redirect()->route('admin.dashboard')->with('success', 'Student enrolled successfully!');
+
+            // ✅ Role-aware redirect (no 403 for faculty)
+            $role  = Auth::user()?->role;
+            $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.dashboard';
+            return redirect()->route($route)->with('success', 'Student enrolled successfully!');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->route('admin.dashboard')->with('error', 'Failed to enroll student. Please check your input.');
+            $role  = Auth::user()?->role;
+            $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.dashboard';
+            return redirect()->route($route)->with('error', 'Failed to enroll student. Please check your input.');
         }
     }
 
@@ -224,7 +212,6 @@ class StudentController extends Controller
             's_gradelvl'    => 'nullable|string',
             's_citizenship' => 'nullable|string',
             's_religion'    => 'nullable|string',
-
             'student_optional_fee_ids'   => ['array'],
             'student_optional_fee_ids.*' => ['integer', 'exists:optional_fees,id'],
         ]);
@@ -236,10 +223,9 @@ class StudentController extends Controller
             [$tuitionId, $baseTotal] = $this->resolveTuition($grade);
 
             $studentOptIds = collect($request->input('student_optional_fee_ids', []))->filter()->unique()->values();
-            $studentOptSum = 0.0;
-            if ($studentOptIds->isNotEmpty()) {
-                $studentOptSum = (float) OptionalFee::whereIn('id', $studentOptIds)->sum('amount');
-            }
+            $studentOptSum = $studentOptIds->isNotEmpty()
+                ? (float) OptionalFee::whereIn('id', $studentOptIds)->sum('amount')
+                : 0.0;
 
             $student->update([
                 's_firstname'       => $request->s_firstname,
@@ -260,16 +246,19 @@ class StudentController extends Controller
                 'tuition_id'        => $tuitionId,
             ]);
 
-            // Sync per-student optionals
             $sync = [];
             foreach ($studentOptIds as $fid) {
                 $sync[$fid] = ['amount_override' => null];
             }
             $student->optionalFees()->sync($sync);
 
-            return redirect()->route('admin.students')->with('success', 'Student updated successfully.');
+            $role  = Auth::user()?->role;
+            $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.students';
+            return redirect()->route($route)->with('success', 'Student updated successfully.');
         } catch (\Exception $e) {
-            return redirect()->route('admin.students')->with('error', 'Failed to update student.');
+            $role  = Auth::user()?->role;
+            $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.students';
+            return redirect()->route($route)->with('error', 'Failed to update student.');
         }
     }
 
@@ -281,7 +270,6 @@ class StudentController extends Controller
         try {
             $student = Student::findOrFail($id);
             $student->delete();
-
             return redirect()->back()->with('success', 'Student archived successfully.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to archive student.');
@@ -303,7 +291,6 @@ class StudentController extends Controller
             ->orderByDesc('created_at')
             ->first();
 
-        // total_yearly already includes grade-level optional fees
         return [$t?->id, $t?->total_yearly ?? 0];
     }
 }

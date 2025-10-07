@@ -38,11 +38,6 @@
                 <i class="bi bi-people"></i><span> Students</span>
             </a>
 
-            <a href="{{ route('faculty.assignments') }}"
-                class="sidebar-link {{ request()->routeIs('faculty.assignments') ? 'active' : '' }}">
-                <i class="bi bi-journal-text"></i><span> Assignments</span>
-            </a>
-
             <a href="{{ route('faculty.schedule') }}"
                 class="sidebar-link {{ request()->routeIs('faculty.schedule') ? 'active' : '' }}">
                 <i class="bi bi-calendar-event"></i><span> Schedule</span>
@@ -59,12 +54,7 @@
         </div>
 
         <!-- Content -->
-        <div class="content" id="content">
-            <div class="topbar d-flex justify-content-between align-items-center mb-4">
-                <h3 class="mb-0">
-                    Welcome, {{ auth()->user()->name ?? 'Faculty' }}!
-                </h3>
-            </div>
+    <div class="content" id="content">
 
             {{-- Flash messages --}}
             <div class="flash-messages position-fixed top-5 start-50 translate-middle-x mt-3" style="z-index:1050;">

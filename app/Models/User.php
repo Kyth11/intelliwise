@@ -10,14 +10,25 @@ class User extends Authenticatable
     use Notifiable;
 
     protected $fillable = [
-        'name', 'username', 'password', 'role', 'guardian_id', 'faculty_id'
+        'name',
+        'username',
+        'password',
+        'role',
+        'guardian_id',
+        'faculty_id',
     ];
 
     protected $hidden = [
-        'password', 'remember_token',
+        'password',
+        'remember_token',
     ];
 
-    // Correct relationships
+    // If you're on Laravel 10+, this will auto-hash assigned passwords:
+    // (Safe to keep even if you still call bcrypt() manually.)
+    protected $casts = [
+        'password' => 'hashed',
+    ];
+
     public function guardian()
     {
         return $this->belongsTo(Guardian::class, 'guardian_id');

@@ -17,6 +17,7 @@ use App\Models\Subjects;
 use App\Models\Gradelvl;
 use App\Models\Schoolyr;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth; // ✅ use Facade for IDE-friendly Auth::id()
 
 class AdminDashboardController extends Controller
 {
@@ -128,15 +129,15 @@ class AdminDashboardController extends Controller
     {
         $toDelete = User::where('id', $id)->where('role', 'admin')->firstOrFail();
 
-        // Prevent deleting self
-        if (auth()->id() === $toDelete->id) {
-            return back()->with('error', "You cannot delete your own account.");
+        // Prevent deleting self (use Facade so IDEs don't underline)
+        if (Auth::id() === $toDelete->id) {
+            return back()->with('error', 'You cannot delete your own account.');
         }
 
         // Prevent deleting the last remaining admin
         $adminCount = User::where('role', 'admin')->count();
         if ($adminCount <= 1) {
-            return back()->with('error', "Cannot delete the last admin account.");
+            return back()->with('error', 'Cannot delete the last admin account.');
         }
 
         $toDelete->delete();
@@ -520,13 +521,14 @@ class AdminDashboardController extends Controller
 
         return back()->with('success', 'Optional fee deleted.');
     }
-    public function finances()
-{
-    // Ensure relations exist: Tuition has relation optionalFees()
-    $tuitions      = Tuition::with('optionalFees')->orderBy('grade_level')->get();
-    $optionalFees  = OptionalFee::orderBy('name')->get();
-    $schoolyrs     = Schoolyr::orderBy('school_year', 'desc')->get();
 
-    return view('auth.admindashboard.finances', compact('tuitions', 'optionalFees', 'schoolyrs'));
-}
+    public function finances()
+    {
+        // Ensure relations exist: Tuition has relation optionalFees()
+        $tuitions      = Tuition::with('optionalFees')->orderBy('grade_level')->get();
+        $optionalFees  = OptionalFee::orderBy('name')->get();
+        $schoolyrs     = Schoolyr::orderBy('school_year', 'desc')->get();
+
+        return view('auth.admindashboard.finances', compact('tuitions', 'optionalFees', 'schoolyrs'));
+    }
 }

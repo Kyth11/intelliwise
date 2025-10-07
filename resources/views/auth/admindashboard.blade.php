@@ -5,46 +5,122 @@
 @push('styles')
     {{-- DataTables + Bootstrap 5 CSS --}}
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+
+    <style>
+        /* -------- Header layout (mirrors Faculty) -------- */
+        #dashboard-header {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 1rem;
+            align-items: stretch;
+        }
+        #dashboard-header .intro {
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            padding: .75rem 1rem;
+            background: var(--bs-body-bg);
+        }
+
+        /* ---- Compact KPI strip (center) ---- */
+        .kpi-strip {
+            display: grid;
+            grid-auto-flow: column;
+            grid-auto-columns: 1fr;
+            gap: .75rem;
+            align-items: center;
+            justify-items: center;
+            padding: .5rem;
+            min-width: 300px;
+        }
+        .kpi-card {
+            width: 120px;
+            border-radius: .75rem;
+            border: 1px solid var(--bs-border-color, rgba(0,0,0,.12));
+            background: var(--bs-body-bg);
+            box-shadow: 0 2px 8px rgba(0,0,0,.06);
+            padding: .5rem .75rem;
+            text-align: center;
+        }
+        .kpi-number {
+            line-height: 1;
+            font-weight: 700;
+            font-size: 1.35rem;
+        }
+        .kpi-label {
+            font-size: .75rem;
+            color: var(--bs-secondary-color);
+            white-space: nowrap;
+        }
+
+        /* ---- Enroll card (right) ---- */
+        .enroll-card {
+            min-width: 260px;
+            border: 1px solid var(--bs-border-color, rgba(0,0,0,.125));
+            box-shadow: 0 2px 8px rgba(0,0,0,.06);
+            border-radius: .75rem;
+        }
+        .enroll-card .btn { width: 100%; }
+
+        .list-toggle-wrap { text-align: center; }
+
+        /* -------- Responsive -------- */
+        @media (max-width: 992px) {
+            #dashboard-header {
+                grid-template-columns: 1fr;
+            }
+            .kpi-strip {
+                order: 2;
+                grid-auto-flow: row;
+                grid-auto-rows: 1fr;
+                grid-template-columns: repeat(2, 1fr);
+                min-width: 0;
+                padding: 0;
+            }
+            .enroll-card { order: 3; }
+            .intro { order: 1; }
+        }
+        @media (max-width: 400px) {
+            .kpi-card { width: 100%; }
+        }
+    </style>
 @endpush
 
 @section('content')
-    <!-- Local styles for header + top-right enroll card -->
-    <style>
-        #dashboard-header {
-            display: flex;
-            align-items: start;
-            justify-content: space-between;
-            gap: 1rem;
-        }
-        #dashboard-header .intro { min-width: 0; }
-        #dashboard-header .enroll-card {
-            min-width: 260px; max-width: 320px;
-            border: 1px solid rgba(0,0,0,.075);
-            box-shadow: 0 2px 8px rgba(0,0,0,.06);
-        }
-        #dashboard-header .enroll-card .btn { width: 100%; }
-        .list-toggle-wrap { text-align: center; }
-
-        @media (max-width: 768px) {
-            #dashboard-header { flex-direction: column; }
-            #dashboard-header .enroll-card { width: 100%; max-width: none; order: 2; }
-            #dashboard-header .intro { order: 1; }
-        }
-    </style>
-
     <div class="card section p-4">
-        <!-- Header row with top-right enroll card -->
+        <!-- Header: Welcome | KPIs (center) | Enroll -->
         <div id="dashboard-header" class="mb-3">
             <div class="intro">
-                <h4>Welcome, {{ Auth::check() ? Auth::user()->name : 'Faculty' }}!</h4>
-                <p>Here’s a quick overview of the system.</p>
+                <div>
+                    <h5 class="mb-1">Welcome, {{ Auth::check() ? Auth::user()->name : 'Admin' }}!</h5>
+                    <div class="text-muted small">Here’s a quick system snapshot and your tools.</div>
+                </div>
             </div>
 
-            <!-- Enroll Student (top-right) -->
+            <!-- KPI strip (center) -->
+            <div class="kpi-strip">
+                <div class="kpi-card">
+                    <div class="kpi-number">{{ $students->count() }}</div>
+                    <div class="kpi-label">Total Students</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-number">{{ $faculties->count() }}</div>
+                    <div class="kpi-label">Teachers</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-number">{{ $guardians->count() + $faculties->count() }}</div>
+                    <div class="kpi-label">System Users</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-number">{{ $announcements->count() }}</div>
+                    <div class="kpi-label">Announcements</div>
+                </div>
+            </div>
+
+            <!-- Enroll & Finances (right) -->
             <div class="card enroll-card p-3 text-center">
                 <h6 class="mb-1">Enroll a Student</h6>
-                <p class="text-muted mb-3">Add a new student to the system.</p>
-                {{-- Link to printable enrollment page --}}
+                <p class="text-muted mb-3 small">Add a new student to the system.</p>
                 <a href="{{ route('students.create') }}" class="btn btn-primary">
                     <i class="bi bi-person-plus me-2"></i> Enroll Now
                 </a>
@@ -54,38 +130,10 @@
             </div>
         </div>
 
-        <!-- Dashboard Cards -->
-        <div class="row mt-2" id="stats-cards">
-            <div class="col-md-3 mb-3">
-                <div class="card p-3 text-center shadow-sm">
-                    <h6>Total Students</h6>
-                    <h3>{{ $students->count() }}</h3>
-                </div>
-            </div>
-            <div class="col-md-3 mb-3">
-                <div class="card p-3 text-center shadow-sm">
-                    <h6>Total Teachers</h6>
-                    <h3>{{ $faculties->count() }}</h3>
-                </div>
-            </div>
-            <div class="col-md-3 mb-3">
-                <div class="card p-3 text-center shadow-sm">
-                    <h6>System Users</h6>
-                    <h3>{{ $guardians->count() + $faculties->count() }}</h3>
-                </div>
-            </div>
-            <div class="col-md-3 mb-3">
-                <div class="card p-3 text-center shadow-sm">
-                    <h6>Active Announcements</h6>
-                    <h3>{{ $announcements->count() }}</h3>
-                </div>
-            </div>
-        </div>
-
         <!-- Announcements -->
-        <div class="card mt-4 p-4" id="announcements-section">
+        <div class="card mt-2 p-4" id="announcements-section">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5>Announcements</h5>
+                <h5 class="mb-0">Announcements</h5>
                 <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addAnnouncementModal">
                     <i class="bi bi-megaphone me-1"></i> Add
                 </button>
@@ -126,7 +174,7 @@
 
                                 <!-- DELETE (SweetAlert2) -->
                                 <form action="{{ route('announcements.destroy', $a->id) }}" method="POST"
-                                    class="d-inline js-confirm-delete" data-confirm="Delete this announcement?">
+                                      class="d-inline js-confirm-delete" data-confirm="Delete this announcement?">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-danger js-delete-btn" aria-label="Delete announcement">
@@ -274,7 +322,7 @@
     </script>
 
     <script>
-        // DataTables for #scheduleTable only (Tuition/Fees moved to Finances page)
+        // DataTables for #scheduleTable
         $(function () {
             const scheduleDT = $('#scheduleTable').DataTable({
                 dom: 'lrtip',
