@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Tuition extends Model
 {
@@ -10,18 +12,10 @@ class Tuition extends Model
 
     protected $fillable = [
         'grade_level',
-        // tuition
-        'tuition_monthly',
-        'tuition_yearly',
-        // misc
-        'misc_monthly',
-        'misc_yearly',
-        // books
-        'books_desc',
-        'books_amount',
-        // totals + sy
-        'total_yearly',
-        'school_year',
+        'tuition_monthly','tuition_yearly',
+        'misc_monthly','misc_yearly',
+        'books_desc','books_amount',
+        'total_yearly','school_year',
     ];
 
     protected $casts = [
@@ -33,11 +27,8 @@ class Tuition extends Model
         'total_yearly'    => 'decimal:2',
     ];
 
-    /**
-     * Grade-level Optional Fees attached to this tuition.
-     * Pivot table: tuition_optional_fee (tuition_id, optional_fee_id)
-     */
-    public function optionalFees()
+    /** Grade-level Optional Fees attached to this tuition. */
+    public function optionalFees(): BelongsToMany
     {
         return $this->belongsToMany(
             OptionalFee::class,
@@ -45,5 +36,11 @@ class Tuition extends Model
             'tuition_id',
             'optional_fee_id'
         )->withTimestamps();
+    }
+
+    /** Payments recorded against this tuition (FK = tuition_id). */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payments::class, 'tuition_id');
     }
 }

@@ -293,4 +293,5 @@ class StudentController extends Controller
 
         return [$t?->id, $t?->total_yearly ?? 0];
     }
+    
 }
