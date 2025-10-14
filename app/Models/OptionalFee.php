@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class OptionalFee extends Model
 {
@@ -13,15 +14,23 @@ class OptionalFee extends Model
         'amount' => 'decimal:2',
     ];
 
-    public function tuitions()
+    public function tuitions(): BelongsToMany
     {
         return $this->belongsToMany(Tuition::class, 'tuition_optional_fee')->withTimestamps();
     }
 
-    public function students()
+    /**
+     * ✅ Pivot table is `optional_fee_student`
+     * columns: optional_fee_id, student_id
+     */
+    public function students(): BelongsToMany
     {
-        return $this->belongsToMany(Student::class, 'student_optional_fees')
-            ->withPivot('amount_override')
-            ->withTimestamps();
+        return $this->belongsToMany(
+            Student::class,
+            'optional_fee_student',   // <- correct table name
+            'optional_fee_id',        // FK to optional_fees
+            'student_id'              // FK to students
+        )->withTimestamps();
+        // ->withPivot('amount_override'); // not present in your schema
     }
 }

@@ -29,6 +29,10 @@ return new class extends Migration {
         });
     }
 
+        /**
+         * Optional: revert to previous state (keep the column but make it nullable string anyway)
+         * No destructive revert to avoid data loss
+         */
     public function down(): void
     {
         // Optional: revert to previous state (keep the column but make it nullable string anyway)

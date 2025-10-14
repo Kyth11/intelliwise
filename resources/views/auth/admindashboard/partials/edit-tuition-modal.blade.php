@@ -45,10 +45,6 @@
           </div>
 
           <div class="row g-2 mt-2">
-            <div class="col-7">
-              <label>Books (desc)</label>
-              <input type="text" name="books_desc" class="form-control" value="{{ old('books_desc', $t->books_desc) }}">
-            </div>
             <div class="col-5">
               <label>Books Amount ₱ (optional)</label>
               <input type="number" step="0.01" name="books_amount" id="edit_books_{{ $t->id }}" class="form-control"

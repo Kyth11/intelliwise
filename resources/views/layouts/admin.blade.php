@@ -60,10 +60,16 @@
                 <i class="bi bi-journal-check"></i><span> Grades</span>
             </a>
 
-            {{-- NEW: Finances --}}
+            {{-- Finances --}}
             <a href="{{ route('admin.finances') }}"
                class="sidebar-link {{ request()->routeIs('admin.finances') ? 'active' : '' }}">
                 <i class="bi bi-cash-coin"></i><span> Finances</span>
+            </a>
+
+            {{-- NEW: Reports (Enrollment) --}}
+            <a href="{{ route('admin.reports.enrollments') }}"
+               class="sidebar-link {{ request()->routeIs('admin.reports.enrollments') ? 'active' : '' }}">
+                <i class="bi bi-table"></i><span> Reports</span>
             </a>
 
             <a href="{{ route('admin.settings') }}"

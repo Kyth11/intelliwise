@@ -4,7 +4,6 @@
 
 @push('styles')
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-
 @endpush
 
 @section('content')
@@ -14,8 +13,7 @@
             <div class="intro">
                 <div>
                     <h5 class="mb-1">Welcome, {{ Auth::check() ? Auth::user()->name : 'Guardian' }}!</h5>
-                    <div class="text-muted small">Here’s a quick snapshot of your learners, balances, and announcements.
-                    </div>
+                    <div class="text-muted small">Here’s a quick snapshot of your learners, balances, and announcements.</div>
                 </div>
             </div>
 
@@ -81,7 +79,7 @@
                             </div>
 
                             <a href="{{ route('guardians.dashboard') }}#announcements-section"
-                                class="btn btn-sm btn-outline-secondary">
+                               class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-eye"></i> View
                             </a>
                         </li>
@@ -105,29 +103,64 @@
 
             @if($children->count())
                 <div class="table-responsive">
-                    <table class="table table-bordered table-striped">
+                    <table class="table table-bordered table-striped align-middle">
                         <thead class="table-light">
                             <tr>
                                 <th>Name</th>
                                 <th>Grade Level</th>
-                                <th>Balance</th>
+                                <th class="text-end">Total Paid</th>
+                                <th class="text-end">Current Balance</th>
+                                <th>Last Payment</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach($children as $st)
                                 @php
+                                    // Name & grade display
                                     $name = $st->full_name
                                         ?? trim(implode(' ', array_filter([$st->s_firstname ?? '', $st->s_middlename ?? '', $st->s_lastname ?? ''])));
-                                    if ($name === '')
-                                        $name = 'Student #' . $st->id;
+                                    if ($name === '') $name = 'Student #' . $st->id;
 
                                     $grade = $st->s_gradelvl ?? optional($st->gradelvl)->grade_level ?? '—';
-                                    $due = isset($st->_computed_due) ? (float) $st->_computed_due : (method_exists($st, 'getTotalDueAttribute') ? $st->total_due : 0.0);
+
+                                    // Base figures from student fields
+                                    $base      = (float) ($st->s_tuition_sum    ?? 0);
+                                    $opt       = (float) ($st->s_optional_total ?? 0);
+                                    $origTotal = $base + $opt;
+
+                                    // Current balance from column (fallback to original total)
+                                    $balance   = isset($st->s_total_due) ? (float) $st->s_total_due : $origTotal;
+
+                                    // Totals via relation (prefer payments sum; fallback to orig - balance)
+                                    $paymentsRelationLoaded = isset($st->payments) || method_exists($st, 'payments');
+                                    $totalPaid = null;
+                                    $lastPay = null;
+
+                                    if ($paymentsRelationLoaded) {
+                                        // lazy load ok in blade; eager-load later if you want to optimize
+                                        $totalPaid = (float) ($st->payments()->sum('amount') ?? 0);
+                                        $lastPay   = $st->payments()->latest()->first();
+                                    }
+
+                                    if ($totalPaid === null) {
+                                        $totalPaid = max($origTotal - $balance, 0);
+                                    }
+
+                                    // Last payment display string
+                                    $lastPaymentText = '—';
+                                    if ($lastPay) {
+                                        $lpAmt   = number_format((float) $lastPay->amount, 2);
+                                        $lpWhen  = \Illuminate\Support\Carbon::parse($lastPay->created_at)->format('Y-m-d g:i A');
+                                        $lpMeth  = $lastPay->payment_method ?? null;
+                                        $lastPaymentText = "₱{$lpAmt} on {$lpWhen}" . ($lpMeth ? " ({$lpMeth})" : '');
+                                    }
                                 @endphp
                                 <tr>
                                     <td>{{ $name }}</td>
                                     <td>{{ $grade }}</td>
-                                    <td>₱{{ number_format($due, 2) }}</td>
+                                    <td class="text-end">₱{{ number_format($totalPaid, 2) }}</td>
+                                    <td class="text-end">₱{{ number_format($balance, 2) }}</td>
+                                    <td>{{ $lastPaymentText }}</td>
                                 </tr>
                             @endforeach
                         </tbody>

@@ -32,7 +32,6 @@
     </div>
 
     @php
-        // Build a quick lookup from Tuitions by grade level
         $tuitionMap = collect($tuitions ?? collect())->keyBy('grade_level');
     @endphp
 
@@ -58,18 +57,18 @@
                             <th class="opt-fees-cell">Optional Fees (selected)</th>
                             <th>Optional (₱)</th>
                             <th>Total Due (₱)</th>
+                            <th>Paid (₱)</th>
+                            <th>Balance (₱)</th>
                             <th class="text-nowrap">Tools</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($group as $s)
                             @php
-                                // Base tuition (includes grade-level optionals inside total_yearly if you precomputed that)
                                 $row  = $tuitionMap->get($s->s_gradelvl);
                                 $base = $row ? (float) $row->total_yearly
                                              : (($s->s_tuition_sum !== null && $s->s_tuition_sum !== '') ? (float) $s->s_tuition_sum : 0);
 
-                                // Student-level optional fees selected (via pivot), respect scope & active
                                 $optCollection = collect($s->optionalFees ?? []);
                                 $filtered = $optCollection->filter(function ($f) {
                                     $scopeOk = !isset($f->scope) || in_array($f->scope, ['student', 'both']);
@@ -77,13 +76,11 @@
                                     return $scopeOk && $activeOk;
                                 });
 
-                                // Sum with pivot override if present
                                 $opt = (float) $filtered->sum(function($f){
                                     $amt = $f->pivot->amount_override ?? $f->amount;
                                     return (float) $amt;
                                 });
 
-                                // Human list "Name (₱amount)"
                                 $optLabels = $filtered->map(function($f){
                                     $amt = (float) ($f->pivot->amount_override ?? $f->amount);
                                     return e($f->name) . ' (₱' . number_format($amt, 2) . ')';
@@ -93,9 +90,14 @@
                                     ? '<ul class="opt-fees-list">'.collect($optLabels)->map(fn($l)=>'<li>'.$l.'</li>')->implode('').' </ul>'
                                     : '—';
 
-                                $due  = $base + $opt;
+                                $originalTotal = $base + $opt;
 
-                                // Household/parents label
+                                // current balance stored (s_total_due), fallback to original if null
+                                $currentBalance = (float) ($s->s_total_due ?? $originalTotal);
+
+                                // paid so far (for display)
+                                $paid = max($originalTotal - $currentBalance, 0);
+
                                 $g = $s->guardian;
                                 $mFirst = trim(collect([data_get($g,'m_firstname'), data_get($g,'m_middlename')])->filter()->implode(' '));
                                 $mLast  = (string) data_get($g,'m_lastname', '');
@@ -133,10 +135,9 @@
                                     $household .= ' / '.$guardianName;
                                 }
 
-                                // Preselected student fee IDs for the modal
                                 $feeIdsCsv = $filtered->pluck('id')->implode(',');
                             @endphp
-                            <tr>
+                            <tr data-id="{{ $s->id }}">
                                 <td>{{ $s->s_firstname }} {{ $s->s_middlename }} {{ $s->s_lastname }}</td>
                                 <td>{{ \Illuminate\Support\Carbon::parse($s->s_birthdate)->format('Y-m-d') }}</td>
                                 <td>{{ $household }}</td>
@@ -150,7 +151,15 @@
                                 {{-- Optional Sum --}}
                                 <td>{{ number_format($opt, 2) }}</td>
 
-                                <td class="fw-semibold">{{ number_format($due, 2) }}</td>
+                                {{-- Original total (base + optionals) --}}
+                                <td class="fw-semibold">{{ number_format($originalTotal, 2) }}</td>
+
+                                {{-- Paid so far --}}
+                                <td class="text-success fw-semibold">{{ number_format($paid, 2) }}</td>
+
+                                {{-- Current balance --}}
+                                <td class="text-danger fw-semibold">{{ number_format($currentBalance, 2) }}</td>
+
                                 <td class="text-nowrap">
                                     <button class="btn btn-sm btn-warning"
                                             data-bs-toggle="modal"
@@ -223,27 +232,28 @@
     document.getElementById('studentSearch').addEventListener('input', attachGlobalFilter);
 
     // Archive confirm
-    document.querySelectorAll('.delete-btn').forEach(button => {
-        button.addEventListener('click', function () {
-            const form = this.closest('form');
-            Swal.fire({
-                title: 'Are you sure to delete this student record?',
-                text: "You can't undo this action.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Yes, proceed',
-                reverseButtons: true,
-                background: '#fff',
-                backdrop: false,
-                allowOutsideClick: true,
-                allowEscapeKey: true
-            }).then((result) => {
-                if (result.isConfirmed) form.submit();
-            });
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.delete-btn');
+        if (!btn) return;
+        const form = btn.closest('form');
+        Swal.fire({
+            title: 'Are you sure to delete this student record?',
+            text: "You can't undo this action.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, proceed',
+            reverseButtons: true,
+            background: '#fff',
+            backdrop: false,
+            allowOutsideClick: true,
+            allowEscapeKey: true
+        }).then((result) => {
+            if (result.isConfirmed) form.submit();
         });
     });
+
 </script>
 @endsection
 
@@ -253,7 +263,6 @@
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
     <script>
-        // Initialize a DataTable per grade-level table and register for global filter
         $(function () {
             $('.student-table').each(function () {
                 const $table = $(this);
@@ -264,7 +273,7 @@
                     order: [],
                     language: { emptyTable: "No students in this grade." },
                     columnDefs: [
-                        { targets: -1, orderable: false } // Tools column
+                        { targets: -1, orderable: false }
                     ]
                 });
 

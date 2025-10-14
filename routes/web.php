@@ -6,11 +6,14 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\AdminDashboardController;
 use App\Http\Controllers\Auth\FacultyDashboardController;
 use App\Http\Controllers\Auth\GuardianDashboardController;
+use App\Http\Controllers\Auth\PaymentsController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\GradesController;
 use App\Http\Controllers\FacultyGradesController;
 
-Route::get('/', fn () => redirect()->route('login'));
+use App\Http\Controllers\EnrollmentReportController;
+
+Route::get('/', fn() => redirect()->route('login'));
 
 // ====================
 // Authentication
@@ -35,6 +38,7 @@ Route::middleware(['auth'])->group(function () {
 
         // Finances
         Route::get('/finances', [AdminDashboardController::class, 'finances'])->name('admin.finances');
+
 
         // Students
         Route::get('/students', [StudentController::class, 'index'])->name('admin.students');
@@ -86,59 +90,68 @@ Route::middleware(['auth'])->group(function () {
 
         // Grades (Admin view)
         Route::get('/grades', [GradesController::class, 'index'])->name('admin.grades');
+
+        // Payments (admin only)
+        Route::post('/payments/store', [PaymentsController::class, 'store'])->name('payments.store');
+
+        // ======================
+        // Reports (Enrollment)
+        // ======================
+        Route::get('/reports/enrollments', [EnrollmentReportController::class, 'index'])
+            ->name('admin.reports.enrollments');
+    });
+/**
+ * ====================
+ * Faculty Panel (self-service)
+ * ====================
+ */
+Route::middleware(['role:faculty'])
+    ->prefix('faculty')
+    ->name('faculty.')
+    ->group(function () {
+        Route::get('/', [FacultyDashboardController::class, 'index'])->name('dashboard');
+
+        // Students list (scoped)
+        Route::get('/students', [FacultyDashboardController::class, 'students'])->name('students');
+
+        // Announcements (Faculty-scoped CRUD)
+        Route::post('/announcements', [FacultyDashboardController::class, 'storeAnnouncement'])->name('announcements.store');
+        Route::put('/announcements/{id}', [FacultyDashboardController::class, 'updateAnnouncement'])->name('announcements.update');
+        Route::delete('/announcements/{id}', [FacultyDashboardController::class, 'destroyAnnouncement'])->name('announcements.destroy');
+
+        // Faculty Enrollment page
+        Route::get('/students/enroll', [FacultyDashboardController::class, 'enrollForm'])->name('students.create');
+        Route::post('/students/store', [StudentController::class, 'store'])->name('students.store');
+
+        // Other faculty pages
+        Route::get('/schedule', [FacultyDashboardController::class, 'schedule'])->name('schedule');
+        Route::view('/settings', 'auth.facultydashboard.setting')->name('settings');
+
+        // Self profile update
+        Route::put('/profile', [FacultyDashboardController::class, 'updateSelf'])->name('profile.update');
+        Route::put('/profile/{id}', [FacultyDashboardController::class, 'update'])->name('profile.update.byid');
+
+        // Faculty Grades
+        Route::get('/grades', [FacultyGradesController::class, 'index'])->name('grades.index');
+        Route::post('/grades', [FacultyGradesController::class, 'store'])->name('grades.store');
     });
 
-    /**
-     * ====================
-     * Faculty Panel (self-service)
-     * ====================
-     */
-    Route::middleware(['role:faculty'])
-        ->prefix('faculty')
-        ->name('faculty.')
-        ->group(function () {
-            Route::get('/', [FacultyDashboardController::class, 'index'])->name('dashboard');
+/**
+ * ====================
+ * Guardian Panel (self-service)
+ * ====================
+ */
+Route::middleware(['role:guardian'])
+    ->prefix('guardians')
+    ->name('guardians.')
+    ->group(function () {
+        Route::get('/dashboard', [GuardianDashboardController::class, 'index'])->name('dashboard');
+        Route::view('/children', 'auth.guardiandashboard.children')->name('children');
+        Route::view('/reports', 'auth.guardiandashboard.reports')->name('reports');
+        Route::view('/settings', 'auth.guardiandashboard.settings')->name('settings');
 
-            // Students list (scoped)
-            Route::get('/students', [FacultyDashboardController::class, 'students'])->name('students');
-
-            // Announcements (Faculty-scoped CRUD)
-            Route::post('/announcements', [FacultyDashboardController::class, 'storeAnnouncement'])->name('announcements.store');
-            Route::put('/announcements/{id}', [FacultyDashboardController::class, 'updateAnnouncement'])->name('announcements.update');
-            Route::delete('/announcements/{id}', [FacultyDashboardController::class, 'destroyAnnouncement'])->name('announcements.destroy');
-
-            // Faculty Enrollment page uses faculty layout
-            Route::get('/students/enroll', [FacultyDashboardController::class, 'enrollForm'])->name('students.create');
-            Route::post('/students/store', [StudentController::class, 'store'])->name('students.store');
-
-            // Other faculty pages
-            Route::get('/schedule', [FacultyDashboardController::class, 'schedule'])->name('schedule');
-            Route::view('/settings', 'auth.facultydashboard.setting')->name('settings');
-
-            // ✅ Self profile update (no id)
-            Route::put('/profile', [FacultyDashboardController::class, 'updateSelf'])->name('profile.update');
-            Route::put('/profile/{id}', [FacultyDashboardController::class, 'update'])->name('profile.update.byid');
-
-            // ✅ Faculty Grades (THIS replaces any duplicates you had elsewhere)
-            Route::get('/grades',  [FacultyGradesController::class, 'index'])->name('grades.index');
-            Route::post('/grades', [FacultyGradesController::class, 'store'])->name('grades.store');
-        });
-
-    /**
-     * ====================
-     * Guardian Panel (self-service)
-     * ====================
-     */
-    Route::middleware(['role:guardian'])
-        ->prefix('guardians')
-        ->name('guardians.')
-        ->group(function () {
-            Route::get('/dashboard', [GuardianDashboardController::class, 'index'])->name('dashboard');
-            Route::view('/children', 'auth.guardiandashboard.children')->name('children');
-            Route::view('/reports',  'auth.guardiandashboard.reports')->name('reports');
-            Route::view('/settings', 'auth.guardiandashboard.settings')->name('settings');
-
-            // Self update
-            Route::put('/{id}', [GuardianDashboardController::class, 'update'])->name('self.update');
-        });
+        // Self update
+        Route::put('/{id}', [GuardianDashboardController::class, 'update'])->name('self.update');
+    });
 });
+

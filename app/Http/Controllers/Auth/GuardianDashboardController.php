@@ -9,6 +9,7 @@ use App\Models\Guardian;
 use App\Models\Student;
 use App\Models\User;
 use App\Models\Tuition;
+use App\Models\Announcement;
 
 class GuardianDashboardController extends Controller
 {
@@ -23,38 +24,50 @@ class GuardianDashboardController extends Controller
 
         // ----- GUARDIAN PANEL -----
         if ($user && $user->role === 'guardian') {
-            // Eager load tuition + optional fees to avoid N+1 and let us compute totals
+            // Eager-load everything the view needs (avoid N+1).
             $guardian = Guardian::with([
                 'students.tuition',
                 'students.optionalFees',
                 'students.gradelvl',
+                'students.payments',      // IMPORTANT for totals/last payment
             ])->find($user->guardian_id);
 
-            // Build a quick lookup: grade_level -> latest tuition total_yearly (fallback for legacy rows)
+            if (!$guardian) {
+                // Safety: no guardian record linked to the user yet
+                return view('auth.guardiandashboard', [
+                    'guardian'      => null,
+                    'children'      => collect(),
+                    'kpiLearners'   => 0,
+                    'kpiBalance'    => 0.0,
+                    'announcements' => collect(),
+                ]);
+            }
+
+            // Students (already eager-loaded above)
+            $children    = $guardian->students ?? collect();
+            $kpiLearners = $children->count();
+
+            // Build a quick lookup (only used as a fallback for legacy rows)
             $tuitionMap = Tuition::orderByDesc('updated_at')
                 ->orderByDesc('created_at')
                 ->get()
                 ->keyBy('grade_level');
 
-            $children    = $guardian?->students ?? collect();
-            $kpiLearners = $children->count();
-            $kpiBalance  = 0.0;
+            // Compute per-student numbers and KPI balance
+            $kpiBalance = 0.0;
 
-            // Compute per-student due: base tuition + student optional fees (no payments yet)
             foreach ($children as $st) {
-                // base tuition
+                // Base tuition (priority: relation → snapshot → by grade level via map)
                 $base = 0.0;
                 if ($st->relationLoaded('tuition') && $st->tuition) {
                     $base = (float) $st->tuition->total_yearly;
                 } elseif (!empty($st->s_tuition_sum)) {
-                    // legacy snapshot string
                     $base = (float) preg_replace('/[^\d.]+/', '', (string) $st->s_tuition_sum);
                 } else {
-                    // final fallback by s_gradelvl
                     $base = (float) optional($tuitionMap->get($st->s_gradelvl))->total_yearly;
                 }
 
-                // student-level optional fees (use pivot override when present)
+                // Student-level optional fees
                 $opt = 0.0;
                 if ($st->relationLoaded('optionalFees')) {
                     $opt = (float) $st->optionalFees->sum(function ($f) {
@@ -62,37 +75,47 @@ class GuardianDashboardController extends Controller
                     });
                 }
 
-                // expose to the view and aggregate the KPI
-                $st->_computed_due  = $base + $opt;
+                $origTotal = $base + $opt;
+
+                // Current balance prefers the s_total_due column, falls back to origTotal
+                $currentBalance = isset($st->s_total_due) ? (float) $st->s_total_due : $origTotal;
+
+                // Expose helpers for the Blade (if you still want to show base/opt somewhere)
                 $st->_computed_base = $base;
                 $st->_optional_sum  = $opt;
+                $st->_computed_due  = $origTotal;
 
-                $kpiBalance += $st->_computed_due;
+                // KPI = sum of current balances
+                $kpiBalance += $currentBalance;
             }
 
-            // ----- Announcements (kept same as before) -----
-            $announcementQuery = \App\Models\Announcement::with(['gradelvls'])->latest();
+            // ----- Announcements (same idea as before) -----
             $learnerGradeLevelIds = $children
                 ->pluck('gradelvl.id')
                 ->filter()
                 ->unique()
                 ->values();
 
-            $announcements = $announcementQuery->where(function ($q) use ($learnerGradeLevelIds) {
-                $q->whereDoesntHave('gradelvls')
-                  ->orWhereHas('gradelvls', function ($qq) use ($learnerGradeLevelIds) {
-                      if ($learnerGradeLevelIds->isNotEmpty()) {
-                          $qq->whereIn('grade_level_id', $learnerGradeLevelIds);
-                      } else {
-                          // If no learners, still allow global announcements
-                          $qq->whereRaw('1=0');
-                      }
-                  });
-            })->get();
+            $announcements = Announcement::with(['gradelvls'])
+                ->where(function ($q) use ($learnerGradeLevelIds) {
+                    // Global announcements (no pivot rows) OR targeted to any of the learner's grades
+                    $q->whereDoesntHave('gradelvls')
+                      ->orWhereHas('gradelvls', function ($qq) use ($learnerGradeLevelIds) {
+                          if ($learnerGradeLevelIds->isNotEmpty()) {
+                              // Pivot uses the default key names: gradelvl_id
+                              $qq->whereIn('gradelvl_id', $learnerGradeLevelIds);
+                          } else {
+                              // If no learners, still allow global ones; this branch becomes a no-op
+                              $qq->whereRaw('1=0');
+                          }
+                      });
+                })
+                ->latest()
+                ->get();
 
             return view('auth.guardiandashboard', [
                 'guardian'      => $guardian,
-                'children'      => $children,
+                'children'      => $children,     // includes payments
                 'kpiLearners'   => $kpiLearners,
                 'kpiBalance'    => $kpiBalance,
                 'announcements' => $announcements,
@@ -122,7 +145,7 @@ class GuardianDashboardController extends Controller
             'password'    => 'required|string|min:6',
         ]);
 
-        // Map single guardian name into existing mother columns (DB has m_* / f_*)
+        // Map single guardian name into mother columns (DB schema uses m_* / f_*)
         $guardian = Guardian::create([
             'g_address'    => $request->g_address,
             'g_contact'    => $request->g_contact,

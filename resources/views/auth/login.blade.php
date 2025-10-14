@@ -55,7 +55,7 @@
     <div class="auth-wrapper">
         <!-- Left side -->
         <div class="auth-left">
-            <img src="{{ asset('images/Intelliwise.png') }}" alt="Logo">
+            <img src="{{ asset('images/Intelliwise.png') }}" alt="Logo" style="width: 200px;">
             <h3>INTELLIWISE GRACE CHRISTIAN ACADEMY Inc.</h3>
             <p style="font-style: italic">Login with your credentials to access your account.</p>
 

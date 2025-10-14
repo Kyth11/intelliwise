@@ -56,32 +56,9 @@
 
           {{-- Books --}}
           <div class="row g-2 mt-2">
-            <div class="col-7">
-              <label class="form-label">Books (desc) — optional</label>
-              <input type="text" name="books_desc" class="form-control" placeholder="e.g., Workbooks set">
-            </div>
-            <div class="col-5">
+            <div class="col-12">
               <label class="form-label">Books Amount ₱ — optional</label>
               <input type="number" step="0.01" min="0" name="books_amount" id="add_books_amount" class="form-control">
-            </div>
-          </div>
-
-          {{-- Grade-level Optional Fees --}}
-          <div class="mt-3">
-            <label class="form-label">Attach Optional Fees (Grade-level)</label>
-            <div class="border rounded p-2" style="max-height: 180px; overflow:auto;">
-              @forelse(($optionalFees ?? collect()) as $fee)
-                @if($fee->scope === 'grade' || $fee->scope === 'both')
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="optfee_{{ $fee->id }}" name="optional_fee_ids[]" value="{{ $fee->id }}">
-                    <label class="form-check-label" for="optfee_{{ $fee->id }}">
-                      {{ $fee->name }} — ₱{{ number_format($fee->amount, 2) }}
-                    </label>
-                  </div>
-                @endif
-              @empty
-                <div class="text-muted">No optional fees available. Add some in “Optional Fees”.</div>
-              @endforelse
             </div>
           </div>
 

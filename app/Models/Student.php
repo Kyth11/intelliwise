@@ -33,7 +33,7 @@ class Student extends Model
         return $this->belongsTo(Guardian::class, 'guardian_id');
     }
 
-    /** Grade level FK (your migration uses gradelvl_id) */
+    /** Grade level FK */
     public function gradelvl(): BelongsTo
     {
         return $this->belongsTo(Gradelvl::class, 'gradelvl_id');
@@ -45,12 +45,20 @@ class Student extends Model
         return $this->belongsTo(Tuition::class, 'tuition_id');
     }
 
-    /** Optional fees directly attached to the student (via pivot) */
+    /**
+     * ✅ Optional fees directly attached to the student (via pivot).
+     * Pivot table in your migration is `optional_fee_student`
+     * with columns: optional_fee_id, student_id, timestamps.
+     */
     public function optionalFees(): BelongsToMany
     {
-        return $this->belongsToMany(OptionalFee::class, 'student_optional_fees')
-                    ->withPivot('amount_override')
-                    ->withTimestamps();
+        return $this->belongsToMany(
+            OptionalFee::class,
+            'optional_fee_student',   // <- correct table name
+            'student_id',             // FK to students
+            'optional_fee_id'         // FK to optional_fees
+        )->withTimestamps();
+        // ->withPivot('amount_override'); // not present in your schema
     }
 
     /**
@@ -70,7 +78,7 @@ class Student extends Model
         return $name !== '' ? $name : ('Student #'.$this->id);
     }
 
-    /* ---------- Optional: handy computed accessors ---------- */
+    /* ---------- Computed accessors ---------- */
 
     /** Base tuition with safe fallbacks for legacy rows */
     public function getBaseTuitionAttribute(): float
@@ -90,7 +98,10 @@ class Student extends Model
     public function getOptionalSumAttribute(): float
     {
         $fees = $this->relationLoaded('optionalFees') ? $this->optionalFees : $this->optionalFees()->get();
-        return (float) $fees->sum(fn($f) => (float) ($f->pivot->amount_override ?? $f->amount ?? 0));
+        return (float) $fees->sum(function ($f) {
+            // no amount_override column in your pivot; fallback to fee amount
+            return (float) ($f->amount ?? 0);
+        });
     }
 
     /** Tuition + optional (no payments deduction) */

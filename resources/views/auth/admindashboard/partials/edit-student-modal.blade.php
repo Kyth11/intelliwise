@@ -101,19 +101,22 @@
                         <div class="form-floating">
                             <input type="text" name="s_tuition_sum" id="edit-tuition" class="form-control"
                                 placeholder="Tuition" readonly>
-                            <label for="edit-tuition">Tuition (auto from grade level)</label>
+                            <label for="edit-tuition">Base Tuition (auto from grade level)</label>
                         </div>
-                        <small class="text-muted">This comes from the latest Tuition record for the chosen grade level.</small>
+                        <small class="text-muted">Pulled from the latest Tuition for the chosen grade level.</small>
                     </div>
+
                     <div class="col-md-6">
                         <div class="form-floating">
                             <select name="payment_status" id="edit-payment" class="form-select">
-                                <option value="Not Paid">Not Paid</option>
+                                <option value="Unpaid">Unpaid</option>
+                                <option value="Partial">Partial</option>
                                 <option value="Paid">Paid</option>
                             </select>
                             <label for="edit-payment">Payment Status</label>
                         </div>
                     </div>
+
                     <div class="col-md-6">
                         <div class="form-floating">
                             <select name="enrollment_status" id="edit-status" class="form-select">
@@ -130,7 +133,6 @@
                         <div class="border rounded p-2" style="max-height: 220px; overflow:auto;">
                             @php
                                 $__fees = ($optionalFees ?? collect())->filter(function($f){
-                                    // only show student-attachable fees (scope student/both) and active
                                     $scopeOk = !isset($f->scope) || in_array($f->scope, ['student','both']);
                                     return $scopeOk && (property_exists($f, 'active') ? $f->active : true);
                                 });
@@ -161,8 +163,24 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="form-floating">
-                                    <input type="text" id="edit-total-due-preview" class="form-control" placeholder="Total Due" readonly>
-                                    <label for="edit-total-due-preview">Total Due (Preview) (₱)</label>
+                                    <input type="text" id="edit-total-due-preview" class="form-control" placeholder="Total (before payments)" readonly>
+                                    <label for="edit-total-due-preview">New Total (before payments) (₱)</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- We’ll show the existing paid/balance so editors understand what will be preserved -->
+                        <div class="row g-2 mt-1">
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <input type="text" id="edit-paid-so-far" class="form-control" placeholder="Paid So Far" readonly>
+                                    <label for="edit-paid-so-far">Paid So Far (₱)</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <input type="text" id="edit-current-balance" class="form-control" placeholder="Current Balance" readonly>
+                                    <label for="edit-current-balance">Current Balance (₱)</label>
                                 </div>
                             </div>
                         </div>
@@ -262,7 +280,9 @@
         editStudentModal.querySelector('#edit-guardian').value = guardian ?? '';
         editStudentModal.querySelector('#edit-guardianemail').value = guardianEmail ?? '';
         editStudentModal.querySelector('#edit-status').value = status ?? 'Enrolled';
-        editStudentModal.querySelector('#edit-payment').value = payment ?? 'Not Paid';
+        // Ensure the enum values are used
+        const paySel = editStudentModal.querySelector('#edit-payment');
+        paySel.value = ['Paid','Unpaid','Partial'].includes(payment) ? payment : 'Unpaid';
 
         // Tick optional-fee checkboxes
         editStudentModal.querySelectorAll('.edit-opt-fee').forEach(cb => {
@@ -277,6 +297,19 @@
             applyTuitionFromGrade(this.value);
         };
         editStudentModal.querySelectorAll('.edit-opt-fee').forEach(cb => cb.onchange = recalcTotals);
+
+        // Pre-fill "Paid so far" and "Current balance" from the table cells
+        const row = document.querySelector(`tr[data-id="${id}"]`);
+        if (row) {
+            const paidCell    = row.querySelector('.text-success');
+            const balanceCell = row.querySelector('.text-danger');
+            const paidVal     = paidCell ? parseFloat((paidCell.textContent||'0').replace(/,/g,'')) : 0;
+            const balVal      = balanceCell ? parseFloat((balanceCell.textContent||'0').replace(/,/g,'')) : 0;
+            const paidField   = document.getElementById('edit-paid-so-far');
+            const balField    = document.getElementById('edit-current-balance');
+            if (paidField) paidField.value = (isFinite(paidVal) ? paidVal : 0).toFixed(2);
+            if (balField) balField.value  = (isFinite(balVal) ? balVal : 0).toFixed(2);
+        }
 
         // Correct form action (admin namespace)
         const form = editStudentModal.querySelector('#editStudentForm');

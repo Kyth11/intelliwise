@@ -1,4 +1,5 @@
 <?php
+// app/Http/Controllers/StudentController.php
 
 namespace App\Http\Controllers;
 
@@ -9,15 +10,13 @@ use App\Models\Tuition;
 use App\Models\Gradelvl;
 use App\Models\OptionalFee;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth; // ✅ use facade for clean IDE types
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class StudentController extends Controller
 {
-    /**
-     * List students (grouped by grade level) — admin view.
-     */
     public function index()
     {
         $students  = Student::with(['guardian','optionalFees'])->get()->groupBy('s_gradelvl');
@@ -39,9 +38,6 @@ class StudentController extends Controller
         ));
     }
 
-    /**
-     * Show enrollment form (faculty sees faculty layout; admin sees admin layout).
-     */
     public function create()
     {
         $guardians = Guardian::all()->map(function ($g) {
@@ -55,7 +51,6 @@ class StudentController extends Controller
 
         $optionalFees = OptionalFee::where('active', true)->orderBy('name')->get();
 
-        // ✅ IDE-friendly
         $role = Auth::user()?->role;
         $view = $role === 'faculty'
             ? 'auth.facultydashboard.enroll-student'
@@ -64,9 +59,6 @@ class StudentController extends Controller
         return view($view, compact('guardians', 'optionalFees'));
     }
 
-    /**
-     * Store new student (works for admin & faculty; redirects correctly by role).
-     */
     public function store(Request $request)
     {
         $request->validate([
@@ -157,6 +149,8 @@ class StudentController extends Controller
                 ? (float) OptionalFee::whereIn('id', $studentOptIds)->sum('amount')
                 : 0.0;
 
+            $total = round($baseTotal + $studentOptSum, 2);
+
             $student = Student::create([
                 's_firstname'        => $request->s_firstname,
                 's_middlename'       => $request->s_middlename,
@@ -169,10 +163,11 @@ class StudentController extends Controller
                 's_email'            => $request->s_email,
                 's_gradelvl'         => $request->s_gradelvl,
                 'enrollment_status'  => $request->enrollment_status ?? 'Enrolled',
-                'payment_status'     => $request->payment_status ?? 'Not Paid',
+                // new enum default is Unpaid
+                'payment_status'     => $request->payment_status ?? 'Unpaid',
                 's_tuition_sum'      => $baseTotal,
                 's_optional_total'   => round($studentOptSum, 2),
-                's_total_due'        => round($baseTotal + $studentOptSum, 2),
+                's_total_due'        => $total, // initial balance = total
                 'tuition_id'         => $tuitionId,
                 'guardian_id'        => $guardian_id,
             ]);
@@ -180,28 +175,25 @@ class StudentController extends Controller
             if ($studentOptIds->isNotEmpty()) {
                 $attach = [];
                 foreach ($studentOptIds as $fid) {
-                    $attach[$fid] = ['amount_override' => null];
+                    $attach[$fid] = [];
                 }
                 $student->optionalFees()->attach($attach);
             }
 
             DB::commit();
 
-            // ✅ Role-aware redirect (no 403 for faculty)
             $role  = Auth::user()?->role;
             $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.dashboard';
             return redirect()->route($route)->with('success', 'Student enrolled successfully!');
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Student store failed: '.$e->getMessage(), ['exception' => $e]);
             $role  = Auth::user()?->role;
             $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.dashboard';
             return redirect()->route($route)->with('error', 'Failed to enroll student. Please check your input.');
         }
     }
 
-    /**
-     * Update existing student.
-     */
     public function update(Request $request, $id)
     {
         $request->validate([
@@ -219,6 +211,13 @@ class StudentController extends Controller
         try {
             $student = Student::findOrFail($id);
 
+            // --- Preserve paid amount ---
+            $old_base = (float) ($student->s_tuition_sum ?? 0);
+            $old_opt  = (float) ($student->s_optional_total ?? 0);
+            $old_total = $old_base + $old_opt;
+            $old_balance = (float) ($student->s_total_due ?? $old_total);
+            $paid_so_far = max($old_total - $old_balance, 0);
+
             $grade = $request->s_gradelvl ?? $student->s_gradelvl;
             [$tuitionId, $baseTotal] = $this->resolveTuition($grade);
 
@@ -226,6 +225,12 @@ class StudentController extends Controller
             $studentOptSum = $studentOptIds->isNotEmpty()
                 ? (float) OptionalFee::whereIn('id', $studentOptIds)->sum('amount')
                 : 0.0;
+
+            $new_total = round($baseTotal + $studentOptSum, 2);
+            $new_balance = max($new_total - $paid_so_far, 0);
+
+            // derive payment status from balance / paid
+            $new_status = $new_balance <= 0 ? 'Paid' : ($paid_so_far > 0 ? 'Partial' : 'Unpaid');
 
             $student->update([
                 's_firstname'       => $request->s_firstname,
@@ -239,16 +244,16 @@ class StudentController extends Controller
                 's_email'           => $request->s_email,
                 's_gradelvl'        => $grade,
                 'enrollment_status' => $request->enrollment_status ?? $student->enrollment_status,
-                'payment_status'    => $request->payment_status ?? $student->payment_status,
+                'payment_status'    => $new_status, // override with computed status
                 's_tuition_sum'     => $baseTotal,
                 's_optional_total'  => round($studentOptSum, 2),
-                's_total_due'       => round($baseTotal + $studentOptSum, 2),
+                's_total_due'       => $new_balance, // <-- PRESERVE paid amount
                 'tuition_id'        => $tuitionId,
             ]);
 
             $sync = [];
             foreach ($studentOptIds as $fid) {
-                $sync[$fid] = ['amount_override' => null];
+                $sync[$fid] = [];
             }
             $student->optionalFees()->sync($sync);
 
@@ -256,15 +261,13 @@ class StudentController extends Controller
             $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.students';
             return redirect()->route($route)->with('success', 'Student updated successfully.');
         } catch (\Exception $e) {
+            Log::error('Student update failed: '.$e->getMessage(), ['exception' => $e]);
             $role  = Auth::user()?->role;
             $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.students';
             return redirect()->route($route)->with('error', 'Failed to update student.');
         }
     }
 
-    /**
-     * Delete student (archive).
-     */
     public function destroy($id)
     {
         try {
@@ -276,10 +279,6 @@ class StudentController extends Controller
         }
     }
 
-    /**
-     * Pick the latest Tuition row for a given grade level.
-     * Returns [tuition_id|null, total_yearly|0].
-     */
     private function resolveTuition(?string $gradeLevel): array
     {
         if (!$gradeLevel) {
@@ -291,7 +290,6 @@ class StudentController extends Controller
             ->orderByDesc('created_at')
             ->first();
 
-        return [$t?->id, $t?->total_yearly ?? 0];
+        return [$t?->id, (float) ($t?->total_yearly ?? 0)];
     }
-    
 }
