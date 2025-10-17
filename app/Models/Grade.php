@@ -9,7 +9,6 @@ class Grade extends Model
 {
     protected $table = 'grades';
 
-    // Allow either old or new FK names
     protected $fillable = [
         'q1','q2','q3','q4','final_grade','remark',
         'student_id','students_id','subject_id','subjects_id',
@@ -54,11 +53,22 @@ class Grade extends Model
     public function gradeLevel() { return $this->belongsTo(Gradelvl::class, 'gradelvl_id'); }
     public function faculty()    { return $this->belongsTo(Faculty::class,  'faculty_id'); }
 
-    /** Compute final average (rounded) if missing */
+    /**
+     * New rule:
+     * - Each quarter is 25% (missing = 0)
+     * - If final <= 70 => 0 (else round)
+     */
     public function computedFinal(): ?int
     {
-        $qs = collect([$this->q1,$this->q2,$this->q3,$this->q4])->filter(fn($v)=>$v!==null);
-        return $qs->count() ? (int) round($qs->avg()) : null;
+        $vals = [
+            (int)($this->q1 ?? 0),
+            (int)($this->q2 ?? 0),
+            (int)($this->q3 ?? 0),
+            (int)($this->q4 ?? 0),
+        ];
+
+        $finalFloat = array_sum($vals) / 4;
+        return ($finalFloat <= 70) ? 0 : (int) round($finalFloat);
     }
 
     /** DepEd helpers */

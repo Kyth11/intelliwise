@@ -21,8 +21,14 @@ class Faculty extends Model
     {
         return $this->hasOne(User::class, 'faculty_id');
     }
-    public function schedules() {
-    return $this->hasMany(Schedule::class);
-}
 
+    public function schedules()
+    {
+        return $this->hasMany(Schedule::class);
+    }
+
+    public function getFullNameAttribute(): string
+    {
+        return trim(collect([$this->f_firstname, $this->f_middlename, $this->f_lastname])->filter()->implode(' '));
+    }
 }

@@ -6,6 +6,7 @@ use App\Models\Grade;
 use App\Models\Gradelvl;
 use App\Models\Schoolyr;
 use App\Models\Student;
+use App\Models\QuarterLock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
@@ -21,10 +22,14 @@ class FacultyGradesController extends Controller
         $gradeLevel = $request->input('grade_level');   // e.g. "Grade 1"
         $studentId  = $request->input('student_id');
 
-        // Students (filtered by grade if provided)
+        /**
+         * IMPORTANT: Do NOT filter students by $gradeLevel here.
+         * We need all students so the client-side Grade dropdown
+         * can re-populate the Student dropdown without a page reload.
+         */
         $students = Student::select('id', 's_firstname', 's_middlename', 's_lastname', 's_gradelvl')
-            ->when($gradeLevel, fn ($q) => $q->where('s_gradelvl', $gradeLevel))
-            ->orderBy('s_lastname')->orderBy('s_firstname')
+            ->orderBy('s_lastname')
+            ->orderBy('s_firstname')
             ->get();
 
         // Resolve Subject model and subject label
@@ -74,13 +79,17 @@ class FacultyGradesController extends Controller
         $rows = $subjects->map(function ($sub) use ($existing) {
             $g = $existing->get($sub->id);
 
-            $final = $g?->final_grade;
-            if ($final === null) {
-                $qs = collect([$g?->q1, $g?->q2, $g?->q3, $g?->q4])->filter(fn ($v) => $v !== null);
-                $final = $qs->count() ? (int) round($qs->avg()) : null;
-            }
-            $remark = $final === null ? null : ($final >= 75 ? 'PASSED' : 'FAILED');
-            [$desc, $abbr] = $final === null ? [null, null] : $this->depedDescriptor($final);
+            // Server-side final (¼ per quarter; missing = 0; ≤70 => 0)
+            $q1 = (int)($g?->q1 ?? 0);
+            $q2 = (int)($g?->q2 ?? 0);
+            $q3 = (int)($g?->q3 ?? 0);
+            $q4 = (int)($g?->q4 ?? 0);
+
+            $finalFloat = ($q1 + $q2 + $q3 + $q4) / 4;
+            $final = ($finalFloat <= 70) ? 0 : (int) round($finalFloat);
+
+            $remark = $final >= 75 ? 'PASSED' : 'FAILED';
+            [$desc, $abbr] = $this->depedDescriptor($final);
 
             return [
                 'subject_id'       => $sub->id,
@@ -96,12 +105,15 @@ class FacultyGradesController extends Controller
             ];
         });
 
-        // General average
+        // General average (include zero finals; only skip null)
         $generalAverage = null;
         if ($rows->count()) {
-            $ga = $rows->pluck('final')->filter()->avg();
-            $generalAverage = $ga ? (int) round($ga) : null;
+            $gaVals = $rows->pluck('final')->filter(fn ($v) => $v !== null);
+            $generalAverage = $gaVals->count() ? (int) round($gaVals->avg()) : null;
         }
+
+        // Quarter flags from Admin (GLOBAL for now, or per SY/Grade if you extend)
+        $quartersOpen = QuarterLock::flags($schoolyrId, $gradeLevel);
 
         return view('auth.facultydashboard.grades', compact(
             'schoolyrs',
@@ -111,7 +123,8 @@ class FacultyGradesController extends Controller
             'gradeLevel',
             'studentId',
             'rows',
-            'generalAverage'
+            'generalAverage',
+            'quartersOpen'
         ));
     }
 
@@ -148,29 +161,45 @@ class FacultyGradesController extends Controller
         $q3 = $request->input('q3', []);
         $q4 = $request->input('q4', []);
 
+        // Quarter lock enforcement
+        $locks = QuarterLock::flags($schoolyrId, $gradeLevel);
+
         // FK names that actually exist in DB
         $studentKey = Grade::studentKey();
         $subjectKey = Grade::subjectKey();
 
         foreach ($subjectIds as $idx => $subjectId) {
             $g = Grade::firstOrNew([
-                $studentKey  => $studentId,
-                $subjectKey  => (int) $subjectId,
-                'schoolyr_id'=> $schoolyrId,
+                $studentKey   => $studentId,
+                $subjectKey   => (int) $subjectId,
+                'schoolyr_id' => $schoolyrId,
             ]);
 
-            // Update quarters (allow blank -> null)
-            $g->q1 = array_key_exists($idx, $q1) ? ($q1[$idx] !== '' ? (int) $q1[$idx] : null) : $g->q1;
-            $g->q2 = array_key_exists($idx, $q2) ? ($q2[$idx] !== '' ? (int) $q2[$idx] : null) : $g->q2;
-            $g->q3 = array_key_exists($idx, $q3) ? ($q3[$idx] !== '' ? (int) $q3[$idx] : null) : $g->q3;
-            $g->q4 = array_key_exists($idx, $q4) ? ($q4[$idx] !== '' ? (int) $q4[$idx] : null) : $g->q4;
+            // Update quarters only if their quarter is OPEN; keep existing otherwise
+            if ($locks['q1']) {
+                $g->q1 = array_key_exists($idx, $q1) ? ($q1[$idx] !== '' ? (int) $q1[$idx] : null) : $g->q1;
+            }
+            if ($locks['q2']) {
+                $g->q2 = array_key_exists($idx, $q2) ? ($q2[$idx] !== '' ? (int) $q2[$idx] : null) : $g->q2;
+            }
+            if ($locks['q3']) {
+                $g->q3 = array_key_exists($idx, $q3) ? ($q3[$idx] !== '' ? (int) $q3[$idx] : null) : $g->q3;
+            }
+            if ($locks['q4']) {
+                $g->q4 = array_key_exists($idx, $q4) ? ($q4[$idx] !== '' ? (int) $q4[$idx] : null) : $g->q4;
+            }
 
-            // Final = average of available quarters
-            $qs = collect([$g->q1, $g->q2, $g->q3, $g->q4])->filter(fn ($v) => $v !== null);
-            $final = $qs->count() ? (int) round($qs->avg()) : null;
+            // Final = ¼ per quarter; missing treated as 0; if <=70 => 0
+            $fq1 = (int)($g->q1 ?? 0);
+            $fq2 = (int)($g->q2 ?? 0);
+            $fq3 = (int)($g->q3 ?? 0);
+            $fq4 = (int)($g->q4 ?? 0);
+
+            $finalFloat = ($fq1 + $fq2 + $fq3 + $fq4) / 4;
+            $final = ($finalFloat <= 70) ? 0 : (int) round($finalFloat);
 
             $g->final_grade = $final;
-            $g->remark      = $final === null ? null : ($final >= 75 ? 'PASSED' : 'FAILED');
+            $g->remark      = $final >= 75 ? 'PASSED' : 'FAILED';
 
             $g->gradelvl_id = $gradelvlId;
             $g->faculty_id  = $facultyId;

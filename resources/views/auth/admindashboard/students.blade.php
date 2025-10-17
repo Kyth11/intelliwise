@@ -3,49 +3,143 @@
 @section('title', 'Students by Grade Level')
 
 @push('styles')
+    {{-- DataTables + Bootstrap 5 CSS --}}
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+
+    {{-- Page-only tiny tweaks (most styles live in your global CSS) --}}
     <style>
-        .students-page .section-title { display:flex; gap:.75rem; align-items:baseline; }
+        .students-page .section-title { display:flex; gap:.5rem; align-items:baseline; }
         .students-page .search-wrap { display:flex; gap:.5rem; align-items:center; }
-        .students-page .search-wrap input { min-width:260px; }
-        .students-page .grade-card { border:1px solid rgba(0,0,0,.075); box-shadow:0 2px 8px rgba(0,0,0,.06); }
-        .students-page .table thead th { position:sticky; top:0; background:var(--bs-body-bg); z-index:1; }
-        .students-page .table td, .students-page .table th { vertical-align: middle; }
-        .students-page .badge-grade { font-size:.825rem; }
-        .opt-fees-cell { max-width: 420px; }
-        .opt-fees-list { margin:0; padding-left: 1rem; }
-        .opt-fees-list li { line-height: 1.25rem; }
+        .grade-card { border:1px solid rgba(0,0,0,.075); box-shadow:0 2px 8px rgba(0,0,0,.06); }
+        .student-table.table-sm td, .student-table.table-sm th { padding:.3rem .4rem; font-size:.8rem; }
+        .badge-grade { font-size:.8rem; }
+        .opt-fees-cell { max-width:380px; }
+        .opt-fees-list { margin:0; padding-left:1rem; }
+        .opt-fees-list li { line-height:1.2rem; }
+        .filters .form-control, .filters .form-select { height: calc(1.5rem + .5rem + 2px); padding:.25rem .5rem; font-size:.8rem; }
     </style>
 @endpush
 
 @section('content')
 <div class="card section p-4 students-page">
-    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
+    <!-- Header (kept consistent with your design language, no Quick Actions here) -->
+    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-2">
         <div class="section-title">
-            <h4 class="mb-1">Students (Grouped by Grade Level)</h4>
-            <span class="text-muted">Browse, edit, or archive students.</span>
-        </div>
-
-        <div class="search-wrap">
-            <input type="text" id="studentSearch" class="form-control form-control-sm" placeholder="Search students...">
+            <h4 class="mb-0">Students (Grouped by Grade Level)</h4>
+            <span class="text-muted ms-2">Browse, filter, edit, or archive students.</span>
         </div>
     </div>
 
+    {{-- ===== Build guardian dropdown options (unique per guardian id) ===== --}}
     @php
-        $tuitionMap = collect($tuitions ?? collect())->keyBy('grade_level');
+        $tuitions     = $tuitions     ?? collect();
+        $gradelvls    = $gradelvls    ?? collect();
+        $optionalFees = $optionalFees ?? collect();
+        $students     = $students     ?? collect();
+
+        $tuitionMap = collect($tuitions)->keyBy('grade_level');
+
+        $guardianMap = [];
+        foreach (($students ?? []) as $grade => $group) {
+            foreach ($group as $s) {
+                $g = $s->guardian ?? null;
+                if (!$g || !isset($g->id)) continue;
+
+                // Parents label
+                $mFirst = trim(collect([data_get($g,'m_firstname'), data_get($g,'m_middlename')])->filter()->implode(' '));
+                $mLast  = (string) data_get($g,'m_lastname', '');
+                $fFirst = trim(collect([data_get($g,'f_firstname'), data_get($g,'f_middlename')])->filter()->implode(' '));
+                $fLast  = (string) data_get($g,'f_lastname', '');
+                $motherFull = trim(($mFirst ? $mFirst.' ' : '').$mLast);
+                $fatherFull = trim(($fFirst ? $fFirst.' ' : '').$fLast);
+
+                $parents = '—';
+                if ($motherFull || $fatherFull) {
+                    if ($motherFull && $fatherFull) {
+                        if ($mLast && $fLast && strcasecmp($mLast,$fLast) === 0) {
+                            $firstToUse = $fFirst ?: $mFirst;
+                            $lastToUse  = $fLast ?: $mLast;
+                            $parents = 'Mr. & Mrs. '.trim(($firstToUse ? $firstToUse.' ' : '').$lastToUse);
+                        } else {
+                            $parents = $motherFull.' & '.$fatherFull;
+                        }
+                    } else {
+                        $parents = $fatherFull ?: $motherFull;
+                    }
+                }
+
+                // Guardian label
+                $guardianName = null;
+                if (isset($g->guardian_name) && $g->guardian_name) {
+                    $guardianName = $g->guardian_name;
+                } elseif (isset($g->g_firstname) || isset($g->g_lastname)) {
+                    $guardianName = trim(collect([$g->g_firstname ?? null, $g->g_middlename ?? null, $g->g_lastname ?? null])->filter()->implode(' ')) ?: null;
+                }
+
+                $household = $parents;
+                if ($guardianName && stripos($parents, $guardianName) === false) {
+                    $household .= ' / '.$guardianName;
+                }
+
+                $guardianMap[$g->id] = $household ?: '—';
+            }
+        }
+        $guardianOptions = collect($guardianMap)
+            ->map(fn($label, $id) => ['id' => $id, 'label' => $label])
+            ->sortBy('label', SORT_NATURAL|SORT_FLAG_CASE)
+            ->values();
     @endphp
 
+    {{-- ===== Filters (kept) ===== --}}
+    <form class="filters row g-2 align-items-end mt-1 mb-2">
+        <div class="col-auto">
+            <label class="form-label mb-0 small">Grade Level</label>
+            <select id="filterGrade" class="form-select form-select-sm">
+                <option value="">All</option>
+                @foreach($gradelvls as $gl)
+                    <option value="{{ $gl->grade_level }}">{{ $gl->grade_level }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="col-auto">
+            <label class="form-label mb-0 small">Pay Status</label>
+            <select id="filterPay" class="form-select form-select-sm">
+                <option value="">All</option>
+                <option>Paid</option>
+                <option>Partial</option>
+                <option>Not Paid</option>
+            </select>
+        </div>
+
+        <div class="col-auto">
+            <label class="form-label mb-0 small">Household / Guardian</label>
+            <select id="filterGuardian" class="form-select form-select-sm">
+                <option value="">All</option>
+                @foreach($guardianOptions as $opt)
+                    <option value="{{ $opt['id'] }}">{{ $opt['label'] }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="col-auto">
+            <label class="form-label mb-0 small">Search</label>
+            <input type="text" id="studentSearch" class="form-control form-control-sm" placeholder="Type to filter…">
+        </div>
+    </form>
+
+    {{-- ===== Grade groups ===== --}}
     @forelse($students as $grade => $group)
-        <div class="card mt-3 p-3 grade-card">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h5 class="mb-0">
+        <div class="card mt-2 p-2 grade-card" data-grade="{{ $grade }}">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <h6 class="mb-0">
                     <span class="badge bg-light text-dark border badge-grade">{{ $grade ?: '— No Grade —' }}</span>
                     <span class="text-muted">({{ $group->count() }})</span>
-                </h5>
+                </h6>
             </div>
 
             <div class="table-responsive">
-                <table class="table table-bordered table-striped align-middle student-table">
+                <table class="table table-bordered table-striped table-sm align-middle student-table">
                     <thead class="table-primary">
                         <tr>
                             <th>Name</th>
@@ -53,12 +147,15 @@
                             <th>Parents / Guardian</th>
                             <th>Contact</th>
                             <th>Email</th>
-                            <th>Tuition (Base, ₱)</th>
-                            <th class="opt-fees-cell">Optional Fees (selected)</th>
+                            <th>Tuition (₱)</th>
+                            <th class="opt-fees-cell">Optional Fees</th>
                             <th>Optional (₱)</th>
                             <th>Total Due (₱)</th>
                             <th>Paid (₱)</th>
                             <th>Balance (₱)</th>
+                            {{-- hidden helper columns for filtering --}}
+                            <th class="d-none">PayStatus</th>
+                            <th class="d-none">GuardianId</th>
                             <th class="text-nowrap">Tools</th>
                         </tr>
                     </thead>
@@ -92,12 +189,19 @@
 
                                 $originalTotal = $base + $opt;
 
-                                // current balance stored (s_total_due), fallback to original if null
-                                $currentBalance = (float) ($s->s_total_due ?? $originalTotal);
+                                // If s_total_due is stored, treat it as current balance; otherwise derive from payments
+                                $paidRecords = (float) ($s->payments()->sum('amount') ?? 0);
+                                if ($s->s_total_due !== null && $s->s_total_due !== '') {
+                                    $currentBalance = max(0.0, (float) $s->s_total_due);
+                                    $paid = max($originalTotal - $currentBalance, 0.0);
+                                } else {
+                                    $paid = min($paidRecords, $originalTotal);
+                                    $currentBalance = max(0.0, round($originalTotal - $paid, 2));
+                                }
 
-                                // paid so far (for display)
-                                $paid = max($originalTotal - $currentBalance, 0);
+                                $derivedPay = $currentBalance <= 0.01 ? 'Paid' : ($paid > 0 ? 'Partial' : 'Not Paid');
 
+                                // Household label
                                 $g = $s->guardian;
                                 $mFirst = trim(collect([data_get($g,'m_firstname'), data_get($g,'m_middlename')])->filter()->implode(' '));
                                 $mLast  = (string) data_get($g,'m_lastname', '');
@@ -135,30 +239,25 @@
                                     $household .= ' / '.$guardianName;
                                 }
 
-                                $feeIdsCsv = $filtered->pluck('id')->implode(',');
+                                $feeIdsCsv  = $filtered->pluck('id')->implode(',');
+                                $guardianId = $s->guardian->id ?? '';
                             @endphp
-                            <tr data-id="{{ $s->id }}">
+
+                            <tr data-id="{{ $s->id }}" data-paystatus="{{ $derivedPay }}" data-guardianid="{{ $guardianId }}">
                                 <td>{{ $s->s_firstname }} {{ $s->s_middlename }} {{ $s->s_lastname }}</td>
                                 <td>{{ \Illuminate\Support\Carbon::parse($s->s_birthdate)->format('Y-m-d') }}</td>
                                 <td>{{ $household }}</td>
                                 <td>{{ $s->s_contact ?? '—' }}</td>
                                 <td>{{ $s->s_email ?? '—' }}</td>
                                 <td>{{ number_format($base, 2) }}</td>
-
-                                {{-- Optional Fees (list) --}}
                                 <td class="opt-fees-cell">{!! $optListHtml !!}</td>
-
-                                {{-- Optional Sum --}}
                                 <td>{{ number_format($opt, 2) }}</td>
-
-                                {{-- Original total (base + optionals) --}}
                                 <td class="fw-semibold">{{ number_format($originalTotal, 2) }}</td>
-
-                                {{-- Paid so far --}}
                                 <td class="text-success fw-semibold">{{ number_format($paid, 2) }}</td>
-
-                                {{-- Current balance --}}
                                 <td class="text-danger fw-semibold">{{ number_format($currentBalance, 2) }}</td>
+                                {{-- hidden helper columns so DataTables can filter easily --}}
+                                <td class="d-none">{{ $derivedPay }}</td>
+                                <td class="d-none">{{ $guardianId }}</td>
 
                                 <td class="text-nowrap">
                                     <button class="btn btn-sm btn-warning"
@@ -181,8 +280,7 @@
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
 
-                                    <form action="{{ route('students.destroy', $s->id) }}" method="POST"
-                                          class="d-inline delete-form">
+                                    <form action="{{ route('students.destroy', $s->id) }}" method="POST" class="d-inline delete-form">
                                         @csrf
                                         @method('DELETE')
                                         <button type="button" class="btn btn-sm btn-danger delete-btn" title="Archive">
@@ -197,63 +295,41 @@
             </div>
         </div>
     @empty
-        <div class="card mt-3 p-3">
-            <p class="text-muted mb-0">No students found.</p>
-        </div>
+        <div class="card mt-3 p-3"><p class="text-muted mb-0">No students found.</p></div>
     @endforelse
 </div>
 
-{{-- Edit modal needs grade levels, tuitions, and optional fees --}}
+{{-- Edit Student Modal (re-usable partial) --}}
 @include('auth.admindashboard.partials.edit-student-modal', [
     'gradelvls'     => $gradelvls ?? collect(),
     'tuitions'      => $tuitions  ?? collect(),
     'optionalFees'  => $optionalFees ?? collect(),
 ])
 
-{{-- SweetAlert2 --}}
+{{-- SweetAlert2 (delete confirm) --}}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    // Global search across ALL grade-level DataTables (and hide empty cards)
-    let studentTables = [];
-    function attachGlobalFilter() {
-        const q = document.getElementById('studentSearch').value;
-        studentTables.forEach(function (pair) {
-            const { dt, $card } = pair;
-            dt.search(q).draw();
-            const hasRows = dt.rows({ filter: 'applied' }).any();
-            if (q && !hasRows) {
-                $card.style.display = 'none';
-            } else {
-                $card.style.display = '';
-            }
-        });
-    }
-
-    document.getElementById('studentSearch').addEventListener('input', attachGlobalFilter);
-
-    // Archive confirm
-    document.addEventListener('click', function (e) {
-        const btn = e.target.closest('.delete-btn');
-        if (!btn) return;
-        const form = btn.closest('form');
-        Swal.fire({
-            title: 'Are you sure to delete this student record?',
-            text: "You can't undo this action.",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Yes, proceed',
-            reverseButtons: true,
-            background: '#fff',
-            backdrop: false,
-            allowOutsideClick: true,
-            allowEscapeKey: true
-        }).then((result) => {
-            if (result.isConfirmed) form.submit();
-        });
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.delete-btn');
+    if (!btn) return;
+    const form = btn.closest('form');
+    Swal.fire({
+        title: 'Are you sure to delete this student record?',
+        text: "You can't undo this action.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, proceed',
+        reverseButtons: true,
+        background: '#fff',
+        backdrop: false,
+        allowOutsideClick: true,
+        allowEscapeKey: true
+    }).then((result) => {
+        if (result.isConfirmed) form.submit();
     });
-
+});
 </script>
 @endsection
 
@@ -263,6 +339,66 @@
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
     <script>
+        let studentTables = [];
+
+        // Keep grade cards visibility in sync with current filters
+        function updateCardVisibility() {
+            const gradeSel    = document.getElementById('filterGrade').value;
+            const paySel      = document.getElementById('filterPay').value;
+            const guardianSel = document.getElementById('filterGuardian').value;
+            const q           = document.getElementById('studentSearch').value;
+
+            studentTables.forEach(({ dt, $card }) => {
+                // Grade filter first
+                const matchesGrade = !gradeSel || $card.dataset.grade === gradeSel;
+                if (!matchesGrade) {
+                    $card.style.display = 'none';
+                    return;
+                }
+                // If any row-level filter/search is active, hide cards with no visible rows
+                const anyRowFilter = !!(paySel || guardianSel || q);
+                const hasRows = dt.rows({ filter: 'applied' }).any();
+                $card.style.display = (anyRowFilter && !hasRows) ? 'none' : '';
+            });
+        }
+
+        function applyGlobalSearch() {
+            const q = document.getElementById('studentSearch').value;
+            studentTables.forEach(({ dt }) => dt.search(q).draw());
+            updateCardVisibility();
+        }
+
+        function applyGradeFilter() {
+            // grade cards are toggled in updateCardVisibility
+            updateCardVisibility();
+        }
+
+        function applyPayFilter() {
+            const pay = document.getElementById('filterPay').value;
+            const PAY_COL_INDEX = 11; // hidden PayStatus column
+            studentTables.forEach(({ dt }) => {
+                if (!pay) {
+                    dt.column(PAY_COL_INDEX).search('').draw();
+                } else {
+                    dt.column(PAY_COL_INDEX).search('^' + pay + '$', true, false).draw();
+                }
+            });
+            updateCardVisibility();
+        }
+
+        function applyGuardianFilter() {
+            const gid = document.getElementById('filterGuardian').value;
+            const GUARD_COL_INDEX = 12; // hidden GuardianId column
+            studentTables.forEach(({ dt }) => {
+                if (!gid) {
+                    dt.column(GUARD_COL_INDEX).search('').draw();
+                } else {
+                    dt.column(GUARD_COL_INDEX).search('^' + gid + '$', true, false).draw();
+                }
+            });
+            updateCardVisibility();
+        }
+
         $(function () {
             $('.student-table').each(function () {
                 const $table = $(this);
@@ -273,17 +409,25 @@
                     order: [],
                     language: { emptyTable: "No students in this grade." },
                     columnDefs: [
-                        { targets: -1, orderable: false }
+                        { targets: -1, orderable: false },          // Tools
+                        { targets: [11,12], visible: false, searchable: true } // PayStatus + GuardianId
                     ]
                 });
 
-                studentTables.push({
-                    dt: dt,
-                    $card: $table.closest('.grade-card')[0]
-                });
+                studentTables.push({ dt, $card: $table.closest('.grade-card')[0] });
             });
 
-            attachGlobalFilter();
+            // Wire filters
+            document.getElementById('studentSearch').addEventListener('input', applyGlobalSearch);
+            document.getElementById('filterGrade').addEventListener('change', applyGradeFilter);
+            document.getElementById('filterPay').addEventListener('change', applyPayFilter);
+            document.getElementById('filterGuardian').addEventListener('change', applyGuardianFilter);
+
+            // Initial pass
+            applyGlobalSearch();
+            applyPayFilter();
+            applyGuardianFilter();
+            applyGradeFilter();
         });
     </script>
 @endpush

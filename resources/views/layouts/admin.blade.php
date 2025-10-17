@@ -21,10 +21,16 @@
     <title>@yield('title', 'IGCA - Admin Dashboard')</title>
     @stack('styles')
 
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('vendor/bootstrap/css/dataTables.bootstrap5.min.css') }}">
+
+    <!-- Local Bootstrap CSS -->
+    <link rel="stylesheet" href="{{ asset('vendor/bootstrap/css/bootstrap.min.css') }}">
+
+    <!-- Local Bootstrap Icons -->
+    <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.css') }}">
+
+    <!-- Local Bootstrap JS -->
+    <script src="{{ asset('vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     <link rel="stylesheet" href="{{ asset('css/dash.css') }}">
 </head>
 
@@ -36,44 +42,46 @@
             <h4>Admin Panel</h4>
 
             <a href="{{ route('admin.dashboard') }}"
-               class="sidebar-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
+                class="sidebar-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
                 <i class="bi bi-speedometer2"></i><span> Dashboard</span>
             </a>
 
             <a href="{{ route('admin.accounts') }}"
-               class="sidebar-link {{ request()->routeIs('admin.accounts') ? 'active' : '' }}">
+                class="sidebar-link {{ request()->routeIs('admin.accounts') ? 'active' : '' }}">
                 <i class="bi bi-person-gear"></i><span> Manage Accounts</span>
             </a>
 
-            <a href="{{ route('admin.students') }}"
-               class="sidebar-link {{ request()->routeIs('admin.students') ? 'active' : '' }}">
-                <i class="bi bi-people"></i><span> Students</span>
-            </a>
-
             <a href="{{ route('admin.faculties') }}"
-               class="sidebar-link {{ request()->routeIs('admin.faculties') ? 'active' : '' }}">
+                class="sidebar-link {{ request()->routeIs('admin.faculties') ? 'active' : '' }}">
                 <i class="bi bi-person-workspace"></i></i><span> Schedule </span>
             </a>
-
-            <a href="{{ route('admin.grades') }}"
-               class="sidebar-link {{ request()->routeIs('admin.grades') ? 'active' : '' }}">
-                <i class="bi bi-journal-check"></i><span> Grades</span>
-            </a>
-
             {{-- Finances --}}
             <a href="{{ route('admin.finances') }}"
-               class="sidebar-link {{ request()->routeIs('admin.finances') ? 'active' : '' }}">
+                class="sidebar-link {{ request()->routeIs('admin.finances') ? 'active' : '' }}">
                 <i class="bi bi-cash-coin"></i><span> Finances</span>
             </a>
 
+            <a href="{{ route('admin.students') }}"
+                class="sidebar-link {{ request()->routeIs('admin.students') ? 'active' : '' }}">
+                <i class="bi bi-people"></i><span> Students</span>
+            </a>
+
+
+            <a href="{{ route('admin.grades') }}"
+                class="sidebar-link {{ request()->routeIs('admin.grades') ? 'active' : '' }}">
+                <i class="bi bi-journal-check"></i><span> Grades</span>
+            </a>
+
+
+
             {{-- NEW: Reports (Enrollment) --}}
             <a href="{{ route('admin.reports.enrollments') }}"
-               class="sidebar-link {{ request()->routeIs('admin.reports.enrollments') ? 'active' : '' }}">
+                class="sidebar-link {{ request()->routeIs('admin.reports.enrollments') ? 'active' : '' }}">
                 <i class="bi bi-table"></i><span> Reports</span>
             </a>
 
             <a href="{{ route('admin.settings') }}"
-               class="sidebar-link {{ request()->routeIs('admin.settings') ? 'active' : '' }}">
+                class="sidebar-link {{ request()->routeIs('admin.settings') ? 'active' : '' }}">
                 <i class="bi bi-gear"></i><span> Settings</span>
             </a>
 
@@ -89,7 +97,7 @@
                 @foreach (['success', 'error'] as $msg)
                     @if(session($msg))
                         <div class="alert alert-{{ $msg == 'success' ? 'success' : 'danger' }} alert-dismissible fade show"
-                             role="alert">
+                            role="alert">
                             {{ session($msg) }}
                             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
@@ -145,4 +153,5 @@
 
     @stack('scripts')
 </body>
+
 </html>

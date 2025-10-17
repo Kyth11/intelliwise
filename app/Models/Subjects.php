@@ -3,23 +3,33 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Subjects extends Model
 {
-    // If your table is named "subjects", you can skip this
+    // Table name is non-standard plural for a model; keep it explicit.
     protected $table = 'subjects';
 
-    // Fields you allow to be mass assigned
     protected $fillable = [
         'subject_name',
         'subject_code',
         'description',
+        'gradelvl_id',
     ];
 
     /**
-     * A subject can have many schedules.
+     * A Subject belongs to a Grade Level.
      */
-    public function schedules()
+    public function gradelvl(): BelongsTo
+    {
+        return $this->belongsTo(Gradelvl::class, 'gradelvl_id');
+    }
+
+    /**
+     * A Subject can have many schedules.
+     */
+    public function schedules(): HasMany
     {
         return $this->hasMany(Schedule::class, 'subject_id');
     }

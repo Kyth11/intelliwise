@@ -39,6 +39,10 @@
             }
         }
     }
+
+    // Link state for forms
+    $guardianId = $auth->guardian_id ?? null;
+    $isLinked   = !empty($guardianId);
 @endphp
 
 <div class="card p-4">
@@ -60,6 +64,9 @@
     {{-- Flash + validation --}}
     @if (session('error'))
         <div class="alert alert-danger">{{ session('error') }}</div>
+    @endif
+    @if (session('success'))
+        <div class="alert alert-success">{{ session('success') }}</div>
     @endif
     @if ($errors->any())
         <div class="alert alert-danger">
@@ -84,10 +91,12 @@
             <div class="card p-3 h-100">
                 <h6 class="mb-3">My Profile</h6>
 
-                {{-- Self-update: PUT /guardians/self/{id} (adjust if your route differs) --}}
-                <form action="{{ route('guardians.self.update', $auth->guardian_id) }}" method="POST" autocomplete="off">
+                {{-- Self-upsert: POST when not linked; PUT when linked --}}
+                <form action="{{ route('guardians.self.upsert') }}" method="POST" autocomplete="off">
                     @csrf
-                    @method('PUT')
+                    @if($isLinked)
+                        @method('PUT')
+                    @endif
 
                     {{-- Primary Contact (mapped in controller to mother fields if you want) --}}
                     <div class="mb-2">
@@ -145,6 +154,13 @@
                         <small class="text-muted">Must be unique.</small>
                     </div>
 
+                    {{-- Optional password in this form too --}}
+                    <div class="mt-3">
+                        <label class="form-label">New password (optional)</label>
+                        <input type="password" name="password" class="form-control" minlength="6" autocomplete="new-password">
+                        <small class="text-muted">Leave blank to keep your current password.</small>
+                    </div>
+
                     <div class="mt-3 d-flex gap-2">
                         <button class="btn btn-primary" type="submit">
                             <i class="bi bi-save me-1"></i> Save Changes
@@ -161,9 +177,11 @@
                 <h6 class="mb-3">Change Password</h6>
 
                 {{-- Same endpoint; hidden fields keep other values when only changing password --}}
-                <form action="{{ route('guardians.self.update', $auth->guardian_id) }}" method="POST" autocomplete="off" novalidate>
+                <form action="{{ route('guardians.self.upsert') }}" method="POST" autocomplete="off" novalidate>
                     @csrf
-                    @method('PUT')
+                    @if($isLinked)
+                        @method('PUT')
+                    @endif
 
                     {{-- Hidden keepers to avoid wiping other fields --}}
                     <input type="hidden" name="g_firstname" value="{{ $primaryFirst }}">
@@ -205,7 +223,6 @@
                     </div>
                 </form>
 
-                {{-- Optional: quick help to edit mother/father details elsewhere --}}
                 <div class="mt-3 text-muted small">
                     Need to update detailed parent names separately? Ask the admin to edit your household record.
                 </div>
@@ -275,3 +292,4 @@
     })();
 </script>
 @endpush
+    

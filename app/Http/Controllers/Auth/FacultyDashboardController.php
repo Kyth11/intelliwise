@@ -13,6 +13,8 @@ use App\Models\Guardian;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class FacultyDashboardController extends Controller
 {
@@ -24,7 +26,7 @@ class FacultyDashboardController extends Controller
             $faculties = Faculty::with([
                 'user',
                 'schedules.subject',
-                'schedules.gradelvl', // singular (matches model)
+                'schedules.gradelvl',
             ])->get();
 
             $subjects  = Subjects::all();
@@ -62,7 +64,7 @@ class FacultyDashboardController extends Controller
 
         $gradelvls = $canSeeAllAnnouncements
             ? Gradelvl::orderBy('grade_level')->get(['id', 'grade_level'])
-            : Gradelvl::whereIn('id', $myGradelvlIds)->orderBy('grade_level')->get(['id', 'grade_level']);
+            : Gradelvl::whereIn('id', $myGradelvls = $myGradelvlIds)->orderBy('grade_level')->get(['id', 'grade_level']);
 
         return view('auth.facultydashboard', compact(
             'faculty',
@@ -87,7 +89,7 @@ class FacultyDashboardController extends Controller
             $query->where('faculty_id', $user->faculty_id);
         }
 
-        $query->orderByRaw("FIELD(day, 'Mon','Tue','Wed','Thu','Fri','Sat','Sun')")
+        $query->orderByRaw("FIELD(day, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')")
               ->orderBy('class_start');
 
         $schedules = $query->get();
@@ -185,7 +187,7 @@ class FacultyDashboardController extends Controller
         $a = Announcement::with('gradelvls')->findOrFail($id);
 
         if (!$canSeeAll) {
-            $myIds   = $this->myGradelvlIds($user->faculty_id); // fixed typo
+            $myIds   = $this->myGradelvlIds($user->faculty_id);
             $isGlobal= $a->gradelvls->isEmpty();
             $overlap = $a->gradelvls->pluck('id')->intersect($myIds);
             if (!$isGlobal && $overlap->isEmpty()) {
@@ -199,7 +201,6 @@ class FacultyDashboardController extends Controller
         return back()->with('success', 'Announcement deleted.');
     }
 
-    /** Helper: announcements visible to a given faculty */
     protected function queryAnnouncementsForFaculty(bool $canSeeAll, $myGradelvlIds)
     {
         $base = Announcement::with(['gradelvls']);
@@ -216,7 +217,6 @@ class FacultyDashboardController extends Controller
         });
     }
 
-    /** Helper: list of grade level IDs taught by a faculty */
     protected function myGradelvlIds($facultyId)
     {
         return Schedule::where('faculty_id', $facultyId)
@@ -226,23 +226,6 @@ class FacultyDashboardController extends Controller
             ->values();
     }
 
-    /** Faculty Enroll Form */
-    public function enrollForm()
-    {
-        $guardians = Guardian::orderBy('id', 'desc')->get()->map(function ($g) {
-            $mother = trim(collect([$g->m_firstname, $g->m_middlename, $g->m_lastname])->filter()->implode(' '));
-            $father = trim(collect([$g->f_firstname, $g->f_middlename, $g->f_lastname])->filter()->implode(' '));
-            $label  = $mother && $father ? ($mother.' & '.$father)
-                    : ($mother ?: ($father ?: 'Guardian #'.$g->id));
-
-            $g->display_name    = $label;
-            $g->display_contact = $g->g_contact ?: ($g->m_contact ?: ($g->f_contact ?: ''));
-            return $g;
-        });
-
-        return view('auth.facultydashboard.enroll-student', compact('guardians'));
-    }
-
     /** Admin creates a new faculty */
     public function store(Request $request)
     {
@@ -250,26 +233,31 @@ class FacultyDashboardController extends Controller
             'f_firstname' => 'required|string|max:255',
             'f_lastname'  => 'required|string|max:255',
             'f_email'     => 'nullable|email|max:255|unique:faculties,f_email',
+            'f_address'   => 'nullable|string|max:255',
+            'f_contact'   => 'nullable|string|max:255',
+
             'username'    => 'required|string|max:255|unique:users,username',
             'password'    => 'required|string|min:6',
         ]);
 
-        $faculty = Faculty::create([
-            'f_firstname'  => $request->f_firstname,
-            'f_middlename' => $request->f_middlename,
-            'f_lastname'   => $request->f_lastname,
-            'f_address'    => $request->f_address,
-            'f_contact'    => $request->f_contact,
-            'f_email'      => $request->f_email,
-        ]);
+        DB::transaction(function () use ($request) {
+            $faculty = Faculty::create([
+                'f_firstname'  => $request->f_firstname,
+                'f_middlename' => $request->f_middlename,
+                'f_lastname'   => $request->f_lastname,
+                'f_address'    => $request->f_address,
+                'f_contact'    => $request->f_contact,
+                'f_email'      => $request->f_email,
+            ]);
 
-        User::create([
-            'name'       => $faculty->f_firstname . ' ' . $faculty->f_lastname,
-            'username'   => $request->username,
-            'password'   => bcrypt($request->password),
-            'role'       => 'faculty',
-            'faculty_id' => $faculty->id,
-        ]);
+            User::create([
+                'name'       => $faculty->full_name ?: ($faculty->f_firstname.' '.$faculty->f_lastname),
+                'username'   => $request->username,
+                'password'   => bcrypt($request->password),
+                'role'       => 'faculty',
+                'faculty_id' => $faculty->id,
+            ]);
+        });
 
         return back()->with('success', 'Faculty account created successfully!');
     }
@@ -290,38 +278,60 @@ class FacultyDashboardController extends Controller
         }
 
         $faculty = Faculty::with('user')->findOrFail($id);
+        $currentUserId = optional($faculty->user)->id;
 
         $request->validate([
             'f_firstname' => 'required|string|max:255',
             'f_lastname'  => 'required|string|max:255',
             'f_email'     => 'nullable|email|max:255|unique:faculties,f_email,' . $faculty->id,
-            'username'    => 'required|string|max:255|unique:users,username,' . ($faculty->user->id ?? 'NULL'),
+            'f_address'   => 'nullable|string|max:255',
+            'f_contact'   => 'nullable|string|max:255',
+
+            'username'    => [
+                'required','string','max:255',
+                Rule::unique('users','username')->ignore($currentUserId),
+            ],
             'password'    => 'nullable|string|min:6',
         ]);
 
-        $faculty->update([
-            'f_firstname'  => $request->f_firstname,
-            'f_middlename' => $request->f_middlename,
-            'f_lastname'   => $request->f_lastname,
-            'f_address'    => $request->f_address,
-            'f_contact'    => $request->f_contact,
-            'f_email'      => $request->f_email,
-        ]);
-
-        if ($faculty->user) {
-            $faculty->user->update([
-                'name'     => $faculty->f_firstname . ' ' . $faculty->f_lastname,
-                'username' => $request->username,
-                'password' => $request->filled('password')
-                    ? bcrypt($request->password)
-                    : $faculty->user->password,
+        DB::transaction(function () use ($request, $faculty, $currentUserId) {
+            $faculty->update([
+                'f_firstname'  => $request->f_firstname,
+                'f_middlename' => $request->f_middlename,
+                'f_lastname'   => $request->f_lastname,
+                'f_address'    => $request->f_address,
+                'f_contact'    => $request->f_contact,
+                'f_email'      => $request->f_email,
             ]);
-        }
+
+            $name = $faculty->full_name ?: ($faculty->f_firstname.' '.$faculty->f_lastname);
+
+            if ($faculty->user) {
+                // Update existing linked user
+                $payload = [
+                    'name'     => $name,
+                    'username' => $request->username,
+                ];
+                if ($request->filled('password')) {
+                    $payload['password'] = bcrypt($request->password);
+                }
+                $faculty->user->update($payload);
+            } else {
+                // Create user if missing
+                User::create([
+                    'name'       => $name,
+                    'username'   => $request->username,
+                    'password'   => bcrypt($request->filled('password') ? $request->password : 'password123'),
+                    'role'       => 'faculty',
+                    'faculty_id' => $faculty->id,
+                ]);
+            }
+        });
 
         return back()->with('success', 'Faculty updated successfully!');
     }
 
-    /** ✅ Self-update (no id in route) */
+    /** Self-update (no id in route) */
     public function updateSelf(Request $request)
     {
         $user = Auth::user();
@@ -329,7 +339,6 @@ class FacultyDashboardController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        // Load/create the faculty record tied to this user
         $faculty = $user->faculty_id ? Faculty::find($user->faculty_id) : null;
         if (!$faculty) {
             $faculty = new Faculty();
@@ -339,31 +348,36 @@ class FacultyDashboardController extends Controller
             'f_firstname' => 'required|string|max:255',
             'f_lastname'  => 'required|string|max:255',
             'f_email'     => 'nullable|email|max:255|unique:faculties,f_email,' . ($faculty->id ?? 'NULL'),
+            'f_address'   => 'nullable|string|max:255',
+            'f_contact'   => 'nullable|string|max:255',
+
             'username'    => 'required|string|max:255|unique:users,username,' . $user->id,
             'password'    => 'nullable|string|min:6',
         ]);
 
-        // Save / update faculty
-        $faculty->f_firstname  = $request->f_firstname;
-        $faculty->f_middlename = $request->f_middlename;
-        $faculty->f_lastname   = $request->f_lastname;
-        $faculty->f_address    = $request->f_address;
-        $faculty->f_contact    = $request->f_contact;
-        $faculty->f_email      = $request->f_email;
-        $faculty->save();
+        DB::transaction(function () use ($request, $user, $faculty) {
+            // Save / update faculty
+            $faculty->f_firstname  = $request->f_firstname;
+            $faculty->f_middlename = $request->f_middlename;
+            $faculty->f_lastname   = $request->f_lastname;
+            $faculty->f_address    = $request->f_address;
+            $faculty->f_contact    = $request->f_contact;
+            $faculty->f_email      = $request->f_email;
+            $faculty->save();
 
-        // Ensure the user is linked
-        if (!$user->faculty_id) {
-            $user->faculty_id = $faculty->id;
-        }
+            // Ensure link
+            if (!$user->faculty_id) {
+                $user->faculty_id = $faculty->id;
+            }
 
-        // Update user account
-        $user->name     = trim($faculty->f_firstname . ' ' . $faculty->f_lastname);
-        $user->username = $request->username;
-        if ($request->filled('password')) {
-            $user->password = bcrypt($request->password);
-        }
-        $user->save();
+            // Update user account
+            $user->name     = trim($faculty->f_firstname . ' ' . $faculty->f_lastname);
+            $user->username = $request->username;
+            if ($request->filled('password')) {
+                $user->password = bcrypt($request->password);
+            }
+            $user->save();
+        });
 
         return back()->with('success', 'Profile saved.');
     }
@@ -382,7 +396,8 @@ class FacultyDashboardController extends Controller
 
         $schedule->update([
             'subject_id'  => $request->subject_id,
-            'gradelvl_id' => $request->gradelvl_id,
+            'gradelvls_id'=> $request->gradelvl_id, // keep legacy column name if your DB uses it
+            'gradelvl_id' => $request->gradelvl_id, // and set the correct one if exists
             'day'         => $request->day,
             'class_start' => $request->class_start,
             'class_end'   => $request->class_end,
@@ -394,8 +409,11 @@ class FacultyDashboardController extends Controller
     public function destroy($id)
     {
         $faculty = Faculty::findOrFail($id);
-        User::where('faculty_id', $faculty->id)->delete();
-        $faculty->delete();
+
+        DB::transaction(function () use ($faculty) {
+            User::where('faculty_id', $faculty->id)->delete();
+            $faculty->delete();
+        });
 
         return back()->with('success', 'Faculty account deleted successfully!');
     }

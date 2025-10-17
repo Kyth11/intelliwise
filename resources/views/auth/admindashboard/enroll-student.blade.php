@@ -150,7 +150,7 @@
                 <form action="{{ route('students.store') }}" method="POST" class="needs-validation" novalidate>
                     @csrf
 
-                    {{-- Flash + Validation --}}
+                    {{-- Flash + Validation
                     @if (session('success'))
                         <div class="alert alert-success">{{ session('success') }}</div>
                     @endif
@@ -165,7 +165,7 @@
                                 @endforeach
                             </ul>
                         </div>
-                    @endif
+                    @endif --}}
 
                     {{-- Learner’s section --}}
                     <div class="row g-3">
@@ -189,11 +189,6 @@
                         </div>
 
                         <div class="col-md-3">
-                            <label class="form-label">Age</label>
-                            <input type="number" class="form-control" id="s_age" placeholder="Auto" readonly>
-                        </div>
-
-                        <div class="col-md-3">
                             <label class="form-label">Gender</label>
                             <select class="form-select" name="s_gender">
                                 <option value="">—</option>
@@ -214,6 +209,13 @@
                             <input type="text" class="form-control" name="s_citizenship" placeholder="e.g., Filipino"
                                    value="{{ old('s_citizenship') }}" required>
                         </div>
+
+
+                        <div class="col-md-3">
+                            <label class="form-label">Age</label>
+                            <input type="number" class="form-control" id="s_age" placeholder="Auto" readonly>
+                        </div>
+
 
                         <div class="col-md-6">
                             <label class="form-label">Address</label>

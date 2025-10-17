@@ -45,6 +45,7 @@
         }
 
         @media print {
+
             .sidebar,
             .no-print,
             .flash-messages,
@@ -72,6 +73,7 @@
         }
 
         @media print {
+
             .form-control,
             .form-select,
             textarea.form-control {
@@ -139,7 +141,8 @@
                 <div class="alert alert-secondary">
                     <strong>INSTRUCTIONS:</strong> This form must be completely answered by the student’s parent/guardian.
                     Please read the questions carefully and fill in all applicable spaces and write your answers legibly in
-                    <strong>CAPITAL letters</strong>. For items not applicable, write <strong>N/A</strong>. Please make sure to
+                    <strong>CAPITAL letters</strong>. For items not applicable, write <strong>N/A</strong>. Please make sure
+                    to
                     submit a <strong>CLEAR COPY</strong> of the <strong>CHILD’S BIRTH CERTIFICATE</strong>.
                 </div>
 
@@ -170,21 +173,21 @@
                             <label class="form-label fw-semibold">LEARNER’S NAME</label>
                             <div class="row g-2">
                                 <div class="col-md-4">
-                                    <input type="text" class="form-control" name="s_lastname" placeholder="LAST NAME" required>
+                                    <input type="text" class="form-control" name="s_lastname" placeholder="LAST NAME"
+                                        required>
                                 </div>
                                 <div class="col-md-4">
-                                    <input type="text" class="form-control" name="s_firstname" placeholder="FIRST NAME" required>
+                                    <input type="text" class="form-control" name="s_firstname" placeholder="FIRST NAME"
+                                        required>
                                 </div>
                                 <div class="col-md-4">
-                                    <input type="text" class="form-control" name="s_middlename" placeholder="MIDDLE NAME (optional)">
+                                    <input type="text" class="form-control" name="s_middlename"
+                                        placeholder="MIDDLE NAME (optional)">
                                 </div>
                             </div>
                         </div>
 
-                        <div class="col-md-3">
-                            <label class="form-label">Age</label>
-                            <input type="number" class="form-control" id="s_age" placeholder="Auto" readonly>
-                        </div>
+
 
                         <div class="col-md-3">
                             <label class="form-label">Gender</label>
@@ -203,7 +206,13 @@
 
                         <div class="col-md-3">
                             <label class="form-label">Citizenship</label>
-                            <input type="text" class="form-control" name="s_citizenship" placeholder="e.g., Filipino" required>
+                            <input type="text" class="form-control" name="s_citizenship" placeholder="e.g., Filipino"
+                                required>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">Age</label>
+                            <input type="number" class="form-control" id="s_age" placeholder="Auto" readonly>
                         </div>
 
                         <div class="col-md-6">
@@ -234,7 +243,8 @@
                                     <option value="Yes">Yes</option>
                                     <option value="No" selected>No</option>
                                 </select>
-                                <input type="text" class="form-control" id="sped_desc" placeholder="If yes, please specify." disabled>
+                                <input type="text" class="form-control" id="sped_desc" placeholder="If yes, please specify."
+                                    disabled>
                             </div>
                         </div>
 
@@ -281,7 +291,8 @@
                             {{-- Household Address --}}
                             <div class="col-12">
                                 <label class="form-label">Household Address</label>
-                                <input type="text" name="g_address" class="form-control" placeholder="Same as student address? Tick below">
+                                <input type="text" name="g_address" class="form-control"
+                                    placeholder="Same as student address? Tick below">
                                 <div class="form-check mt-1">
                                     <input class="form-check-input" type="checkbox" id="sameAddress">
                                     <label class="form-check-label" for="sameAddress">Same as student’s address</label>
@@ -289,42 +300,64 @@
                             </div>
 
                             {{-- Mother --}}
-                            <div class="col-12"><h6 class="mt-3 mb-1">Mother</h6></div>
-                            <div class="col-md-4"><input type="text" name="m_firstname" class="form-control" placeholder="First Name"></div>
-                            <div class="col-md-4"><input type="text" name="m_middlename" class="form-control" placeholder="Middle Name (optional)"></div>
-                            <div class="col-md-4"><input type="text" name="m_lastname" class="form-control" placeholder="Last Name"></div>
-                            <div class="col-md-6"><input type="text" name="m_contact" class="form-control" placeholder="Contact"></div>
-                            <div class="col-md-6"><input type="email" name="m_email" class="form-control" placeholder="Email (optional)"></div>
-                            <div class="col-md-6"><input type="text" name="m_occupation" class="form-control" placeholder="Occupation (print only)"></div>
+                            <div class="col-12">
+                                <h6 class="mt-3 mb-1">Mother</h6>
+                            </div>
+                            <div class="col-md-4"><input type="text" name="m_firstname" class="form-control"
+                                    placeholder="First Name"></div>
+                            <div class="col-md-4"><input type="text" name="m_middlename" class="form-control"
+                                    placeholder="Middle Name (optional)"></div>
+                            <div class="col-md-4"><input type="text" name="m_lastname" class="form-control"
+                                    placeholder="Last Name"></div>
+                            <div class="col-md-6"><input type="text" name="m_contact" class="form-control"
+                                    placeholder="Contact"></div>
+                            <div class="col-md-6"><input type="email" name="m_email" class="form-control"
+                                    placeholder="Email (optional)"></div>
+                            <div class="col-md-6"><input type="text" name="m_occupation" class="form-control"
+                                    placeholder="Occupation (print only)"></div>
 
                             {{-- Father --}}
-                            <div class="col-12"><h6 class="mt-3 mb-1">Father</h6></div>
-                            <div class="col-md-4"><input type="text" name="f_firstname" class="form-control" placeholder="First Name"></div>
-                            <div class="col-md-4"><input type="text" name="f_middlename" class="form-control" placeholder="Middle Name (optional)"></div>
-                            <div class="col-md-4"><input type="text" name="f_lastname" class="form-control" placeholder="Last Name"></div>
-                            <div class="col-md-6"><input type="text" name="f_contact" class="form-control" placeholder="Contact"></div>
-                            <div class="col-md-6"><input type="email" name="f_email" class="form-control" placeholder="Email (optional)"></div>
-                            <div class="col-md-6"><input type="text" name="f_occupation" class="form-control" placeholder="Occupation (print only)"></div>
+                            <div class="col-12">
+                                <h6 class="mt-3 mb-1">Father</h6>
+                            </div>
+                            <div class="col-md-4"><input type="text" name="f_firstname" class="form-control"
+                                    placeholder="First Name"></div>
+                            <div class="col-md-4"><input type="text" name="f_middlename" class="form-control"
+                                    placeholder="Middle Name (optional)"></div>
+                            <div class="col-md-4"><input type="text" name="f_lastname" class="form-control"
+                                    placeholder="Last Name"></div>
+                            <div class="col-md-6"><input type="text" name="f_contact" class="form-control"
+                                    placeholder="Contact"></div>
+                            <div class="col-md-6"><input type="email" name="f_email" class="form-control"
+                                    placeholder="Email (optional)"></div>
+                            <div class="col-md-6"><input type="text" name="f_occupation" class="form-control"
+                                    placeholder="Occupation (print only)"></div>
 
                             {{-- If with a guardian --}}
                             <div class="col-12">
-                                <label class="form-label mt-2">If learner is with a guardian, please indicate details</label>
-                                <input type="text" name="alt_guardian_details" class="form-control" placeholder="Full name, contact no., relation (print only)">
+                                <label class="form-label mt-2">If learner is with a guardian, please indicate
+                                    details</label>
+                                <input type="text" name="alt_guardian_details" class="form-control"
+                                    placeholder="Full name, contact no., relation (print only)">
                             </div>
 
                             {{-- Single login for parents --}}
                             <div class="col-12 mt-2">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="hasLogin" name="has_login">
-                                    <label class="form-check-label" for="hasLogin">Create Parent/Guardian Login Account (single account)</label>
+                                    <label class="form-check-label" for="hasLogin">Create Parent/Guardian Login Account
+                                        (single account)</label>
                                 </div>
                             </div>
                             <div id="guardianLoginFields" class="row g-2 d-none">
-                                <div class="col-md-6"><input type="text" name="username" class="form-control" placeholder="Username"></div>
+                                <div class="col-md-6"><input type="text" name="username" class="form-control"
+                                        placeholder="Username"></div>
                                 <div class="col-md-6">
                                     <div class="input-group">
-                                        <input type="password" name="password" id="guardianPassword" class="form-control" placeholder="Password">
-                                        <button type="button" class="btn btn-outline-secondary toggle-password" data-target="guardianPassword">👁</button>
+                                        <input type="password" name="password" id="guardianPassword" class="form-control"
+                                            placeholder="Password">
+                                        <button type="button" class="btn btn-outline-secondary toggle-password"
+                                            data-target="guardianPassword">👁</button>
                                     </div>
                                 </div>
                             </div>
@@ -336,16 +369,22 @@
                     {{-- Consent --}}
                     <div>
                         <p class="mb-2">
-                            As the parent (or legal guardian) of the above-named learner, I hereby consent to his/her enrollment at
-                            <strong>Barra Grace Christian School</strong>. In addition to such consent, I hereby acknowledge the following conditions:
+                            As the parent (or legal guardian) of the above-named learner, I hereby consent to his/her
+                            enrollment at
+                            <strong>Barra Grace Christian School</strong>. In addition to such consent, I hereby acknowledge
+                            the following conditions:
                         </p>
                         <ol class="mb-3">
                             <li>I will be responsible for paying for the learner’s school fees.</li>
                             <li>An initial amount will be given to the institution to officially enroll the learner.</li>
-                            <li>The school will have the right to hold off documents and important records in case of failure in settling school payables.</li>
+                            <li>The school will have the right to hold off documents and important records in case of
+                                failure in settling school payables.</li>
                             <li>The learner will be provided with all the necessary equipment for distant learning.</li>
-                            <li>To be open and available for communication with regards to matters about the learner, his studies, and other school activities.</li>
-                            <li>I will be liable, and I am aware that failure to settle my financial obligations, the school will execute legal actions against me, therefore I will make sure to pay all fees within the said school year.</li>
+                            <li>To be open and available for communication with regards to matters about the learner, his
+                                studies, and other school activities.</li>
+                            <li>I will be liable, and I am aware that failure to settle my financial obligations, the school
+                                will execute legal actions against me, therefore I will make sure to pay all fees within the
+                                said school year.</li>
                         </ol>
 
                         <div class="d-flex justify-content-end">
@@ -355,7 +394,8 @@
 
                     <div class="mt-4 d-flex gap-2 no-print">
                         <button class="btn btn-success" type="submit"><i class="bi bi-check-circle me-1"></i> Save</button>
-                        <button class="btn btn-outline-secondary" type="button" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print</button>
+                        <button class="btn btn-outline-secondary" type="button" onclick="window.print()"><i
+                                class="bi bi-printer me-1"></i> Print</button>
                     </div>
                 </form>
             </div>
@@ -430,7 +470,7 @@
                     const el = newGuardianFields.querySelector(sel);
                     if (!el) return;
                     const needLogin = isNew && hasLoginCheckbox.checked;
-                    if (needLogin) { el.setAttribute('required','required'); applyRequiredMessage(el); }
+                    if (needLogin) { el.setAttribute('required', 'required'); applyRequiredMessage(el); }
                     else { el.removeAttribute('required'); el.setCustomValidity(''); }
                 });
             }

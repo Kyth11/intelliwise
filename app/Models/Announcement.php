@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Announcement extends Model
 {
@@ -13,7 +15,7 @@ class Announcement extends Model
         'content',
         'date_of_event',
         'deadline',
-        'gradelvl_id',   // keep for legacy UI (first selected)
+        'gradelvl_id', // legacy single selection
     ];
 
     protected $casts = [
@@ -21,22 +23,29 @@ class Announcement extends Model
         'deadline'      => 'date',
     ];
 
-    // Legacy single grade level (for older UIs that expect one)
-    public function gradelvl()
+    /**
+     * Legacy single grade level (nullable).
+     */
+    public function gradelvl(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Gradelvl::class, 'gradelvl_id');
+        return $this->belongsTo(Gradelvl::class, 'gradelvl_id');
     }
 
-    // NEW: Many-to-many grades
-    public function gradelvls()
+    /**
+     * New: many-to-many grade levels via pivot table "announcement_gradelvl".
+     */
+    public function gradelvls(): BelongsToMany
     {
-        return $this->belongsToMany(\App\Models\Gradelvl::class, 'announcement_gradelvl')
+        return $this->belongsToMany(Gradelvl::class, 'announcement_gradelvl', 'announcement_id', 'gradelvl_id')
             ->withTimestamps();
     }
 
-    // Helper (optional): comma-separated names of grade levels
+    /**
+     * Helper: "Grade 1, Grade 2, ..." from the many-to-many relation.
+     */
     public function getGradeLevelNamesAttribute(): string
     {
+        // Eager-load gradelvls in queries to avoid N+1 when using this accessor.
         return $this->gradelvls->pluck('grade_level')->implode(', ');
     }
 }

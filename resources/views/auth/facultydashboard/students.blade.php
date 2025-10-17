@@ -1,5 +1,5 @@
+{{-- resources/views/faculty/students/index.blade.php --}}
 @extends('layouts.faculty')
-
 @section('title', 'Faculty · Students')
 
 @push('styles')
@@ -10,32 +10,72 @@
     .students-page .grade-card { border:1px solid rgba(0,0,0,.075); box-shadow:0 2px 8px rgba(0,0,0,.06); }
     .students-page .table td, .students-page .table th { vertical-align: middle; }
     .badge-grade { font-size:.825rem; }
+
+    .filters .form-control, .filters .form-select {
+        height: calc(1.5rem + .5rem + 2px);
+        padding:.25rem .5rem;
+        font-size:.85rem;
+    }
+
+    @media print {
+        .no-print { display: none !important; }
+        @page { size: A4 portrait; margin: 14mm 12mm; }
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
 </style>
 @endpush
 
 @section('content')
 <div class="card section p-4 students-page">
-    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
-        <div class="section-title">
-            <h4 class="mb-1">
-                {{ ($canSeeAll ?? false) ? 'All Students' : 'My Students' }}
-            </h4>
+    <div id="dashboard-header" class="mb-3">
+        <div class="intro">
+            <div>
+                <h5 class="mb-1">
+                    {{ ($canSeeAll ?? false) ? 'Students (Grouped by Grade Level)' : 'My Students' }}
+                </h5>
+                <div class="text-muted small">
+                    {{ ($canSeeAll ?? false) ? 'Browse and search all learners.' : 'Browse and search your learners.' }}
+                </div>
+            </div>
         </div>
 
-        <div class="search-wrap">
-            <input type="text" id="studentSearch" class="form-control form-control-sm" placeholder="Search students...">
+        <div class="kpi-strip">
+            <div class="kpi-card">
+                <div class="kpi-number">{{ collect($studentsByGrade)->flatten(1)->count() }}</div>
+                <div class="kpi-label">Students</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-number">{{ collect($studentsByGrade)->keys()->count() }}</div>
+                <div class="kpi-label">Grade Levels</div>
+            </div>
+        </div>
+
+        <div class="pay-card p-3 text-center">
+            <h6 class="mb-1">Quick Action</h6>
+            <p class="text-muted mb-3 small">Print this page.</p>
+            <button class="btn btn-outline-dark btn-sm no-print" onclick="window.print()">
+                <i class="bi bi-printer me-1"></i> Print
+            </button>
         </div>
     </div>
+
+    <!-- Simple filter row (search only) -->
+    <form class="filters row g-2 align-items-end mt-1 mb-2">
+        <div class="col-auto">
+            <label class="form-label mb-0 small">Search</label>
+            <input type="text" id="studentSearch" class="form-control form-control-sm" placeholder="Type to filter…">
+        </div>
+    </form>
 
     @php $byGrade = $studentsByGrade ?? collect(); @endphp
 
     @forelse($byGrade as $grade => $group)
-        <div class="card mt-3 p-3 grade-card">
+        <div class="card mt-2 p-3 grade-card">
             <div class="d-flex justify-content-between align-items-center mb-2">
-                <h5 class="mb-0">
+                <h6 class="mb-0">
                     <span class="badge bg-light text-dark border badge-grade">{{ $grade ?: '— No Grade —' }}</span>
                     <span class="text-muted">({{ $group->count() }})</span>
-                </h5>
+                </h6>
             </div>
 
             <div class="table-responsive">
@@ -55,7 +95,6 @@
                             @php
                                 $g = $s->guardian;
 
-                                // Build parents/guardian label (same idea as admin page, simplified)
                                 $mFirst = trim(collect([data_get($g,'m_firstname'), data_get($g,'m_middlename')])->filter()->implode(' '));
                                 $mLast  = (string) data_get($g,'m_lastname', '');
                                 $fFirst = trim(collect([data_get($g,'f_firstname'), data_get($g,'f_middlename')])->filter()->implode(' '));
@@ -81,9 +120,8 @@
                                 $guardianName = null;
                                 if (isset($g) && ($g->guardian_name ?? null)) {
                                     $guardianName = $g->guardian_name;
-                                }
-                                if (!$guardianName && isset($g) && property_exists($g,'g_firstname')) {
-                                    $legacy = trim(collect([$g->g_firstname, $g->g_middlename ?? null, $g->g_lastname ?? null])->filter()->implode(' '));
+                                } elseif (isset($g) && (isset($g->g_firstname) || isset($g->g_lastname))) {
+                                    $legacy = trim(collect([$g->g_firstname ?? null, $g->g_middlename ?? null, $g->g_lastname ?? null])->filter()->implode(' '));
                                     $guardianName = $legacy ?: null;
                                 }
 
@@ -94,7 +132,7 @@
                             @endphp
 
                             <tr>
-                                <td>{{ $s->s_firstname }} {{ $s->s_middlename }} {{ $s->s_lastname }}</td>
+                                <td>{{ trim(($s->s_firstname ?? '').' '.($s->s_middlename ?? '').' '.($s->s_lastname ?? '')) }}</td>
                                 <td>{{ $s->s_birthdate ? \Illuminate\Support\Carbon::parse($s->s_birthdate)->format('Y-m-d') : '—' }}</td>
                                 <td>{{ $household }}</td>
                                 <td>{{ $s->s_contact ?? '—' }}</td>
@@ -121,8 +159,7 @@
     if (!input) return;
 
     const cards = Array.from(document.querySelectorAll('.grade-card'));
-
-    function norm(s){ return (s || '').toLowerCase(); }
+    const norm = (s) => (s || '').toLowerCase();
 
     function filter() {
         const q = norm(input.value);
@@ -134,9 +171,8 @@
                 tr.style.display = match ? '' : 'none';
                 if (match) any = true;
             });
-            // hide whole card if no visible rows during search
-            if (q && !any) { card.style.display = 'none'; }
-            else { card.style.display = ''; }
+            // hide entire grade card if no rows match during search
+            card.style.display = (q && !any) ? 'none' : '';
         });
     }
 

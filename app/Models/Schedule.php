@@ -3,10 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Schoolyr;
-use App\Models\Subjects;
-use App\Models\Gradelvl;
-use App\Models\Faculty;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Schedule extends Model
 {
@@ -19,25 +16,47 @@ class Schedule extends Model
         'faculty_id',
         'subject_id',
         'gradelvl_id',
-        'school_year',
+        'school_year', // references Schoolyr::school_year (string key)
     ];
 
-    public function schoolYear()
+    /**
+     * Optional: cast time strings if you want Carbon instances.
+     * (Uncomment if you store full datetime; keep as string if HH:MM)
+     */
+    // protected $casts = [
+    //     'class_start' => 'datetime:H:i',
+    //     'class_end'   => 'datetime:H:i',
+    // ];
+
+    /**
+     * School year relation keyed by human-readable "school_year" (e.g., "2025-2026").
+     * Local key: schedules.school_year, Owner key: schoolyrs.school_year
+     */
+    public function schoolYear(): BelongsTo
     {
         return $this->belongsTo(Schoolyr::class, 'school_year', 'school_year');
     }
 
-    public function subject()
+    /**
+     * Subject offered on this schedule.
+     */
+    public function subject(): BelongsTo
     {
         return $this->belongsTo(Subjects::class, 'subject_id');
     }
 
-    public function gradelvl()
+    /**
+     * Grade level for this class.
+     */
+    public function gradelvl(): BelongsTo
     {
         return $this->belongsTo(Gradelvl::class, 'gradelvl_id');
     }
 
-    public function faculty()
+    /**
+     * Assigned faculty (teacher/instructor).
+     */
+    public function faculty(): BelongsTo
     {
         return $this->belongsTo(Faculty::class, 'faculty_id');
     }

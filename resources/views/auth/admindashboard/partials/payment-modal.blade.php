@@ -93,6 +93,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const paymentMethod        = document.getElementById('paymentMethod');
     const payForm              = document.getElementById('paymentForm');
 
+    // ✅ Bootstrap 5 modal instance (no jQuery)
+    const modalEl = document.getElementById('addPaymentModal');
+    const paymentModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+    // Optional: ensure any leftover backdrops are removed once hidden
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('padding-right');
+    });
+
     function showStudentData(student) {
         if (!student) {
             studentPayables.style.display = 'none';
@@ -191,18 +202,25 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
+                    // Hide the Bootstrap 5 modal properly (removes backdrop)
+                    paymentModal.hide();
+
+                    // Show success AFTER hiding modal so overlays don't stack
                     Swal.fire('Payment Saved', 'Student balance updated', 'success');
+
                     // Update table Paid and Balance
                     const row = document.querySelector(`tr[data-id="${studentId}"]`);
                     if (row) {
                         const paidCell    = row.querySelector('.text-success');
                         const balanceCell = row.querySelector('.text-danger');
-                        const prevPaid = parseFloat(paidCell.textContent.replace(/,/g,''));
+                        const prevPaid = parseFloat(paidCell.textContent.replace(/,/g,'')) || 0;
                         paidCell.textContent = (prevPaid + amount).toFixed(2);
-                        balanceCell.textContent = data.new_balance.toFixed(2);
+                        balanceCell.textContent = Number(data.new_balance).toFixed(2);
                     }
+
+                    // Reset form fields/UI
                     payForm.reset();
-                    $('#addPaymentModal').modal('hide');
+                    showStudentData(null);
                 } else {
                     Swal.fire('Error', data.message || 'Payment failed', 'error');
                 }

@@ -3,29 +3,38 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-
-use App\Models\User;
-use App\Models\Student;
-use App\Models\Faculty;
-use App\Models\Guardian;
 use App\Models\Announcement;
-use App\Models\Schedule;
-use App\Models\Tuition;
-use App\Models\OptionalFee;
-use App\Models\Subjects;
+use App\Models\AppSetting;
+use App\Models\Faculty;
 use App\Models\Gradelvl;
+use App\Models\Guardian;
+use App\Models\OptionalFee;
+use App\Models\Payments;
+use App\Models\Schedule;
 use App\Models\Schoolyr;
-use Illuminate\Support\Facades\Hash;
+use App\Models\Student;
+use App\Models\Subjects;
+use App\Models\Tuition;
+use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class AdminDashboardController extends Controller
 {
     public function dashboard()
     {
-        $students   = Student::with('guardian')->get();
-        $faculties  = Faculty::with('user')->get();
-        $guardians  = Guardian::with('user')->get();
+        // Students with everything the blades touch to avoid N+1s
+        $students = Student::with([
+            'guardian',
+            'optionalFees',
+            'tuition',
+            'gradelvl',
+        ])->get();
+
+        $faculties = Faculty::with('user')->get();
+        $guardians = Guardian::with('user')->get();
 
         $announcements = Announcement::with('gradelvls')
             ->orderByRaw('COALESCE(date_of_event, created_at) DESC')
@@ -36,11 +45,18 @@ class AdminDashboardController extends Controller
             ->orderBy('day')
             ->get();
 
-        $tuitions      = Tuition::with('optionalFees')->orderBy('updated_at', 'desc')->get();
-        $subjects      = Subjects::all();
-        $gradelvls     = Gradelvl::all();
-        $schoolyrs     = Schoolyr::orderBy('school_year', 'desc')->get();
-        $optionalFees  = OptionalFee::where('active', true)->orderBy('name')->get();
+        // Tuitions with optional fees
+        $tuitions     = Tuition::with('optionalFees')->orderBy('updated_at', 'desc')->get();
+        $subjects     = Subjects::with('gradelvl')->orderBy('subject_name')->get();
+        $gradelvls    = Gradelvl::orderBy('grade_level')->get();
+        $schoolyrs    = Schoolyr::orderBy('school_year', 'desc')->get();
+        $optionalFees = OptionalFee::where('active', true)->orderBy('name')->get();
+
+        // Recent payments (top 10)
+        $recentPayments = Payments::with('tuition')
+            ->latest('created_at')
+            ->take(10)
+            ->get();
 
         return view('auth.admindashboard', compact(
             'students',
@@ -52,7 +68,8 @@ class AdminDashboardController extends Controller
             'subjects',
             'gradelvls',
             'schoolyrs',
-            'optionalFees'
+            'optionalFees',
+            'recentPayments'
         ));
     }
 
@@ -75,12 +92,43 @@ class AdminDashboardController extends Controller
         return view('auth.admindashboard.accounts', compact('faculties', 'guardians'));
     }
 
+    /**
+     * Single source of truth for the Settings page.
+     * (Fixes "Cannot redeclare ... settings()" by ensuring only ONE method exists.)
+     */
     public function settings()
     {
         $admins    = User::where('role', 'admin')->orderBy('created_at', 'desc')->get();
         $schoolyrs = Schoolyr::orderBy('school_year', 'desc')->get();
 
-        return view('auth.admindashboard.settings', compact('admins', 'schoolyrs'));
+        // Subjects section needs these
+        $subjects  = Subjects::with('gradelvl')->orderBy('subject_name')->get();
+        $gradelvls = Gradelvl::orderBy('grade_level')->get(['id', 'grade_level']);
+
+        // Global toggle: enable/disable faculty enrollment
+        $facultyEnrollmentEnabled = (bool) AppSetting::get('faculty_enrollment_enabled', true);
+
+        return view('auth.admindashboard.settings', compact(
+            'admins',
+            'schoolyrs',
+            'subjects',
+            'gradelvls',
+            'facultyEnrollmentEnabled'
+        ));
+    }
+
+    /**
+     * Update system-wide settings (currently: faculty enrollment toggle).
+     */
+    public function updateSystemSettings(Request $request)
+    {
+        $enabled = $request->has('faculty_enrollment_enabled')
+            ? $request->boolean('faculty_enrollment_enabled')
+            : false;
+
+        AppSetting::set('faculty_enrollment_enabled', $enabled);
+
+        return back()->with('success', 'System settings saved.');
     }
 
     public function storeAdmin(Request $request)
@@ -243,7 +291,7 @@ class AdminDashboardController extends Controller
             'class_end'   => 'required|date_format:H:i|after:class_start',
             'faculty_id'  => 'required|exists:faculties,id',
             'subject_id'  => 'required|exists:subjects,id',
-            'gradelvls_id'=> 'nullable|exists:gradelvls,id',
+            'gradelvl_id' => 'nullable|exists:gradelvls,id',
             'school_year' => 'nullable|string|max:9|exists:schoolyrs,school_year',
         ]);
 
@@ -295,15 +343,15 @@ class AdminDashboardController extends Controller
         $baseTotal = round(($tYear ?? 0) + ($mYear ?? 0) + ($books ?: 0), 2);
 
         $tuition = Tuition::create([
-            'grade_level'    => $data['grade_level'],
-            'tuition_monthly'=> round($tMon, 2),
-            'tuition_yearly' => round($tYear, 2),
-            'misc_monthly'   => $mMon !== null ? round($mMon, 2) : null,
-            'misc_yearly'    => $mYear !== null ? round($mYear, 2) : null,
-            'books_desc'     => $data['books_desc'] ?? null,
-            'books_amount'   => $request->filled('books_amount') ? round($books, 2) : null,
-            'school_year'    => $data['school_year'] ?? null,
-            'total_yearly'   => 0,
+            'grade_level'     => $data['grade_level'],
+            'tuition_monthly' => round($tMon, 2),
+            'tuition_yearly'  => round($tYear, 2),
+            'misc_monthly'    => $mMon !== null ? round($mMon, 2) : null,
+            'misc_yearly'     => $mYear !== null ? round($mYear, 2) : null,
+            'books_desc'      => $data['books_desc'] ?? null,
+            'books_amount'    => $request->filled('books_amount') ? round($books, 2) : null,
+            'school_year'     => $data['school_year'] ?? null,
+            'total_yearly'    => 0,
         ]);
 
         $ids = collect($data['optional_fee_ids'] ?? [])->filter()->unique()->values();
@@ -361,14 +409,14 @@ class AdminDashboardController extends Controller
             : ($tuition->books_amount ?? 0);
 
         $tuition->update([
-            'grade_level'    => $data['grade_level'],
-            'tuition_monthly'=> round($tMon, 2),
-            'tuition_yearly' => round($tYear, 2),
-            'misc_monthly'   => $mMon !== null ? round($mMon, 2) : null,
-            'misc_yearly'    => $mYear !== null ? round($mYear, 2) : null,
-            'books_desc'     => $data['books_desc'] ?? null,
-            'books_amount'   => $request->filled('books_amount') ? round($books, 2) : null,
-            'school_year'    => $data['school_year'] ?? null,
+            'grade_level'     => $data['grade_level'],
+            'tuition_monthly' => round($tMon, 2),
+            'tuition_yearly'  => round($tYear, 2),
+            'misc_monthly'    => $mMon !== null ? round($mMon, 2) : null,
+            'misc_yearly'     => $mYear !== null ? round($mYear, 2) : null,
+            'books_desc'      => $data['books_desc'] ?? null,
+            'books_amount'    => $request->filled('books_amount') ? round($books, 2) : null,
+            'school_year'     => $data['school_year'] ?? null,
         ]);
 
         $ids = collect($data['optional_fee_ids'] ?? [])->filter()->unique()->values();
@@ -447,7 +495,7 @@ class AdminDashboardController extends Controller
         $guardians    = Guardian::with('students')->get()->map(function ($g) {
             $mother = trim(collect([$g->m_firstname, $g->m_middlename, $g->m_lastname])->filter()->implode(' '));
             $father = trim(collect([$g->f_firstname, $g->f_middlename, $g->f_lastname])->filter()->implode(' '));
-            $label  = $mother && $father ? ($mother . ' & ' . $father) : ($mother ?: ($father ?: 'Guardian #'.$g->id));
+            $label  = $mother && $father ? ($mother . ' & ' . $father) : ($mother ?: ($father ?: 'Guardian #' . $g->id));
             $g->display_name = $label;
             return $g;
         });
@@ -459,5 +507,54 @@ class AdminDashboardController extends Controller
             'students',
             'guardians'
         ));
+    }
+
+    /* ===========================
+     * SUBJECTS CRUD
+     * =========================== */
+
+    public function storeSubject(Request $request)
+    {
+        $data = $request->validate([
+            'subject_name' => ['required','string','max:255'],
+            'subject_code' => ['required','string','max:50','unique:subjects,subject_code'],
+            'description'  => ['nullable','string','max:1000'],
+            'gradelvl_id'  => ['required','exists:gradelvls,id'],
+        ]);
+
+        Subjects::create($data);
+
+        return back()->with('success', 'Subject added.');
+    }
+
+    public function updateSubject(Request $request, $id)
+    {
+        $subject = Subjects::findOrFail($id);
+
+        $data = $request->validate([
+            'subject_name' => ['required','string','max:255'],
+            'subject_code' => [
+                'required','string','max:50',
+                Rule::unique('subjects','subject_code')->ignore($subject->id),
+            ],
+            'description'  => ['nullable','string','max:1000'],
+            'gradelvl_id'  => ['required','exists:gradelvls,id'],
+        ]);
+
+        $subject->update($data);
+
+        return back()->with('success', 'Subject updated.');
+    }
+
+    public function destroySubject($id)
+    {
+        $subject = Subjects::findOrFail($id);
+
+        try {
+            $subject->delete();
+            return back()->with('success', 'Subject deleted.');
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Cannot delete subject because it is in use.');
+        }
     }
 }

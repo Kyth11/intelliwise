@@ -1,15 +1,18 @@
 @extends('layouts.faculty')
 @section('title', 'IGCA - Faculty Dashboard')
 
-@push('styles')
-    {{-- DataTables + Bootstrap 5 CSS (kept for future tables; safe to leave) --}}
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
-@endpush
-
 @section('content')
+@php
+    // Read the admin-controlled switch (defaults to true if not set)
+    $enrollOpen = (bool) \App\Models\AppSetting::get('faculty_enrollment_enabled', true);
+@endphp
+
 <div class="card section p-4">
-    <!-- Header row: Welcome | KPIs (center) | Enroll -->
+    <!-- =========================
+         Header: Intro | KPIs | Right: Enroll
+    ========================== -->
     <div id="dashboard-header" class="mb-3">
+        <!-- Intro -->
         <div class="intro">
             <div>
                 <h5 class="mb-1">Welcome, {{ Auth::check() ? Auth::user()->name : 'Faculty' }}!</h5>
@@ -17,33 +20,46 @@
             </div>
         </div>
 
-        <!-- Compact KPI strip (center) -->
+        <!-- KPI strip -->
         <div class="kpi-strip">
             <div class="kpi-card">
                 <div class="kpi-number">{{ $studentsCount }}</div>
                 <div class="kpi-label">{{ $canSeeAllStudents ? 'Total Students' : 'Students' }}</div>
             </div>
-
             <div class="kpi-card">
                 <div class="kpi-number">{{ $announcements->count() }}</div>
                 <div class="kpi-label">Announcements</div>
             </div>
         </div>
 
-        <!-- Enroll Student (top-right) — visible to ALL faculty -->
+        <!-- Enroll card (essential action only; no extras) -->
         <div class="card enroll-card p-3 text-center">
             <h6 class="mb-1">Enroll a Student</h6>
             <p class="text-muted mb-3 small">Add a new student to the system.</p>
-            <a href="{{ route('faculty.students.create') }}" class="btn btn-primary">
-                <i class="bi bi-person-plus me-2"></i> Enroll Now
-            </a>
+
+            @if ($enrollOpen)
+                <a href="{{ route('faculty.students.create') }}" class="btn btn-primary">
+                    <i class="bi bi-person-plus me-2"></i> Enroll Now
+                </a>
+            @else
+                {{-- Disabled + gray, with no navigable href --}}
+                <a href="#" class="btn btn-secondary disabled"
+                   aria-disabled="true" tabindex="-1" onclick="return false;"
+                   title="Enrollment is currently closed by the admin">
+                    <i class="bi bi-person-plus me-2"></i> Enroll Now
+                </a>
+            @endif
         </div>
     </div>
 
-    <!-- Announcements (Faculty can Add/Edit/Delete; grade levels limited by permission) -->
+    <!-- =========================
+         Announcements
+    ========================== -->
     <div class="card mt-2 p-4" id="announcements-section">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">Announcements</h5>
+
+            <!-- Keep only necessary controls (Add) -->
             <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addAnnouncementModal">
                 <i class="bi bi-megaphone me-1"></i> Add
             </button>
@@ -80,7 +96,7 @@
                         <div class="d-flex gap-2">
                             <!-- EDIT -->
                             <button class="btn btn-sm btn-warning" data-bs-toggle="modal"
-                                data-bs-target="#editAnnouncementModal{{ $a->id }}">
+                                data-bs-target="#editAnnouncementModal{{ $a->id }}" title="Edit">
                                 <i class="bi bi-pencil-square"></i>
                             </button>
 
@@ -89,8 +105,7 @@
                                   class="d-inline js-confirm-delete" data-confirm="Delete this announcement?">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="btn btn-sm btn-danger js-delete-btn"
-                                        aria-label="Delete announcement">
+                                <button type="submit" class="btn btn-sm btn-danger js-delete-btn" aria-label="Delete">
                                     <i class="bi bi-archive"></i>
                                 </button>
                             </form>
@@ -215,7 +230,7 @@
 @endsection
 
 @push('scripts')
-    {{-- jQuery (for SweetAlert handler parity with admin) --}}
+    {{-- jQuery for SweetAlert handler parity with admin --}}
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"
         integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
 

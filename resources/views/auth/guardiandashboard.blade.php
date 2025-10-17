@@ -2,13 +2,11 @@
 
 @section('title', 'Guardian Dashboard')
 
-@push('styles')
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-@endpush
-
 @section('content')
     <div class="card section p-4">
-        <!-- Header: Welcome | KPIs | Pay -->
+        <!-- =========================
+             Header: Welcome | KPIs | Pay
+        ========================== -->
         <div id="dashboard-header" class="mb-3">
             <div class="intro">
                 <div>
@@ -33,7 +31,7 @@
                 </div>
             </div>
 
-            <!-- Pay card -->
+            <!-- Pay card (kept minimal) -->
             <div class="card pay-card p-3 text-center">
                 <h6 class="mb-1">Pay Tuition & Fees</h6>
                 <p class="text-muted mb-3 small">Use GCash to settle balances conveniently.</p>
@@ -43,7 +41,9 @@
             </div>
         </div>
 
-        <!-- Announcements -->
+        <!-- =========================
+             Announcements (view only)
+        ========================== -->
         <div class="card mt-2 p-4" id="announcements-section">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0">Announcements</h5>
@@ -77,11 +77,7 @@
                                         {{ \Illuminate\Support\Carbon::parse($a->created_at)->format('Y-m-d g:i A') }}</span>
                                 </small>
                             </div>
-
-                            <a href="{{ route('guardians.dashboard') }}#announcements-section"
-                               class="btn btn-sm btn-outline-secondary">
-                                <i class="bi bi-eye"></i> View
-                            </a>
+                            {{-- No extra "View" button needed here --}}
                         </li>
                     @endforeach
                 </ul>
@@ -90,7 +86,9 @@
             @endif
         </div>
 
-        <!-- Learners -->
+        <!-- =========================
+             Learners
+        ========================== -->
         <div class="card mt-4 p-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0">Learners</h5>
@@ -137,11 +135,9 @@
                                     $lastPay = null;
 
                                     if ($paymentsRelationLoaded) {
-                                        // lazy load ok in blade; eager-load later if you want to optimize
                                         $totalPaid = (float) ($st->payments()->sum('amount') ?? 0);
                                         $lastPay   = $st->payments()->latest()->first();
                                     }
-
                                     if ($totalPaid === null) {
                                         $totalPaid = max($origTotal - $balance, 0);
                                     }
@@ -175,6 +171,7 @@
 
 @push('scripts')
     <script>
+        // Show more/less for Announcements UL (minimal; no extra buttons elsewhere)
         (function attachListShowMore(listId, toggleWrapId, maxVisible = 10) {
             const ul = document.getElementById(listId);
             const wrap = document.getElementById(toggleWrapId);
