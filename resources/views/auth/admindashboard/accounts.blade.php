@@ -111,7 +111,7 @@
                                     data-username="{{ $f->user->username ?? '' }}">
                                 <i class="bi bi-pencil-square"></i>
                             </button>
-                            <form action="{{ route('faculties.destroy', $f->id) }}" method="POST" class="d-inline delete-form">
+                            <form action="{{ route('admin.faculties.destroy', $f->id) }}" method="POST" class="d-inline delete-form">
                                 @csrf @method('DELETE')
                                 <button type="button" class="btn btn-sm btn-danger delete-btn">
                                     <i class="bi bi-archive"></i>
@@ -201,7 +201,7 @@
                                 <i class="bi bi-pencil-square"></i>
                             </button>
 
-                            <form action="{{ route('guardians.destroy', $g->id) }}" method="POST" class="d-inline delete-form">
+                            <form action="{{ route('admin.guardians.destroy', $g->id) }}" method="POST" class="d-inline delete-form">
                                 @csrf @method('DELETE')
                                 <button type="button" class="btn btn-sm btn-danger delete-btn">
                                     <i class="bi bi-archive"></i>
@@ -412,7 +412,7 @@ document.getElementById('editFacultyModal')
     const d = btn.dataset;
 
     const form = document.getElementById('editFacultyForm');
-    form.action = "{{ route('faculties.update', ':id') }}".replace(':id', ds(d,'id'));
+    form.action = "{{ route('admin.faculties.update', ':id') }}".replace(':id', ds(d,'id'));
 
     document.getElementById('ef_firstname').value = v(ds(d,'firstname'));
     document.getElementById('ef_middlename').value = v(ds(d,'middlename'));
@@ -432,7 +432,7 @@ document.getElementById('editGuardianModal')
     const d = btn.dataset;
 
     const form = document.getElementById('editGuardianForm');
-    form.action = "{{ route('guardians.update', ':id') }}".replace(':id', ds(d,'id'));
+    form.action = "{{ route('admin.guardians.update', ':id') }}".replace(':id', ds(d,'id'));
 
     const gFirst  = pick(v(ds(d,'gFirstname','g_firstname')), v(ds(d,'mFirstname','m_firstname')), v(ds(d,'fFirstname','f_firstname')));
     const gMiddle = pick(v(ds(d,'gMiddlename','g_middlename')), v(ds(d,'mMiddlename','m_middlename')), v(ds(d,'fMiddlename','f_middlename')));

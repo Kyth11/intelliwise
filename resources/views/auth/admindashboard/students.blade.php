@@ -280,7 +280,7 @@
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
 
-                                    <form action="{{ route('students.destroy', $s->id) }}" method="POST" class="d-inline delete-form">
+                                    <form action="{{ route('admin.students.destroy', $s->id) }}" method="POST" class="d-inline delete-form">
                                         @csrf
                                         @method('DELETE')
                                         <button type="button" class="btn btn-sm btn-danger delete-btn" title="Archive">

@@ -117,7 +117,7 @@
                                         data-bs-target="#editTuitionModal{{ $t->id }}">
                                     <i class="bi bi-pencil-square"></i>
                                 </button>
-                                <form action="{{ route('tuitions.destroy', $t->id) }}" method="POST"
+                                <form action="{{ route('admin.tuitions.destroy', $t->id) }}" method="POST"
                                       class="d-inline js-confirm-delete" data-confirm="Delete this tuition record?">
                                     @csrf @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-danger js-delete-btn" aria-label="Delete tuition">
@@ -173,14 +173,14 @@
                                        value="{{ number_format($fee->amount, 2, '.', '') }}" required form="{{ $formId }}">
                             </td>
                             <td class="text-nowrap">
-                                <form id="{{ $formId }}" action="{{ route('optionalfees.update', $fee->id) }}"
+                                <form id="{{ $formId }}" action="{{ route('admin.optionalfees.update', $fee->id) }}"
                                       method="POST" class="d-inline">
                                     @csrf @method('PUT')
                                     <button class="btn btn-warning btn-sm" type="submit">
                                         <i class="bi bi-save me-1"></i> Save
                                     </button>
                                 </form>
-                                <form action="{{ route('optionalfees.destroy', $fee->id) }}" method="POST"
+                                <form action="{{ route('admin.optionalfees.destroy', $fee->id) }}" method="POST"
                                       class="d-inline js-confirm-delete" data-confirm="Delete this optional fee?">
                                     @csrf @method('DELETE')
                                     <button type="submit" class="btn btn-danger btn-sm js-delete-btn">
@@ -200,7 +200,7 @@
     <div class="modal fade" id="addTuitionModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form action="{{ route('tuitions.store') }}" method="POST">
+                <form action="{{ route('admin.tuitions.store') }}" method="POST">
                     @csrf
                     <div class="modal-header">
                         <h5 class="modal-title">Add Tuition</h5>
@@ -295,7 +295,7 @@
     <div class="modal fade" id="addOptionalFeeModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form action="{{ route('optionalfees.store') }}" method="POST">
+                <form action="{{ route('admin.optionalfees.store') }}" method="POST">
                     @csrf
                     <div class="modal-header">
                         <h5 class="modal-title">Add Optional Fee</h5>
@@ -431,3 +431,4 @@
         });
     </script>
 @endpush
+    

@@ -6,7 +6,7 @@
     {{-- Vendor CSS --}}
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
     {{-- Global Admin Styles (merged) --}}
-    <link rel="stylesheet" href="{{ asset('css/admin.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/css.css') }}">
 @endpush
 
 @section('content')
@@ -61,7 +61,7 @@
                         <a href="{{ route('admin.finances') }}" class="btn btn-sm btn-outline-primary">
                             <i class="bi bi-cash-coin me-1"></i> Finances
                         </a>
-                        <a href="{{ route('students.create') }}" class="btn btn-sm btn-outline-success">
+                        <a href="{{ route('admin.students.create') }}" class="btn btn-sm btn-outline-success">
                             <i class="bi bi-person-plus me-1"></i> Enroll Student
                         </a>
                         <a href="{{ route('admin.settings') }}?tab=subjects" class="btn btn-sm btn-outline-dark">
@@ -260,7 +260,7 @@
                                                     <i class="bi bi-pencil-square"></i>
                                                 </button>
 
-                                                <form action="{{ route('announcements.destroy', $a->id) }}" method="POST"
+                                                <form action="{{ route('admin.announcements.destroy', $a->id) }}" method="POST"
                                                     class="d-inline js-confirm-delete" data-confirm="Delete this announcement?">
                                                     @csrf
                                                     @method('DELETE')
@@ -332,7 +332,7 @@
                                                             data-bs-target="#editScheduleModal{{ $schedule->id }}">
                                                             <i class="bi bi-pencil-square"></i>
                                                         </button>
-                                                        <form action="{{ route('schedules.destroy', $schedule->id) }}" method="POST"
+                                                        <form action="{{ route('admin.schedules.destroy', $schedule->id) }}" method="POST"
                                                             class="d-inline js-confirm-delete"
                                                             data-confirm="Delete this schedule record?">
                                                             @csrf
@@ -366,7 +366,7 @@
                                 <option value="10" selected>10</option>
                                 <option value="20">20</option>
                             </select>
-                            <a href="{{ route('admin.finances') }}" class="btn btn-sm btn-outline-primary">View all</a>
+                            {{-- <a href="{{ route('admin.finances') }}" class="btn btn-sm btn-outline-primary">View all</a> --}}
                         </div>
                     </div>
 
@@ -615,7 +615,7 @@
                 finances: "{{ route('admin.finances') }}",
                 settings: "{{ route('admin.settings') }}",
                 addSubject: "{{ route('admin.settings') }}?tab=subjects",
-                enroll: "{{ route('students.create') }}",
+                enroll: "{{ route('admin.students.create') }}",
                 students: "{{ route('admin.students') }}",
                 grades: "{{ route('admin.grades') }}"
             };

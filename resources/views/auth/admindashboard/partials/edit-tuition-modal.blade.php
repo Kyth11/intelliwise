@@ -1,8 +1,9 @@
+{{-- resources/views/auth/admindashboard/partials/edit-tuition-modal.blade.php --}}
 @if(isset($t))
 <div class="modal fade" id="editTuitionModal{{ $t->id }}" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form action="{{ route('tuitions.update', $t->id) }}" method="POST" id="editTuitionForm{{ $t->id }}">
+      <form action="{{ route('admin.tuitions.update', $t->id) }}" method="POST" id="editTuitionForm{{ $t->id }}">
         @csrf
         @method('PUT')
 
@@ -80,7 +81,7 @@
             <label>School Year (optional)</label>
             <select name="school_year" class="form-select">
               <option value="">— None —</option>
-              @foreach($schoolyrs as $sy)
+              @foreach(($schoolyrs ?? collect()) as $sy)
                 <option value="{{ $sy->school_year }}" {{ (old('school_year', $t->school_year) === $sy->school_year) ? 'selected' : '' }}>
                   {{ $sy->school_year }}
                 </option>

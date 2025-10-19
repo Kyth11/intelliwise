@@ -147,7 +147,7 @@
                         CERTIFICATE</strong>.
                 </div>
 
-                <form action="{{ route('students.store') }}" method="POST" class="needs-validation" novalidate>
+                <form action="{{ route('admin.students.store') }}" method="POST" class="needs-validation" novalidate>
                     @csrf
 
                     {{-- Flash + Validation

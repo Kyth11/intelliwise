@@ -401,7 +401,7 @@ document.getElementById('statusSelect')?.addEventListener('change', applyClientF
         studentSel.appendChild(makeOpt('', '— All Students —', !preId));
 
         try {
-            const base = @json(route('reports.enrollments.students'));
+            const base = @json(route('admin.reports.enrollments.students')); // <-- fixed
             const url = new URL(base, window.location.origin);
             if (gradeId) url.searchParams.set('gradelvl_id', gradeId);
             const res = await fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } });

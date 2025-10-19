@@ -14,7 +14,7 @@ use App\Http\Controllers\FacultyGradesController;
 use App\Http\Controllers\Admin\GradeQuarterController;
 use App\Http\Controllers\EnrollmentReportController;
 
-Route::get('/', fn () => redirect()->route('login'));
+Route::get('/', fn() => redirect()->route('login'));
 
 // ====================
 // Authentication
@@ -102,6 +102,11 @@ Route::middleware(['auth', 'role:admin'])
         Route::get('/reports/enrollments/students', [EnrollmentReportController::class, 'students'])->name('reports.enrollments.students');
         Route::get('/reports/enrollments/export', [EnrollmentReportController::class, 'export'])->name('reports.enrollments.export');
 
+        // Subjects (Admin)
+        Route::post('/subjects', [AdminDashboardController::class, 'storeSubject'])->name('subjects.store');
+        Route::put('/subjects/{id}', [AdminDashboardController::class, 'updateSubject'])->name('subjects.update');
+        Route::delete('/subjects/{id}', [AdminDashboardController::class, 'destroySubject'])->name('subjects.destroy');
+
         // (Optional) AJAX endpoint in your comment
         Route::get('/grades/report', [GradesController::class, 'reportAjax'])->name('grades.report');
     });
@@ -114,7 +119,7 @@ Route::middleware(['auth', 'role:faculty'])
     ->name('faculty.')
     ->group(function () {
         // Keep "/" usable; send to dashboard
-        Route::get('/', fn () => redirect()->route('faculty.dashboard'));
+        Route::get('/', fn() => redirect()->route('faculty.dashboard'));
 
         // Dashboard (uses existing FacultyDashboardController)
         Route::get('/dashboard', [FacultyDashboardController::class, 'index'])->name('dashboard');

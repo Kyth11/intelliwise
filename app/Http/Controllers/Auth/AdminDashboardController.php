@@ -262,45 +262,55 @@ class AdminDashboardController extends Controller
         ));
     }
 
-    public function storeSchedule(Request $request)
-    {
-        $data = $request->validate([
-            'day'         => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
-            'class_start' => 'required|date_format:H:i',
-            'class_end'   => 'required|date_format:H:i|after:class_start',
-            'faculty_id'  => 'required|exists:faculties,id',
-            'subject_id'  => 'required|exists:subjects,id',
-            'gradelvl_id' => 'nullable|exists:gradelvls,id',
-            'school_year' => 'nullable|string|max:9|exists:schoolyrs,school_year',
-        ]);
+  public function storeSchedule(Request $request)
+{
+    $data = $request->validate([
+        'day'         => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
+        'class_start' => 'required|date_format:H:i',
+        'class_end'   => 'required|date_format:H:i|after:class_start',
+        'faculty_id'  => 'required|exists:faculties,id',
+        'subject_id'  => 'required|exists:subjects,id',
+        'gradelvl_id' => 'nullable|exists:gradelvls,id',
+        'school_year' => 'nullable|string|max:9|exists:schoolyrs,school_year',
+    ]);
 
-        $data['school_year'] = $data['school_year'] ?: null;
+    // normalize to HH:MM
+    $data['class_start'] = substr($data['class_start'], 0, 5);
+    $data['class_end']   = substr($data['class_end'],   0, 5);
 
-        Schedule::create($data);
+    // SAFE optional
+    $data['school_year'] = $request->input('school_year');
 
-        return back()->with('success', 'Schedule added successfully!');
-    }
+    Schedule::create($data);
 
-    public function updateSchedule(Request $request, $id)
-    {
-        $schedule = Schedule::findOrFail($id);
+    return back()->with('success', 'Schedule added successfully!');
+}
 
-        $data = $request->validate([
-            'day'         => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
-            'class_start' => 'required|date_format:H:i',
-            'class_end'   => 'required|date_format:H:i|after:class_start',
-            'faculty_id'  => 'required|exists:faculties,id',
-            'subject_id'  => 'required|exists:subjects,id',
-            'gradelvl_id' => 'nullable|exists:gradelvls,id',
-            'school_year' => 'nullable|string|max:9|exists:schoolyrs,school_year',
-        ]);
+public function updateSchedule(Request $request, $id)
+{
+    $schedule = Schedule::findOrFail($id);
 
-        $data['school_year'] = $data['school_year'] ?: null;
+    $data = $request->validate([
+        'day'         => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
+        'class_start' => 'required|date_format:H:i',
+        'class_end'   => 'required|date_format:H:i|after:class_start',
+        'faculty_id'  => 'required|exists:faculties,id',
+        'subject_id'  => 'required|exists:subjects,id',
+        'gradelvl_id' => 'nullable|exists:gradelvls,id', // <-- typo fixed
+        'school_year' => 'nullable|string|max:9|exists:schoolyrs,school_year',
+    ]);
 
-        $schedule->fill($data)->save();
+    // normalize to HH:MM
+    $data['class_start'] = substr($data['class_start'], 0, 5);
+    $data['class_end']   = substr($data['class_end'],   0, 5);
 
-        return back()->with('success', 'Schedule updated successfully!');
-    }
+    // SAFE optional
+    $data['school_year'] = $request->input('school_year');
+
+    $schedule->update($data);
+
+    return back()->with('success', 'Schedule updated successfully!');
+}
 
     public function destroySchedule($id)
     {

@@ -34,22 +34,8 @@
 @endphp
 
 <div class="card section p-4">
-    <!-- Top bar: title + theme -->
-    {{-- <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-
-        <div class="d-flex align-items-center gap-2">
-            <span class="text-muted small">Theme</span>
-            <button type="button" class="btn btn-outline-secondary btn-sm theme-chip" data-theme="light">
-                <i class="bi bi-sun"></i> Light
-            </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm theme-chip" data-theme="dark">
-                <i class="bi bi-moon-stars"></i> Dark
-            </button>
-        </div>
-    </div> --}}
-
     <!-- =========================
-         Header: Intro | KPIs | Right: Quick Actions (search + FE toggle)
+         Header: Intro | KPIs | Right: Quick Actions
     ========================== -->
     <div id="dashboard-header" class="mb-3">
         <!-- Intro -->
@@ -109,7 +95,7 @@
     </div>
 
     <!-- =========================
-         Main content (Faculty Enrollment card removed)
+         Main content
     ========================== -->
     <div class="row g-3">
 
@@ -209,7 +195,11 @@
                                             <i class="bi bi-pencil-square"></i>
                                         </button>
 
-                                        <form action="{{ route('subjects.destroy', $s->id) }}" method="POST" class="d-inline js-confirm-delete" data-confirm="Delete subject '{{ $s->subject_name }}' ({{ $s->subject_code }})?">
+                                        {{-- FIXED: use admin.subjects.destroy --}}
+                                        <form action="{{ route('admin.subjects.destroy', $s->id) }}"
+                                              method="POST"
+                                              class="d-inline js-confirm-delete"
+                                              data-confirm="Delete subject '{{ $s->subject_name }}' ({{ $s->subject_code }})?">
                                             @csrf @method('DELETE')
                                             <button type="submit" class="btn btn-sm btn-danger js-delete-btn">
                                                 <i class="bi bi-archive"></i>
@@ -329,12 +319,99 @@
         </div>
     </div>
 </div>
+
+{{-- Add Subject Modal --}}
+<div class="modal fade" id="addSubjectModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form action="{{ route('admin.subjects.store') }}" method="POST" class="modal-content">
+      @csrf
+      <div class="modal-header" style="background: linear-gradient(90deg, #198754, #157347); color:#fff;">
+        <h5 class="modal-title"><i class="bi bi-journal-plus me-2"></i>Add Subject</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="mb-2">
+          <label class="form-label">Subject Name</label>
+          <input type="text" name="subject_name" class="form-control" required>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Subject Code</label>
+          <input type="text" name="subject_code" class="form-control" placeholder="Must be unique" required>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Grade Level</label>
+          <select name="gradelvl_id" class="form-select" required>
+            <option value="">Select grade level</option>
+            @foreach(($gradelvls ?? []) as $g)
+              <option value="{{ $g->id }}">{{ $g->grade_level }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Description (optional)</label>
+          <textarea name="description" class="form-control" rows="3" placeholder="Short description"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+        <button type="submit" class="btn btn-success">
+          <i class="bi bi-save me-1"></i> Save Subject
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{{-- Edit Subject Modal --}}
+<div class="modal fade" id="editSubjectModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form id="editSubjectForm" action="#" method="POST" class="modal-content">
+      @csrf
+      @method('PUT')
+      <div class="modal-header" style="background: linear-gradient(90deg, #ffc107, #ffca2c); color:#000;">
+        <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Edit Subject</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="mb-2">
+          <label class="form-label">Subject Name</label>
+          <input type="text" id="es_name" name="subject_name" class="form-control" required>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Subject Code</label>
+          <input type="text" id="es_code" name="subject_code" class="form-control" required>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Grade Level</label>
+          <select id="es_gradelvl" name="gradelvl_id" class="form-select" required>
+            <option value="">Select grade level</option>
+            @foreach(($gradelvls ?? []) as $g)
+              <option value="{{ $g->id }}">{{ $g->grade_level }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Description (optional)</label>
+          <textarea id="es_desc" name="description" class="form-control" rows="3"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+        <button type="submit" class="btn btn-warning">
+          <i class="bi bi-save me-1"></i> Update Subject
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
 @endsection
 
 @push('scripts')
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-    @includeIf('auth.admindashboard.partials.subjects-modals')
 
     <script>
     // Theme chips
@@ -451,7 +528,8 @@
             const gid  = btn.dataset.grade || '';
 
             const form = document.getElementById('editSubjectForm');
-            form.action = "{{ route('subjects.update', ':id') }}".replace(':id', id);
+            // FIXED: admin.* route here
+            form.action = "{{ route('admin.subjects.update', ':id') }}".replace(':id', id);
 
             document.getElementById('es_name').value = name;
             document.getElementById('es_code').value = code;
@@ -469,7 +547,8 @@
             finances: "{{ route('admin.finances') }}",
             settings: "{{ route('admin.settings') }}",
             addSubject: "{{ route('admin.settings') }}?tab=subjects",
-            enroll: "{{ route('students.create') }}",
+            // FIXED: use admin.students.create
+            enroll: "{{ route('admin.students.create') }}",
             students: "{{ route('admin.students') }}",
             grades: "{{ route('admin.grades') }}"
         };
@@ -506,5 +585,5 @@
             chip.classList.toggle('bg-secondary', !on);
         });
     })();
-</script>
+    </script>
 @endpush

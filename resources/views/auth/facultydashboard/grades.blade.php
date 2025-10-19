@@ -4,7 +4,7 @@
 
 @push('styles')
 <style>
-    /* Page-specific tweaks that play nice with your base CSS */
+    /* ===== Table/editor tweaks ===== */
     .table-report thead th { position: sticky; top: 0; background: var(--bs-body-bg); z-index: 1; }
     .qcell { width: 88px; }
     .finalcell { width: 110px; }
@@ -12,17 +12,51 @@
     .badge-lock { background: #ffe9e9; color:#a40000; border:1px solid #ffcccc; }
     .badge-open { background: #e9fff1; color:#0a7e2f; border:1px solid #c9f2d9; }
 
+    /* ===== Report (print target) styling to match admin look ===== */
+    .report-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; background: #fff; }
+    .report-card .report-header h5 { margin: 0; }
+    .report-meta {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+        gap: .35rem 1rem;
+        margin-top: .5rem;
+    }
+    .report-meta .kv { display: grid; grid-template-columns: 140px 1fr; gap: .35rem; }
+    .report-meta .k { color: var(--bs-secondary-color, #6c757d); }
+    .report-meta .v { font-weight: 600; }
+
+    .report-table { table-layout: fixed; width: 100%; }
+    .report-table th, .report-table td { padding: 6px 8px; }
+    .report-table td { word-wrap: break-word; }
+
+    /* ===== Print: only the report card ===== */
+    @page { size: A4 portrait; margin: 10mm 12mm; }
     @media print {
-        .no-print { display:none!important; }
-        @page { size: A4 portrait; margin: 12mm 12mm; }
-        .table-report tr, .table-report td, .table-report th { page-break-inside: avoid; }
+        html, body { background: #fff !important; }
+        /* Hide everything by default */
+        body * { visibility: hidden !important; }
+        /* Show only the report */
+        #reportCard, #reportCard * { visibility: visible !important; }
+        #reportCard {
+            position: static !important;
+            margin: 0 auto !important;
+            box-shadow: none !important;
+            width: auto !important;
+            max-width: 100% !important;
+        }
+        /* Keep table tidy on paper */
+        .report-table { font-size: 11px; }
+        .report-table tr, .report-table td, .report-table th { page-break-inside: avoid; }
+        .report-meta .kv { grid-template-columns: 120px 1fr; }
+        /* Never print UI chrome */
+        .no-print { display: none !important; }
     }
 </style>
 @endpush
 
 @section('content')
 @php
-    // Build student lists for the dynamic dropdown
+    // ---------- Build student lists for the dynamic dropdown ----------
     $allStudentsList = collect($students)->map(function ($s) {
         $mid = trim((string)($s->s_middlename ?? ''));
         $name = trim(implode(' ', array_filter([$s->s_firstname ?? '', $mid, $s->s_lastname ?? ''])));
@@ -34,16 +68,32 @@
     $selectedGrade    = $gradeLevel ?? request('grade_level');
     $selectedStudent  = $studentId ?? request('student_id');
 
-    // Show editor only when user clicked View (i.e., selections are present)
     $showEditor = filled($selectedSchoolYr) && filled($selectedGrade) && filled($selectedStudent);
 
-    // Quarter open/closed flags provided by Admin (default: all open)
+    // Quarter flags (default open)
     $quartersOpen = array_merge(['q1'=>true,'q2'=>true,'q3'=>true,'q4'=>true], $quartersOpen ?? []);
     $hasAnyOpen = in_array(true, $quartersOpen, true);
+
+    // ---------- Report (print) header details ----------
+    $currentStudent = collect($students)->firstWhere('id', (int) $selectedStudent);
+    $studentName    = $currentStudent
+        ? trim(implode(' ', array_filter([$currentStudent->s_firstname ?? '', $currentStudent->s_middlename ?? '', $currentStudent->s_lastname ?? ''])))
+        : null;
+
+    $gradeForReport = ($selectedGrade ?: null) ?? ($currentStudent->s_gradelvl ?? null) ?? '—';
+
+    $schoolYrModel  = collect($schoolyrs)->firstWhere('id', (int) $selectedSchoolYr);
+    $schoolYrText   = $schoolYrModel->display_year
+        ?? $schoolYrModel->school_year
+        ?? ($selectedSchoolYr ? ('SY #' . $selectedSchoolYr) : '—');
+
+    $printedOn = now()->format('Y-m-d');
 @endphp
 
 <div class="card section p-4">
-    <!-- Header matches base layout patterns -->
+    <!-- =========================
+         Header: Intro | KPIs | Quick Action (Print)
+    ========================== -->
     <div id="dashboard-header" class="mb-3">
         <div class="intro">
             <div>
@@ -73,9 +123,9 @@
 
         <div class="pay-card p-3 text-center">
             <h6 class="mb-1">Quick Action</h6>
-            <p class="text-muted mb-3 small">Print your current view.</p>
-            <button class="btn btn-outline-dark btn-sm no-print" onclick="window.print()">
-                <i class="bi bi-printer me-1"></i> Print
+            <p class="text-muted mb-3 small">Print the grading sheet for your current view.</p>
+            <button class="btn btn-outline-dark btn-sm no-print" id="printBtn">
+                <i class="bi bi-printer me-1"></i> Print Grading Sheet
             </button>
         </div>
     </div>
@@ -91,8 +141,10 @@
         </div>
     @endif
 
-    {{-- Filters (GET) --}}
-    <div class="card p-3 mb-3">
+    {{-- =========================
+         Filters (GET)
+    ========================== --}}
+    <div class="card p-3 mb-3 no-print">
         <form id="filterForm" class="row g-2 align-items-end" method="GET" action="{{ route('faculty.grades.index') }}">
             <div class="col-md-3">
                 <label class="form-label">School Year</label>
@@ -132,9 +184,11 @@
         </form>
     </div>
 
-    {{-- Quarter status banner --}}
+    {{-- =========================
+         Quarter status banner
+    ========================== --}}
     @if($showEditor)
-        <div class="d-flex flex-wrap gap-2 mb-3">
+        <div class="d-flex flex-wrap gap-2 mb-3 no-print">
             <span class="small">Quarter status:</span>
             <span class="badge rounded-pill {{ $quartersOpen['q1'] ? 'badge-open' : 'badge-lock' }}">Q1 {{ $quartersOpen['q1'] ? 'Open' : 'Closed' }}</span>
             <span class="badge rounded-pill {{ $quartersOpen['q2'] ? 'badge-open' : 'badge-lock' }}">Q2 {{ $quartersOpen['q2'] ? 'Open' : 'Closed' }}</span>
@@ -146,11 +200,13 @@
         </div>
     @endif
 
-    {{-- Editor (POST) --}}
+    {{-- =========================
+         Editor (POST)
+    ========================== --}}
     @if($showEditor)
-    <form id="gradesForm" action="{{ route('faculty.grades.store') }}" method="POST" autocomplete="off">
+    <form id="gradesForm" action="{{ route('faculty.grades.store') }}" method="POST" autocomplete="off" class="no-print">
         @csrf
-        {{-- carry filters along --}}
+        {{-- keep filters with the post --}}
         <input type="hidden" name="schoolyr_id"  id="hf_sy"    value="{{ $selectedSchoolYr }}">
         <input type="hidden" name="grade_level"  id="hf_grade" value="{{ $selectedGrade }}">
         <input type="hidden" name="student_id"   id="hf_stu"   value="{{ $selectedStudent }}">
@@ -174,7 +230,7 @@
                     <tr data-row>
                         <td>
                             {{ $r['subject_label'] }}
-                            <input type="hidden" name="subject_id[]" value="{{ $r['subject_id'] }}">
+                            <input type="hidden" name="subject_id[]" value="{{ $r['subject_id'] }}" data-subject-id="{{ $r['subject_id'] }}">
                         </td>
 
                         <td>
@@ -250,11 +306,6 @@
             <button class="btn btn-primary" type="submit" {{ (!$rows->count() || !$hasAnyOpen) ? 'disabled' : '' }}>
                 <i class="bi bi-save me-1"></i> Save
             </button>
-            <a class="btn btn-outline-secondary" href="{{ route('faculty.grades.index', [
-                'schoolyr_id'=>$selectedSchoolYr,
-                'grade_level'=>$selectedGrade,
-                'student_id'=>$selectedStudent
-            ]) }}">Reset</a>
         </div>
     </form>
     @else
@@ -262,6 +313,99 @@
             Select a <strong>School Year</strong>, <strong>Grade Level</strong>, and <strong>Student</strong>, then click <strong>View</strong> to edit grades.
         </div>
     @endif
+
+    {{-- =========================
+         REPORT CARD (Print target)
+    ========================== --}}
+    <div class="report-card mt-4" id="reportCard">
+        <div class="report-header text-center mb-2">
+            <h5 class="mb-0">Report on Learner’s Progress</h5>
+            <div class="text-muted">Quarterly Grades and Final Rating (DepEd Format)</div>
+        </div>
+
+        {{-- Student details --}}
+        <div class="report-meta">
+            <div class="kv"><div class="k">Student</div><div class="v" id="rpStudent">{{ $studentName ?: '—' }}</div></div>
+            <div class="kv"><div class="k">Grade Level</div><div class="v" id="rpGrade">{{ $gradeForReport }}</div></div>
+            <div class="kv"><div class="k">School Year</div><div class="v" id="rpSY">{{ $schoolYrText }}</div></div>
+            <div class="kv"><div class="k">Printed On</div><div class="v" id="rpPrinted">{{ $printedOn }}</div></div>
+        </div>
+
+        <div class="table-responsive mt-2">
+            <table class="table table-bordered align-middle report-table">
+                <thead class="table-light">
+                    <tr class="text-center">
+                        <th style="min-width: 220px;">Learning Areas</th>
+                        <th>Q1</th>
+                        <th>Q2</th>
+                        <th>Q3</th>
+                        <th>Q4</th>
+                        <th>Final Grade</th>
+                        <th>Remarks</th>
+                        <th>Descriptor</th>
+                    </tr>
+                </thead>
+                <tbody id="reportTbody">
+                    @forelse($rows as $r)
+                        <tr>
+                            <td class="rp-subject">{{ $r['subject_label'] }}</td>
+                            <td class="text-center rp-q1">{{ $r['q1'] ?? '—' }}</td>
+                            <td class="text-center rp-q2">{{ $r['q2'] ?? '—' }}</td>
+                            <td class="text-center rp-q3">{{ $r['q3'] ?? '—' }}</td>
+                            <td class="text-center rp-q4">{{ $r['q4'] ?? '—' }}</td>
+                            <td class="text-center fw-semibold rp-final">{{ $r['final'] ?? '—' }}</td>
+                            <td class="text-center rp-remark {{ (($r['final'] ?? null) !== null && $r['final'] < 75) ? 'text-danger fw-semibold' : '' }}">
+                                {{ ($r['final'] ?? null) === null ? '—' : (($r['final'] >= 75) ? 'PASSED' : 'FAILED') }}
+                            </td>
+                            <td class="text-center rp-descr">
+                                @if($r['descriptor'])
+                                    {{ $r['descriptor'] }} ({{ $r['descriptor_abbr'] }})
+                                @else
+                                    —
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8" class="text-center text-muted">Select a school year, grade, and student to view grades.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+
+                @if(!empty($rows) && (method_exists($rows, 'isNotEmpty') ? $rows->isNotEmpty() : count($rows)))
+                    <tfoot>
+                        <tr class="table-light">
+                            <th>General Average</th>
+                            <th colspan="3"></th>
+                            <th></th>
+                            <th class="text-center" id="rpGA">{{ $generalAverage ?? '—' }}</th>
+                            <th class="text-center" id="rpGARemark">
+                                {{ ($generalAverage !== null ? ($generalAverage >= 75 ? 'PASSED' : 'FAILED') : '—') }}
+                            </th>
+                            <th class="text-center" id="rpGADescr">
+                                @php
+                                    $desc = null; $abbr = null;
+                                    if ($generalAverage !== null) {
+                                        if ($generalAverage >= 90)      { $desc = 'Outstanding';            $abbr = 'O'; }
+                                        elseif ($generalAverage >= 85) { $desc = 'Very Satisfactory';      $abbr = 'VS'; }
+                                        elseif ($generalAverage >= 80) { $desc = 'Satisfactory';           $abbr = 'S'; }
+                                        elseif ($generalAverage >= 75) { $desc = 'Fairly Satisfactory';    $abbr = 'FS'; }
+                                        else                           { $desc = 'Did Not Meet Expectations'; $abbr = 'DNME'; }
+                                    }
+                                @endphp
+                                {{ $desc ? ($desc . ' (' . $abbr . ')') : '—' }}
+                            </th>
+                        </tr>
+                    </tfoot>
+                @endif
+            </table>
+        </div>
+
+        <div class="small text-muted mt-2">
+            Notes: Final Grade is the rounded average of available quarters (Q1–Q4). Remarks: ≥75 PASSED; &lt;75 FAILED.
+            Descriptors: O (90–100), VS (85–89), S (80–84), FS (75–79), DNME (&lt;75).
+        </div>
+    </div>
 </div>
 @endsection
 
@@ -303,7 +447,7 @@ function populateStudents(grade, selectedId) {
     list.forEach(s => sel.appendChild(opt(String(s.id), s.name, selectedId && String(selectedId) === String(s.id))));
 }
 
-// Live compute per-row final/remark/descriptor + GA (25% each, blanks = 0, <=70 => 0)
+// Live compute per-row final/remark/descriptor + GA
 function rowCompute(tr) {
     const inputs = Array.from(tr.querySelectorAll('input.q'));
     const clamp = (n) => Math.min(100, Math.max(0, n));
@@ -369,10 +513,91 @@ function computeGA() {
     if (gaDescr) gaDescr.textContent = `${desc} (${abbr})`;
 }
 
+/* ===== Sync the REPORT (print view) with the EDITOR before printing ===== */
+function syncReportFromEditor() {
+    const editorRows = Array.from(document.querySelectorAll('#gradesBody tr[data-row]'));
+    const reportRows = Array.from(document.querySelectorAll('#reportTbody tr'));
+
+    // If counts mismatch, just bail silently; we'll print whatever server gave.
+    if (!editorRows.length || editorRows.length !== reportRows.length) return;
+
+    const clamp01 = (n) => Math.min(100, Math.max(0, n));
+    const toInt = (v) => {
+        const n = parseInt(String(v ?? '').trim(), 10);
+        return Number.isNaN(n) ? null : clamp01(n);
+    };
+
+    let finals = [];
+
+    for (let i=0; i<editorRows.length; i++) {
+        const er = editorRows[i];
+        const rr = reportRows[i];
+
+        const qInputs = er.querySelectorAll('input.q');
+        const getVal = (idx) => {
+            const raw = qInputs[idx]?.value ?? '';
+            const n = toInt(raw);
+            return n === null ? '—' : n;
+        };
+
+        // Qs
+        const q1 = getVal(0), q2 = getVal(1), q3 = getVal(2), q4 = getVal(3);
+
+        rr.querySelector('.rp-q1')?.replaceChildren(document.createTextNode(q1));
+        rr.querySelector('.rp-q2')?.replaceChildren(document.createTextNode(q2));
+        rr.querySelector('.rp-q3')?.replaceChildren(document.createTextNode(q3));
+        rr.querySelector('.rp-q4')?.replaceChildren(document.createTextNode(q4));
+
+        const nums = [q1,q2,q3,q4].map(v => (v === '—' ? 0 : Number(v)));
+        const avg  = (nums[0]+nums[1]+nums[2]+nums[3])/4;
+        const fin  = (avg <= 70) ? 0 : Math.round(avg);
+        finals.push(fin);
+
+        const rpFinal  = rr.querySelector('.rp-final');
+        const rpRemark = rr.querySelector('.rp-remark');
+        const rpDescr  = rr.querySelector('.rp-descr');
+
+        if (rpFinal)  rpFinal.textContent  = fin;
+        if (rpRemark) {
+            rpRemark.textContent = fin >= 75 ? 'PASSED' : 'FAILED';
+            rpRemark.classList.toggle('text-danger', fin < 75);
+            rpRemark.classList.toggle('fw-semibold', fin < 75);
+        }
+        if (rpDescr) {
+            let desc='Did Not Meet Expectations', abbr='DNME';
+            if (fin >= 90) { desc='Outstanding'; abbr='O'; }
+            else if (fin >= 85) { desc='Very Satisfactory'; abbr='VS'; }
+            else if (fin >= 80) { desc='Satisfactory'; abbr='S'; }
+            else if (fin >= 75) { desc='Fairly Satisfactory'; abbr='FS'; }
+            rpDescr.textContent = `${desc} (${abbr})`;
+        }
+    }
+
+    // GA
+    if (finals.length) {
+        const ga = Math.round(finals.reduce((a,b)=>a+b,0)/finals.length);
+        const rpGA       = document.getElementById('rpGA');
+        const rpGARemark = document.getElementById('rpGARemark');
+        const rpGADescr  = document.getElementById('rpGADescr');
+
+        if (rpGA) rpGA.textContent = ga;
+        if (rpGARemark) rpGARemark.textContent = ga >= 75 ? 'PASSED' : 'FAILED';
+        if (rpGADescr) {
+            let desc='Did Not Meet Expectations', abbr='DNME';
+            if (ga >= 90) { desc='Outstanding'; abbr='O'; }
+            else if (ga >= 85) { desc='Very Satisfactory'; abbr='VS'; }
+            else if (ga >= 80) { desc='Satisfactory'; abbr='S'; }
+            else if (ga >= 75) { desc='Fairly Satisfactory'; abbr='FS'; }
+            rpGADescr.textContent = `${desc} (${abbr})`;
+        }
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     const gradeSel = document.getElementById('gradeLevelFilter');
     const stuSel   = document.getElementById('studentSelect');
     const sySel    = document.getElementById('schoolyrSelect');
+    const printBtn = document.getElementById('printBtn');
 
     // Initial student list (respect preselects)
     populateStudents(gradeSel?.value || PRESELECT_GRADE, PRESELECT_STUDENT);
@@ -394,15 +619,21 @@ document.addEventListener('DOMContentLoaded', function () {
     [sySel, gradeSel, stuSel].forEach(el => el?.addEventListener('change', syncHidden));
     syncHidden();
 
-    // Wire row listeners
+    // Wire editor row listeners
     document.querySelectorAll('tr[data-row]').forEach(tr => {
         tr.querySelectorAll('input.q').forEach(inp => {
             inp.addEventListener('input', () => { rowCompute(tr); computeGA(); });
         });
-        // initial compute
-        rowCompute(tr);
+        rowCompute(tr); // initial
     });
     computeGA();
+
+    // Ensure report reflects editor values at print time
+    window.addEventListener('beforeprint', syncReportFromEditor);
+    printBtn?.addEventListener('click', () => {
+        syncReportFromEditor();
+        window.print();
+    });
 });
 </script>
 @endpush

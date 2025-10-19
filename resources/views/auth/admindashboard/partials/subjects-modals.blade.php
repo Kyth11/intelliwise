@@ -1,7 +1,7 @@
 {{-- Add Subject Modal --}}
 <div class="modal fade" id="addSubjectModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
-    <form action="{{ route('subjects.store') }}" method="POST" class="modal-content">
+    <form action="{{ route('admin.subjects.store') }}" method="POST" class="modal-content">
       @csrf
       <div class="modal-header" style="background: linear-gradient(90deg, #198754, #157347); color:#fff;">
         <h5 class="modal-title"><i class="bi bi-journal-plus me-2"></i>Add Subject</h5>

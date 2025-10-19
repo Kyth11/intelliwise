@@ -1,131 +1,140 @@
-<form action="{{ route('schedules.update', $schedule->id) }}" method="POST">
-    @csrf
-    @method('PUT')
+@php
+    /** @var \App\Models\Schedule $schedule */
+    $currentFacultyId  = $schedule->faculty_id ?? optional($schedule->faculty)->id;
+    $currentSubjectId  = $schedule->subject_id ?? optional($schedule->subject)->id;
+    $currentGradelvlId = $schedule->gradelvl_id ?? optional($schedule->gradelvl)->id;
 
-    <div class="modal-header">
-        <h5 class="modal-title">Edit Schedule (ID: {{ $schedule->id }})</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-    </div>
+    // Make sure time inputs are HH:MM (no seconds)
+    $startVal = old('class_start', $schedule->class_start);
+    $endVal   = old('class_end',   $schedule->class_end);
+    if ($startVal && strlen($startVal) > 5) $startVal = substr($startVal, 0, 5);
+    if ($endVal   && strlen($endVal)   > 5) $endVal   = substr($endVal,   0, 5);
 
-    <div class="modal-body row g-3">
-        @php
-            use Illuminate\Support\Carbon;
-            $days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-            $selectedDay = old('day', $schedule->day);
+    $dayVal = old('day', $schedule->day);
+    $days   = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+@endphp
 
-            // Format DB times (HH:MM:SS) to HH:MM for the <input type="time">
-            $startValue = old('class_start',
-                $schedule->class_start
-                    ? Carbon::parse($schedule->class_start)->format('H:i')
-                    : null
-            );
-            $endValue = old('class_end',
-                $schedule->class_end
-                    ? Carbon::parse($schedule->class_end)->format('H:i')
-                    : null
-            );
+<div class="modal fade" id="editScheduleModal{{ $schedule->id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
 
-            // current school year value (old input wins)
-            $currentSY = old('school_year', $schedule->school_year);
-        @endphp
+      {{-- UPDATE (separate form; no nested forms) --}}
+      <form id="updateSchedule{{ $schedule->id }}"
+            action="{{ route('admin.schedules.update', $schedule->id) }}"
+            method="POST">
+        @csrf
+        @method('PUT')
 
-        <div class="col-md-4">
-            <label for="day{{ $schedule->id }}" class="form-label">Day</label>
-            <select name="day" id="day{{ $schedule->id }}" class="form-select" required>
-                <option value="" class="dropdownheader">-- Select Day --</option>
+        <div class="modal-header">
+          <h5 class="modal-title">Edit Schedule</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-sm-4">
+              <label class="form-label">Day <span class="text-danger">*</span></label>
+              <select name="day" class="form-select" required>
                 @foreach($days as $d)
-                    <option value="{{ $d }}" {{ $selectedDay === $d ? 'selected' : '' }}>
-                        {{ $d }}
-                    </option>
+                  <option value="{{ $d }}" {{ $dayVal === $d ? 'selected' : '' }}>{{ $d }}</option>
                 @endforeach
-            </select>
-            @error('day') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
-        </div>
+              </select>
+            </div>
 
-        <div class="col-md-4">
-            <label for="class_start{{ $schedule->id }}" class="form-label">Class Start</label>
-            <input
-                type="time"
-                name="class_start"
-                id="class_start{{ $schedule->id }}"
-                class="form-control"
-                step="60"  {{-- minutes only --}}
-                value="{{ $startValue }}"
-                required
-            >
-            @error('class_start') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
-        </div>
+            <div class="col-sm-4">
+              <label class="form-label">Class Start <span class="text-danger">*</span></label>
+              <input type="time" name="class_start" class="form-control"
+                     step="60" value="{{ $startVal }}" required>
+            </div>
 
-        <div class="col-md-4">
-            <label for="class_end{{ $schedule->id }}" class="form-label">Class End</label>
-            <input
-                type="time"
-                name="class_end"
-                id="class_end{{ $schedule->id }}"
-                class="form-control"
-                step="60"  {{-- minutes only --}}
-                value="{{ $endValue }}"
-                required
-            >
-            @error('class_end') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
-        </div>
+            <div class="col-sm-4">
+              <label class="form-label">Class End <span class="text-danger">*</span></label>
+              <input type="time" name="class_end" class="form-control"
+                     step="60" value="{{ $endVal }}" required>
+            </div>
 
-        <div class="col-md-6">
-            <label class="form-label">Faculty</label>
-            <select name="faculty_id" class="form-select" required>
-                <option value="" class="dropdownheader">-- Select Faculty --</option>
-                @foreach($faculties as $faculty)
-                    <option value="{{ $faculty->id }}" {{ $faculty->id == $schedule->faculty_id ? 'selected' : '' }}>
-                        {{ $faculty->user->name ?? ($faculty->f_firstname . ' ' . $faculty->f_lastname) }}
-                    </option>
+            <div class="col-sm-6">
+              <label class="form-label">Faculty <span class="text-danger">*</span></label>
+              <select name="faculty_id" class="form-select" required>
+                @foreach(($faculties ?? collect()) as $f)
+                  @php $fname = optional($f->user)->name ?: ('Faculty #'.$f->id); @endphp
+                  <option value="{{ $f->id }}" {{ (string)old('faculty_id', $currentFacultyId) === (string)$f->id ? 'selected' : '' }}>
+                    {{ $fname }}
+                  </option>
                 @endforeach
-            </select>
-            @error('faculty_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
-        </div>
+              </select>
+            </div>
 
-        <div class="col-md-6">
-            <label class="form-label">Subject</label>
-            <select name="subject_id" class="form-select" required>
-                <option value="" class="dropdownheader">-- Select Subject --</option>
-                @foreach($subjects as $subject)
-                    <option value="{{ $subject->id }}" {{ $subject->id == $schedule->subject_id ? 'selected' : '' }}>
-                        {{ $subject->subject_name }}
-                    </option>
+            <div class="col-sm-6">
+              <label class="form-label">Subject <span class="text-danger">*</span></label>
+              <select name="subject_id" class="form-select" required>
+                @foreach(($subjects ?? collect()) as $s)
+                  <option value="{{ $s->id }}" {{ (string)old('subject_id', $currentSubjectId) === (string)$s->id ? 'selected' : '' }}>
+                    {{ $s->subject_name }}
+                  </option>
                 @endforeach
-            </select>
-            @error('subject_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
-        </div>
+              </select>
+            </div>
 
-        <div class="col-md-4">
-            <label class="form-label">Grade Level</label>
-            <select name="gradelvl_id" class="form-select">
-                <option value="" class="dropdownheader">-- Select Grade Level --</option>
-                @foreach($gradelvls as $g)
-                    <option value="{{ $g->id }}" {{ $g->id == $schedule->gradelvl_id ? 'selected' : '' }}>
-                        {{ $g->grade_level }}
-                    </option>
-                @endforeach
-            </select>
-            @error('gradelvl_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
-        </div>
-
-        <div class="col-md-6">
-            <label class="form-label">School Year (optional)</label>
-            <select name="school_year" class="form-select">
+            <div class="col-sm-6">
+              <label class="form-label">Grade Level (optional)</label>
+              <select name="gradelvl_id" class="form-select">
                 <option value="">— None —</option>
-                @foreach($schoolyrs as $sy)
-                    <option value="{{ $sy->school_year }}" {{ $currentSY === $sy->school_year ? 'selected' : '' }}>
-                        {{ $sy->school_year }}
-                    </option>
+                @foreach(($gradelvls ?? collect()) as $gl)
+                  <option value="{{ $gl->id }}" {{ (string)old('gradelvl_id', $currentGradelvlId) === (string)$gl->id ? 'selected' : '' }}>
+                    {{ $gl->grade_level }}
+                  </option>
                 @endforeach
-            </select>
-            @error('school_year') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+              </select>
+            </div>
+
+            <div class="col-sm-6">
+              <label class="form-label">School Year (optional)</label>
+              <select name="school_year" class="form-select">
+                <option value="">— None —</option>
+                @foreach(($schoolyrs ?? collect()) as $sy)
+                  <option value="{{ $sy->school_year }}" {{ (string)old('school_year', $schedule->school_year) === (string)$sy->school_year ? 'selected' : '' }}>
+                    {{ $sy->school_year }}
+                  </option>
+                @endforeach
+              </select>
+            </div>
+          </div>
+
+          {{-- errors --}}
+          @if ($errors->any())
+            <div class="alert alert-danger mt-3 mb-0">
+              <ul class="mb-0">
+                @foreach ($errors->all() as $err)
+                  <li>{{ $err }}</li>
+                @endforeach
+              </ul>
+            </div>
+          @endif
         </div>
+      </form>
+
+      {{-- DELETE (separate form) --}}
+      <form id="deleteSchedule{{ $schedule->id }}"
+            action="{{ route('admin.schedules.destroy', $schedule->id) }}"
+            method="POST" class="d-none">
+        @csrf
+        @method('DELETE')
+      </form>
+
+      <div class="modal-footer d-flex justify-content-between">
+        <button type="submit" class="btn btn-danger"
+                form="deleteSchedule{{ $schedule->id }}"
+                onclick="return confirm('Delete this schedule record?')">
+          Delete
+        </button>
+
+        <div>
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-warning" form="updateSchedule{{ $schedule->id }}">Update</button>
+        </div>
+      </div>
 
     </div>
-
-    <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button class="btn btn-success">Save Changes</button>
-    </div>
-</form>
+  </div>
+</div>

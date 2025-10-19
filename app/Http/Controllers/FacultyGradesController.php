@@ -7,6 +7,7 @@ use App\Models\Gradelvl;
 use App\Models\Schoolyr;
 use App\Models\Student;
 use App\Models\QuarterLock;
+use App\Models\Schedule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
@@ -15,24 +16,40 @@ class FacultyGradesController extends Controller
 {
     public function index(Request $request)
     {
+        $user       = Auth::user();
+        $isFaculty  = ($user->role === 'faculty');
+        // “Default faculty” (username === 'faculty') and admins can see all
+        $canSeeAll  = ($user->role === 'admin') || ($user->username === 'faculty');
+
         $schoolyrs  = Schoolyr::orderByDesc('id')->get();
-        $gradelvls  = Gradelvl::orderBy('grade_level')->get();
+
+        // Limit grade levels to what the faculty actually teaches (for normal faculty)
+        if ($isFaculty && !$canSeeAll) {
+            [$myGradeIds, $myGradeNames] = $this->myGradelvlScope($user->faculty_id);
+            $gradelvls = Gradelvl::whereIn('id', $myGradeIds)
+                ->orderBy('grade_level')
+                ->get();
+        } else {
+            $gradelvls     = Gradelvl::orderBy('grade_level')->get();
+            $myGradeNames  = null; // no restriction
+        }
 
         $schoolyrId = $request->input('schoolyr_id');
         $gradeLevel = $request->input('grade_level');   // e.g. "Grade 1"
         $studentId  = $request->input('student_id');
 
-        /**
-         * IMPORTANT: Do NOT filter students by $gradeLevel here.
-         * We need all students so the client-side Grade dropdown
-         * can re-populate the Student dropdown without a page reload.
-         */
-        $students = Student::select('id', 's_firstname', 's_middlename', 's_lastname', 's_gradelvl')
+        // Students visible to this user
+        $studentsQuery = Student::select('id', 's_firstname', 's_middlename', 's_lastname', 's_gradelvl')
             ->orderBy('s_lastname')
-            ->orderBy('s_firstname')
-            ->get();
+            ->orderBy('s_firstname');
 
-        // Resolve Subject model and subject label
+        if ($isFaculty && !$canSeeAll) {
+            $studentsQuery->whereIn('s_gradelvl', $myGradeNames);
+        }
+
+        $students = $studentsQuery->get();
+
+        // Resolve Subject model and subject label (no change to your schema)
         $subjectModel = class_exists(\App\Models\Subjects::class)
             ? \App\Models\Subjects::class
             : (class_exists(\App\Models\Subjects::class) ? \App\Models\Subjects::class : null);
@@ -42,7 +59,7 @@ class FacultyGradesController extends Controller
             $subjects = $subjectModel::query()
                 ->when($gradeLevel, function ($q) use ($subjectModel, $gradeLevel) {
                     try {
-                        $tmp = new $subjectModel;
+                        $tmp   = new $subjectModel;
                         $table = $tmp->getTable();
                         if (Schema::hasColumn($table, 'grade_level')) {
                             $q->where('grade_level', $gradeLevel);
@@ -60,7 +77,7 @@ class FacultyGradesController extends Controller
                 });
         }
 
-        // Use correct FK names that exist in DB
+        // FK names that exist in DB
         $studentKey = Grade::studentKey();
         $subjectKey = Grade::subjectKey();
 
@@ -70,16 +87,13 @@ class FacultyGradesController extends Controller
             $existing = Grade::where($studentKey, $studentId)
                 ->where('schoolyr_id', $schoolyrId)
                 ->get()
-                ->keyBy(function ($g) use ($subjectKey) {
-                    return $g->{$subjectKey};
-                });
+                ->keyBy(fn ($g) => $g->{$subjectKey});
         }
 
         // Build rows for blade
         $rows = $subjects->map(function ($sub) use ($existing) {
             $g = $existing->get($sub->id);
 
-            // Server-side final (¼ per quarter; missing = 0; ≤70 => 0)
             $q1 = (int)($g?->q1 ?? 0);
             $q2 = (int)($g?->q2 ?? 0);
             $q3 = (int)($g?->q3 ?? 0);
@@ -105,14 +119,14 @@ class FacultyGradesController extends Controller
             ];
         });
 
-        // General average (include zero finals; only skip null)
+        // General average (include zero finals; skip nulls)
         $generalAverage = null;
         if ($rows->count()) {
             $gaVals = $rows->pluck('final')->filter(fn ($v) => $v !== null);
             $generalAverage = $gaVals->count() ? (int) round($gaVals->avg()) : null;
         }
 
-        // Quarter flags from Admin (GLOBAL for now, or per SY/Grade if you extend)
+        // Quarter flags from Admin (GLOBAL)
         $quartersOpen = QuarterLock::flags($schoolyrId, $gradeLevel);
 
         return view('auth.facultydashboard.grades', compact(
@@ -148,12 +162,25 @@ class FacultyGradesController extends Controller
             'q4.*'         => ['nullable','integer','between:0,100'],
         ]);
 
+        $user       = Auth::user();
+        $isFaculty  = ($user->role === 'faculty');
+        $canSeeAll  = ($user->role === 'admin') || ($user->username === 'faculty');
+
         $schoolyrId = (int) $request->schoolyr_id;
         $studentId  = (int) $request->student_id;
         $gradeLevel = (string) $request->grade_level;
 
+        // Guardrail: normal faculty can only grade students in their taught grade levels
+        if ($isFaculty && !$canSeeAll) {
+            [, $myGradeNames] = $this->myGradelvlScope($user->faculty_id);
+            $allowed = Student::where('id', $studentId)
+                ->whereIn('s_gradelvl', $myGradeNames)
+                ->exists();
+            abort_unless($allowed, 403, 'You are not allowed to grade this student.');
+        }
+
         $gradelvlId = optional(Gradelvl::where('grade_level', $gradeLevel)->first())->id;
-        $facultyId  = Auth::user()->faculty_id ?? null;
+        $facultyId  = $user->faculty_id ?? null;
 
         $subjectIds = $request->input('subject_id', []);
         $q1 = $request->input('q1', []);
@@ -161,10 +188,8 @@ class FacultyGradesController extends Controller
         $q3 = $request->input('q3', []);
         $q4 = $request->input('q4', []);
 
-        // Quarter lock enforcement
         $locks = QuarterLock::flags($schoolyrId, $gradeLevel);
 
-        // FK names that actually exist in DB
         $studentKey = Grade::studentKey();
         $subjectKey = Grade::subjectKey();
 
@@ -175,32 +200,20 @@ class FacultyGradesController extends Controller
                 'schoolyr_id' => $schoolyrId,
             ]);
 
-            // Update quarters only if their quarter is OPEN; keep existing otherwise
-            if ($locks['q1']) {
-                $g->q1 = array_key_exists($idx, $q1) ? ($q1[$idx] !== '' ? (int) $q1[$idx] : null) : $g->q1;
-            }
-            if ($locks['q2']) {
-                $g->q2 = array_key_exists($idx, $q2) ? ($q2[$idx] !== '' ? (int) $q2[$idx] : null) : $g->q2;
-            }
-            if ($locks['q3']) {
-                $g->q3 = array_key_exists($idx, $q3) ? ($q3[$idx] !== '' ? (int) $q3[$idx] : null) : $g->q3;
-            }
-            if ($locks['q4']) {
-                $g->q4 = array_key_exists($idx, $q4) ? ($q4[$idx] !== '' ? (int) $q4[$idx] : null) : $g->q4;
-            }
+            if ($locks['q1']) { $g->q1 = array_key_exists($idx, $q1) ? ($q1[$idx] !== '' ? (int)$q1[$idx] : null) : $g->q1; }
+            if ($locks['q2']) { $g->q2 = array_key_exists($idx, $q2) ? ($q2[$idx] !== '' ? (int)$q2[$idx] : null) : $g->q2; }
+            if ($locks['q3']) { $g->q3 = array_key_exists($idx, $q3) ? ($q3[$idx] !== '' ? (int)$q3[$idx] : null) : $g->q3; }
+            if ($locks['q4']) { $g->q4 = array_key_exists($idx, $q4) ? ($q4[$idx] !== '' ? (int)$q4[$idx] : null) : $g->q4; }
 
-            // Final = ¼ per quarter; missing treated as 0; if <=70 => 0
             $fq1 = (int)($g->q1 ?? 0);
             $fq2 = (int)($g->q2 ?? 0);
             $fq3 = (int)($g->q3 ?? 0);
             $fq4 = (int)($g->q4 ?? 0);
-
             $finalFloat = ($fq1 + $fq2 + $fq3 + $fq4) / 4;
             $final = ($finalFloat <= 70) ? 0 : (int) round($finalFloat);
 
             $g->final_grade = $final;
             $g->remark      = $final >= 75 ? 'PASSED' : 'FAILED';
-
             $g->gradelvl_id = $gradelvlId;
             $g->faculty_id  = $facultyId;
 
@@ -217,5 +230,22 @@ class FacultyGradesController extends Controller
         if ($final >= 80) return ['Satisfactory', 'S'];
         if ($final >= 75) return ['Fairly Satisfactory', 'FS'];
         return ['Did Not Meet Expectations', 'DNME'];
+    }
+
+    /**
+     * Return [IDs, NAMES] of grade levels this faculty teaches (via schedules).
+     */
+    private function myGradelvlScope(?int $facultyId): array
+    {
+        if (!$facultyId) return [collect(), collect()];
+
+        $gradeIds = Schedule::where('faculty_id', $facultyId)
+            ->pluck('gradelvl_id')
+            ->filter()
+            ->unique();
+
+        $names = Gradelvl::whereIn('id', $gradeIds)->pluck('grade_level');
+
+        return [$gradeIds, $names];
     }
 }

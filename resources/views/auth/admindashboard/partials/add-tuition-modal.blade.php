@@ -1,8 +1,8 @@
-<!-- Add Tuition Modal -->
+{{-- resources/views/auth/admindashboard/partials/add-tuition-modal.blade.php --}}
 <div class="modal fade" id="addTuitionModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form action="{{ route('tuitions.store') }}" method="POST">
+      <form action="{{ route('admin.tuitions.store') }}" method="POST">
         @csrf
 
         <div class="modal-header">
@@ -11,7 +11,7 @@
         </div>
 
         <div class="modal-body">
-
+          {{-- Grade --}}
           <div class="mb-3">
             <label class="form-label">Grade Level</label>
             <select name="grade_level" class="form-select" required>
@@ -62,12 +62,35 @@
             </div>
           </div>
 
+          {{-- Grade-level Optional Fees (checkboxes) --}}
+          @if(isset($optionalFees) && $optionalFees->isNotEmpty())
+            <div class="mt-3">
+              <label class="form-label">Attach Optional Fees (Grade-level)</label>
+              <div class="border rounded p-2" style="max-height: 180px; overflow:auto;">
+                @foreach($optionalFees as $fee)
+                  @if($fee->scope === 'grade' || $fee->scope === 'both')
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox"
+                             id="add_optfee_{{ $fee->id }}"
+                             name="optional_fee_ids[]"
+                             value="{{ $fee->id }}">
+                      <label class="form-check-label" for="add_optfee_{{ $fee->id }}">
+                        {{ $fee->name }} — ₱{{ number_format($fee->amount, 2) }}
+                      </label>
+                    </div>
+                  @endif
+                @endforeach
+              </div>
+              <small class="text-muted">Optional fees are added to the computed total.</small>
+            </div>
+          @endif
+
           {{-- School Year --}}
           <div class="mb-3 mt-3">
             <label class="form-label">School Year (optional)</label>
             <select name="school_year" class="form-select">
               <option value="">— None —</option>
-              @foreach($schoolyrs as $sy)
+              @foreach(($schoolyrs ?? collect()) as $sy)
                 <option value="{{ $sy->school_year }}">{{ $sy->school_year }}</option>
               @endforeach
             </select>

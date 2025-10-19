@@ -120,7 +120,7 @@
                                                                     </button>
 
                                                                     <!-- DELETE -->
-                                                                    <form action="{{ route('schedules.destroy', $schedule->id) }}" method="POST"
+                                                                    <form action="{{ route('admin.schedules.destroy', $schedule->id) }}" method="POST"
                                                                           class="d-inline delete-form">
                                                                         @csrf
                                                                         @method('DELETE')

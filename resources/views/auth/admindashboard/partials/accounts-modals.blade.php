@@ -5,7 +5,7 @@
    ========================= --}}
 <div class="modal fade" id="addFacultyModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
-        <form id="addFacultyForm" action="{{ route('faculties.store') }}" method="POST" autocomplete="off">
+        <form id="addFacultyForm" action="{{ route('admin.faculties.store') }}" method="POST" autocomplete="off">
             @csrf
             <div class="modal-content">
                 <div class="modal-header" style="background: linear-gradient(90deg, #476DA3, #3C5F8E); color:#fff;">
@@ -74,7 +74,7 @@
    ========================= --}}
 <div class="modal fade" id="addGuardianModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl">
-        <form id="addGuardianForm" action="{{ route('guardians.store') }}" method="POST" autocomplete="off">
+        <form id="addGuardianForm" action="{{ route('admin.guardians.store') }}" method="POST" autocomplete="off">
             @csrf
             <div class="modal-content">
                 <div class="modal-header" style="background: linear-gradient(90deg, #476DA3, #3C5F8E); color:#fff;">
