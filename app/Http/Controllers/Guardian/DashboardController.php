@@ -1,17 +1,14 @@
 <?php
 
-namespace App\Http\Controllers\Auth;
+namespace App\Http\Controllers\Guardian;
 
-use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
 use App\Models\Guardian;
 use App\Models\Announcement;
 
-class GuardianDashboardController extends Controller
+class DashboardController extends Controller
 {
-    /**
-     * Guardian dashboard (view-only). Admin guardians management moved to Admin\GuardianController.
-     */
     public function index()
     {
         $user = Auth::user();

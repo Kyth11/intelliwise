@@ -54,7 +54,7 @@
         <div class="pay-card p-3">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h6 class="mb-0">Quick Actions</h6>
-                <a href="{{ route('admin.settings') }}" class="btn btn-sm btn-outline-secondary" title="Settings">
+                <a href="{{ route('admin.settings.index') }}" class="btn btn-sm btn-outline-secondary" title="Settings">
                     <i class="bi bi-gear"></i>
                 </a>
             </div>
@@ -431,4 +431,3 @@
         });
     </script>
 @endpush
-    

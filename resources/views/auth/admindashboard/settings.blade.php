@@ -545,11 +545,11 @@
 
         const routes = {
             finances: "{{ route('admin.finances') }}",
-            settings: "{{ route('admin.settings') }}",
-            addSubject: "{{ route('admin.settings') }}?tab=subjects",
+            settings: "{{ route('admin.settings.index') }}",
+  addSubject: "{{ route('admin.settings.index', ['tab' => 'subjects']) }}", // ← fix
             // FIXED: use admin.students.create
             enroll: "{{ route('admin.students.create') }}",
-            students: "{{ route('admin.students') }}",
+            students: "{{ route('admin.students.index') }}",
             grades: "{{ route('admin.grades') }}"
         };
 

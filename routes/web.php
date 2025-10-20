@@ -2,19 +2,32 @@
 
 use Illuminate\Support\Facades\Route;
 
+// ---------- Auth & Dashboards ----------
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\AdminDashboardController;
 use App\Http\Controllers\Auth\FacultyDashboardController;
 use App\Http\Controllers\Auth\GuardianDashboardController;
 use App\Http\Controllers\Auth\PaymentsController;
 
+// ---------- Admin CRUD (split controllers) ----------
+use App\Http\Controllers\Admin\AnnouncementController as AdminAnnouncementController;
+use App\Http\Controllers\Admin\ScheduleController as AdminScheduleController;
+use App\Http\Controllers\Admin\TuitionController as AdminTuitionController;
+use App\Http\Controllers\Admin\OptionalFeeController as AdminOptionalFeeController;
+use App\Http\Controllers\Admin\SubjectController as AdminSubjectController;
+use App\Http\Controllers\Admin\SettingController as AdminSettingController;
+use App\Http\Controllers\Admin\FacultyController as AdminFacultyController;
+use App\Http\Controllers\Admin\GuardianController as AdminGuardianController;
+use App\Http\Controllers\Admin\GradeQuarterController;
+
+// ---------- Shared / other controllers ----------
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\GradesController;
 use App\Http\Controllers\FacultyGradesController;
-use App\Http\Controllers\Admin\GradeQuarterController;
 use App\Http\Controllers\EnrollmentReportController;
 
-Route::get('/', fn() => redirect()->route('login'));
+// Home → Login
+Route::get('/', fn () => redirect()->route('login'));
 
 // ====================
 // Authentication
@@ -25,155 +38,167 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 // ====================
 // Admin (auth + role:admin)
+// Prefix: /admin    Name: admin.*
 // ====================
 Route::middleware(['auth', 'role:admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
+        // Landing redirect
+        Route::get('/', fn () => redirect()->route('admin.dashboard'))->name('home');
 
-        // Dashboard
+        // Top-level views
         Route::get('/dashboard', [AdminDashboardController::class, 'dashboard'])->name('dashboard');
+        Route::get('/finances',  [AdminDashboardController::class, 'finances'])->name('finances');
+        Route::get('/accounts',  [AdminDashboardController::class, 'accounts'])->name('accounts');
+        Route::get('/grades',    [GradesController::class, 'index'])->name('grades');
 
-        // Finances
-        Route::get('/finances', [AdminDashboardController::class, 'finances'])->name('finances');
+        // Settings (view-only here; actions below)
+        Route::get('/settings', [AdminDashboardController::class, 'settings'])->name('settings.index');
+
+        // Settings actions
+        Route::prefix('settings')->name('settings.')->group(function () {
+            Route::put   ('/system',      [AdminSettingController::class, 'updateSystem'])->name('system.update');
+            Route::post  ('/admins',      [AdminSettingController::class, 'storeAdmin'])->name('admins.store');
+            Route::delete('/admins/{id}', [AdminSettingController::class, 'destroyAdmin'])->name('admins.destroy');
+            Route::post  ('/school-year', [AdminSettingController::class, 'storeSchoolYear'])->name('schoolyear.store');
+        });
 
         // Students (admin-managed)
-        Route::get('/students', [StudentController::class, 'index'])->name('students');
-        Route::get('/students/enroll', [StudentController::class, 'create'])->name('students.create');
-        Route::post('/students/store', [StudentController::class, 'store'])->name('students.store');
-        Route::put('/students/{id}', [StudentController::class, 'update'])->name('students.update');
-        Route::delete('/students/{id}', [StudentController::class, 'destroy'])->name('students.destroy');
+        Route::prefix('students')->name('students.')->group(function () {
+            Route::get   ('/',        [StudentController::class, 'index'])->name('index');
+            Route::get   ('/enroll',  [StudentController::class, 'create'])->name('create');
+            Route::post  ('/store',   [StudentController::class, 'store'])->name('store');
+            Route::put   ('/{id}',    [StudentController::class, 'update'])->name('update');
+            Route::delete('/{id}',    [StudentController::class, 'destroy'])->name('destroy');
+        });
 
-        // Faculties (account management)
-        Route::get('/faculties', [FacultyDashboardController::class, 'index'])->name('faculties');
-        Route::post('/faculties/store', [FacultyDashboardController::class, 'store'])->name('faculties.store');
-        Route::put('/faculties/{id}', [FacultyDashboardController::class, 'update'])->name('faculties.update');
-        Route::delete('/faculties/{id}', [FacultyDashboardController::class, 'destroy'])->name('faculties.destroy');
+        // Faculties (admin account management)
+        Route::prefix('faculties')->name('faculties.')->group(function () {
+            Route::get   ('/',      [AdminFacultyController::class, 'index'])->name('index');
+            Route::post  ('/store', [AdminFacultyController::class, 'store'])->name('store');
+            Route::put   ('/{id}',  [AdminFacultyController::class, 'update'])->name('update');
+            Route::delete('/{id}',  [AdminFacultyController::class, 'destroy'])->name('destroy');
+        });
 
-        // Guardians (account management)
-        Route::get('/guardians', [GuardianDashboardController::class, 'index'])->name('guardians');
-        Route::post('/guardians/store', [GuardianDashboardController::class, 'store'])->name('guardians.store');
-        Route::put('/guardians/{id}', [GuardianDashboardController::class, 'update'])->name('guardians.update');
-        Route::delete('/guardians/{id}', [GuardianDashboardController::class, 'destroy'])->name('guardians.destroy');
+        // Guardians (admin account management)
+        Route::prefix('guardians')->name('guardians.')->group(function () {
+            Route::get   ('/',      [AdminGuardianController::class, 'index'])->name('index');
+            Route::post  ('/store', [AdminGuardianController::class, 'store'])->name('store');
+            Route::put   ('/{id}',  [AdminGuardianController::class, 'update'])->name('update');
+            Route::delete('/{id}',  [AdminGuardianController::class, 'destroy'])->name('destroy');
+        });
 
-        // Announcements (Admin)
-        Route::post('/announcements/store', [AdminDashboardController::class, 'storeAnnouncement'])->name('announcements.store');
-        Route::put('/announcements/{id}', [AdminDashboardController::class, 'updateAnnouncement'])->name('announcements.update');
-        Route::delete('/announcements/{id}', [AdminDashboardController::class, 'destroyAnnouncement'])->name('announcements.destroy');
+        // Announcements (Admin CRUD)
+        Route::prefix('announcements')->name('announcements.')->group(function () {
+            Route::post  ('/store', [AdminAnnouncementController::class, 'store'])->name('store');
+            Route::put   ('/{id}',  [AdminAnnouncementController::class, 'update'])->name('update');
+            Route::delete('/{id}',  [AdminAnnouncementController::class, 'destroy'])->name('destroy');
+        });
 
-        // Schedules (admin management)
-        Route::get('/schedules', [AdminDashboardController::class, 'schedules'])->name('schedules');
-        Route::post('/schedules/store', [AdminDashboardController::class, 'storeSchedule'])->name('schedules.store');
-        Route::put('/schedules/{id}', [AdminDashboardController::class, 'updateSchedule'])->name('schedules.update');
-        Route::delete('/schedules/{id}', [AdminDashboardController::class, 'destroySchedule'])->name('schedules.destroy');
+        // Schedules: index view stays in AdminDashboardController@schedules, CRUD in AdminScheduleController
+        Route::prefix('schedules')->name('schedules.')->group(function () {
+            Route::get   ('/',      [AdminDashboardController::class, 'schedules'])->name('index');
+            Route::post  ('/store', [AdminScheduleController::class, 'store'])->name('store');
+            Route::put   ('/{id}',  [AdminScheduleController::class, 'update'])->name('update');
+            Route::delete('/{id}',  [AdminScheduleController::class, 'destroy'])->name('destroy');
+        });
 
-        // Tuition + Optional fees
-        Route::post('/tuitions', [AdminDashboardController::class, 'storeTuition'])->name('tuitions.store');
-        Route::put('/tuitions/{id}', [AdminDashboardController::class, 'updateTuition'])->name('tuitions.update');
-        Route::delete('/tuitions/{id}', [AdminDashboardController::class, 'destroyTuition'])->name('tuitions.destroy');
-        Route::delete('/tuition/{id}', [AdminDashboardController::class, 'destroyTuition'])->name('tuition.destroy');
+        // Tuition (Admin CRUD)
+        Route::prefix('tuitions')->name('tuitions.')->group(function () {
+            Route::post  ('/',     [AdminTuitionController::class, 'store'])->name('store');
+            Route::put   ('/{id}', [AdminTuitionController::class, 'update'])->name('update');
+            Route::delete('/{id}', [AdminTuitionController::class, 'destroy'])->name('destroy');
+        });
+        // Legacy single path kept for compatibility with older forms
+        Route::delete('/tuition/{id}', [AdminTuitionController::class, 'destroy'])->name('tuition.destroy');
 
-        Route::post('/optional-fees', [AdminDashboardController::class, 'storeOptionalFee'])->name('optionalfees.store');
-        Route::put('/optional-fees/{id}', [AdminDashboardController::class, 'updateOptionalFee'])->name('optionalfees.update');
-        Route::delete('/optional-fees/{id}', [AdminDashboardController::class, 'destroyOptionalFee'])->name('optionalfees.destroy');
+        // Optional Fees (Admin CRUD)
+        Route::prefix('optional-fees')->name('optionalfees.')->group(function () {
+            Route::post  ('/',     [AdminOptionalFeeController::class, 'store'])->name('store');
+            Route::put   ('/{id}', [AdminOptionalFeeController::class, 'update'])->name('update');
+            Route::delete('/{id}', [AdminOptionalFeeController::class, 'destroy'])->name('destroy');
+        });
 
-        // Settings + Accounts
-        Route::put('/settings/system', [AdminDashboardController::class, 'updateSystemSettings'])->name('settings.system.update');
-        Route::get('/settings', [AdminDashboardController::class, 'settings'])->name('settings');
-        Route::post('/settings/admins', [AdminDashboardController::class, 'storeAdmin'])->name('settings.admins.store');
-        Route::delete('/settings/admins/{id}', [AdminDashboardController::class, 'destroyAdmin'])->name('settings.admins.destroy');
-        Route::post('/settings/school-year', [AdminDashboardController::class, 'storeSchoolYear'])->name('settings.schoolyear.store');
-
-        // Accounts page
-        Route::get('/accounts', [AdminDashboardController::class, 'accounts'])->name('accounts');
-
-        // Grades (Admin view)
-        Route::get('/grades', [GradesController::class, 'index'])->name('grades');
-
-        // NEW (GLOBAL toggles; matches QuarterLock)
+        // Grades (global quarter toggles)
         Route::post('/grades/quarters/save', [GradeQuarterController::class, 'save'])->name('grades.quarters.save');
 
         // Payments (admin only)
-        Route::post('/payments/store', [PaymentsController::class, 'store'])->name('payments.store');
+        Route::prefix('payments')->name('payments.')->group(function () {
+            Route::post('/store', [PaymentsController::class, 'store'])->name('store');
+        });
 
         // Reports (Admin)
-        Route::get('/reports/enrollments', [EnrollmentReportController::class, 'index'])->name('reports.enrollments');
-        Route::get('/reports/enrollments/print', [EnrollmentReportController::class, 'print'])->name('reports.enrollments.print');
-        Route::get('/reports/enrollments/students', [EnrollmentReportController::class, 'students'])->name('reports.enrollments.students');
-        Route::get('/reports/enrollments/export', [EnrollmentReportController::class, 'export'])->name('reports.enrollments.export');
+        Route::prefix('reports')->name('reports.')->group(function () {
+            Route::get('/enrollments',        [EnrollmentReportController::class, 'index'])->name('enrollments');
+            Route::get('/enrollments/print',  [EnrollmentReportController::class, 'print'])->name('enrollments.print');
+            Route::get('/enrollments/students',[EnrollmentReportController::class, 'students'])->name('enrollments.students');
+            Route::get('/enrollments/export', [EnrollmentReportController::class, 'export'])->name('enrollments.export');
+        });
 
-        // Subjects (Admin)
-        Route::post('/subjects', [AdminDashboardController::class, 'storeSubject'])->name('subjects.store');
-        Route::put('/subjects/{id}', [AdminDashboardController::class, 'updateSubject'])->name('subjects.update');
-        Route::delete('/subjects/{id}', [AdminDashboardController::class, 'destroySubject'])->name('subjects.destroy');
+        // Subjects (Admin CRUD)
+        Route::prefix('subjects')->name('subjects.')->group(function () {
+            Route::post  ('/',     [AdminSubjectController::class, 'store'])->name('store');
+            Route::put   ('/{id}', [AdminSubjectController::class, 'update'])->name('update');
+            Route::delete('/{id}', [AdminSubjectController::class, 'destroy'])->name('destroy');
+        });
 
-        // (Optional) AJAX endpoint in your comment
+        // Optional AJAX
         Route::get('/grades/report', [GradesController::class, 'reportAjax'])->name('grades.report');
     });
 
 // ====================
 // Faculty Panel (auth + role:faculty)
+// Prefix: /faculty    Name: faculty.*
 // ====================
 Route::middleware(['auth', 'role:faculty'])
     ->prefix('faculty')
     ->name('faculty.')
     ->group(function () {
-        // Keep "/" usable; send to dashboard
-        Route::get('/', fn() => redirect()->route('faculty.dashboard'));
 
-        // Dashboard (uses existing FacultyDashboardController)
+        Route::get('/', fn () => redirect()->route('faculty.dashboard'))->name('home'); // add ->name('home')
         Route::get('/dashboard', [FacultyDashboardController::class, 'index'])->name('dashboard');
 
-        // Students list (read-only list page)
-        Route::get('/students', [FacultyDashboardController::class, 'students'])->name('students');
+        // Read-only students list + guarded enrollment
+        Route::get ('/students',        [FacultyDashboardController::class, 'students'])->name('students');
+        Route::get ('/students/create', [StudentController::class, 'create'])->middleware('enrollment.open')->name('students.create');
+        Route::post('/students',        [StudentController::class, 'store'])->middleware('enrollment.open')->name('students.store');
 
-        // Enrollment flow (guarded by your FacultyEnrollmentEnabled middleware alias "enrollment.open")
-        Route::get('/students/create', [StudentController::class, 'create'])
-            ->middleware('enrollment.open')
-            ->name('students.create');
+        // Faculty announcements (scoped CRUD)
+        Route::post  ('/announcements',      [\App\Http\Controllers\Faculty\AnnouncementController::class, 'store'])->name('announcements.store');
+        Route::put   ('/announcements/{id}', [\App\Http\Controllers\Faculty\AnnouncementController::class, 'update'])->name('announcements.update');
+        Route::delete('/announcements/{id}', [\App\Http\Controllers\Faculty\AnnouncementController::class, 'destroy'])->name('announcements.destroy');
 
-        Route::post('/students', [StudentController::class, 'store'])
-            ->middleware('enrollment.open')
-            ->name('students.store');
-
-        // Announcements (Faculty-scoped CRUD)
-        Route::post('/announcements', [FacultyDashboardController::class, 'storeAnnouncement'])->name('announcements.store');
-        Route::put('/announcements/{id}', [FacultyDashboardController::class, 'updateAnnouncement'])->name('announcements.update');
-        Route::delete('/announcements/{id}', [FacultyDashboardController::class, 'destroyAnnouncement'])->name('announcements.destroy');
-
-        // Schedule
+        // Schedule view
         Route::get('/schedule', [FacultyDashboardController::class, 'schedule'])->name('schedule');
 
         // Simple settings view
         Route::view('/settings', 'auth.facultydashboard.setting')->name('settings');
 
-        // Profile (self) + by id
-        Route::put('/profile', [FacultyDashboardController::class, 'updateSelf'])->name('profile.update');
-        Route::put('/profile/{id}', [FacultyDashboardController::class, 'update'])->name('profile.update.byid');
+        // Profile (self + by id)
+        Route::put('/profile',     [\App\Http\Controllers\Faculty\ProfileController::class, 'updateSelf'])->name('profile.update');
+        Route::put('/profile/{id}',[\App\Http\Controllers\Faculty\ProfileController::class, 'update'])->name('profile.update.byid');
 
         // Grades (Faculty)
-        Route::get('/grades', [FacultyGradesController::class, 'index'])->name('grades.index');
+        Route::get ('/grades', [FacultyGradesController::class, 'index'])->name('grades.index');
         Route::post('/grades', [FacultyGradesController::class, 'store'])->name('grades.store');
     });
 
 // ====================
 // Guardian Panel (auth + role:guardian)
+// Prefix: /guardians  Name: guardians.*
 // ====================
 Route::middleware(['auth', 'role:guardian'])
     ->prefix('guardians')
     ->name('guardians.')
     ->group(function () {
-        Route::get('/dashboard', [GuardianDashboardController::class, 'index'])->name('dashboard');
-        Route::view('/children', 'auth.guardiandashboard.children')->name('children');
+        Route::get('/', fn () => redirect()->route('guardians.dashboard'))->name('home');
+        Route::get('/dashboard', [GuardianDashboardController::class, 'index'])->name('dashboard'); // ← ADD THIS
 
-        // Use controller so the blade gets data
-        Route::get('/reports', [GuardianDashboardController::class, 'reports'])->name('reports');
+        Route::view('/children',  'auth.guardiandashboard.children')->name('children');
+        Route::get ('/reports',   [\App\Http\Controllers\Guardian\ReportsController::class, 'reports'])->name('reports');
+        Route::view('/settings',  'auth.guardiandashboard.settings')->name('settings');
 
-        Route::view('/settings', 'auth.guardiandashboard.settings')->name('settings');
-
-        // Self upsert (create/link if missing, otherwise update)
-        Route::match(['post', 'put'], '/self', [GuardianDashboardController::class, 'selfUpsert'])->name('self.upsert');
-
-        // Legacy direct update by id (kept for compatibility)
-        Route::put('/{id}', [GuardianDashboardController::class, 'update'])->name('self.update');
+        Route::match(['post','put'], '/self', [\App\Http\Controllers\Guardian\ProfileController::class, 'upsert'])->name('self.upsert');
+        Route::put('/{id}', [\App\Http\Controllers\Guardian\ProfileController::class, 'update'])->name('self.update');
     });

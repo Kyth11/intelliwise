@@ -51,7 +51,7 @@
                 <i class="bi bi-person-gear"></i><span> Manage Accounts</span>
             </a>
 
-            <a href="{{ route('admin.faculties') }}"
+            <a href="{{ route('admin.faculties.index') }}"
                 class="sidebar-link {{ request()->routeIs('admin.faculties') ? 'active' : '' }}">
                 <i class="bi bi-person-workspace"></i></i><span> Schedule </span>
             </a>
@@ -61,7 +61,7 @@
                 <i class="bi bi-cash-coin"></i><span> Finances</span>
             </a>
 
-            <a href="{{ route('admin.students') }}"
+            <a href="{{ route('admin.students.index') }}"
                 class="sidebar-link {{ request()->routeIs('admin.students') ? 'active' : '' }}">
                 <i class="bi bi-people"></i><span> Students</span>
             </a>
@@ -80,7 +80,7 @@
                 <i class="bi bi-table"></i><span> Reports</span>
             </a>
 
-            <a href="{{ route('admin.settings') }}"
+            <a href="{{ route('admin.settings.index') }}"
                 class="sidebar-link {{ request()->routeIs('admin.settings') ? 'active' : '' }}">
                 <i class="bi bi-gear"></i><span> Settings</span>
             </a>

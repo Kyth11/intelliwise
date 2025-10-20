@@ -29,6 +29,8 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
+/*************  ✨ Windsurf Command ⭐  *************/
+/*******  3037e367-b073-405e-aa8e-d8ba7ab61f59  *******/
     public function guardian()
     {
         return $this->belongsTo(Guardian::class, 'guardian_id');

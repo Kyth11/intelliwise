@@ -48,7 +48,7 @@
                 <div class="card quick-actions p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h6 class="mb-0">Quick Actions</h6>
-                        <a href="{{ route('admin.settings') }}" class="btn btn-sm btn-outline-secondary" title="Settings">
+                        <a href="{{ route('admin.settings.index') }}" class="btn btn-sm btn-outline-secondary" title="Settings">
                             <i class="bi bi-gear"></i>
                         </a>
                     </div>
@@ -64,7 +64,7 @@
                         <a href="{{ route('admin.students.create') }}" class="btn btn-sm btn-outline-success">
                             <i class="bi bi-person-plus me-1"></i> Enroll Student
                         </a>
-                        <a href="{{ route('admin.settings') }}?tab=subjects" class="btn btn-sm btn-outline-dark">
+                        <a href="{{ route('admin.settings.index') }}?tab=subjects" class="btn btn-sm btn-outline-dark">
                             <i class="bi bi-journal-plus me-1"></i> Add Subject
                         </a>
                     </div>
@@ -76,14 +76,12 @@
              Below Header: Left (charts + Announcements + Schedule) | Right (Recent Payments)
         ========================== -->
         @php
-            // ---------- Finance + grade aggregates ----------
             $tuitionMap = collect($tuitions ?? collect())->keyBy('grade_level');
 
             $gradeCounts = collect();
             $paidTotal = 0;
             $balTotal = 0;
 
-            // Recent payments view: household + student + grade (max 20)
             $recentPaymentsView = collect();
 
             foreach ($students as $s) {
@@ -94,7 +92,6 @@
                 $base = $row ? (float) $row->total_yearly
                     : ((isset($s->s_tuition_sum) && $s->s_tuition_sum !== '') ? (float) $s->s_tuition_sum : 0);
 
-                // Optional fees (student-scoped, active)
                 $optCollection = collect($s->optionalFees ?? []);
                 $filtered = $optCollection->filter(function ($f) {
                     $scopeOk = !isset($f->scope) || in_array($f->scope, ['student', 'both']);
@@ -114,7 +111,6 @@
                 $paidTotal += $paid;
                 $balTotal += $currentBalance;
 
-                // Build household label like in students.blade
                 $g = $s->guardian ?? null;
                 $mFirst = trim(collect([data_get($g, 'm_firstname'), data_get($g, 'm_middlename')])->filter()->implode(' '));
                 $mLast = (string) data_get($g, 'm_lastname', '');
@@ -151,7 +147,6 @@
                 }
                 $household = $household ?: '—';
 
-                // If anything has been paid, add to the recent list
                 if ($paid > 0) {
                     $recentPaymentsView->push([
                         'household' => $household,
@@ -183,7 +178,7 @@
                             <div class="card h-100">
                                 <div class="card-header d-flex justify-content-between align-items-center">
                                     <h6 class="mb-0">Students per Grade Level</h6>
-                                    <a href="{{ route('admin.students') }}" class="btn btn-sm btn-outline-primary">View
+                                    <a href="{{ route('admin.students.index') }}" class="btn btn-sm btn-outline-primary">View
                                         details</a>
                                 </div>
                                 <div class="card-body chart-wrap">
@@ -319,12 +314,10 @@
                                         @if($schedules->isNotEmpty())
                                             @foreach($schedules as $schedule)
                                                 <tr>
-                                                    <td><span class="badge bg-light text-dark border">{{ $schedule->day }}</span>
-                                                    </td>
+                                                    <td><span class="badge bg-light text-dark border">{{ $schedule->day }}</span></td>
                                                     <td>{{ $schedule->class_start }} - {{ $schedule->class_end }}</td>
                                                     <td>{{ $schedule->subject->subject_name ?? '-' }}</td>
-                                                    <td>{{ $schedule->gradelvls->grade_level ?? $schedule->gradelvl->grade_level ?? '-' }}
-                                                    </td>
+                                                    <td>{{ $schedule->gradelvls->grade_level ?? $schedule->gradelvl->grade_level ?? '-' }}</td>
                                                     <td>{{ $schedule->school_year ?? '—' }}</td>
                                                     <td>{{ $schedule->faculty->user->name ?? '—' }}</td>
                                                     <td class="text-nowrap">
@@ -366,7 +359,6 @@
                                 <option value="10" selected>10</option>
                                 <option value="20">20</option>
                             </select>
-                            {{-- <a href="{{ route('admin.finances') }}" class="btn btn-sm btn-outline-primary">View all</a> --}}
                         </div>
                     </div>
 
@@ -579,7 +571,7 @@
     </script>
 
     <script>
-        // Recent Payments: length control (DataTables-like)
+        // Recent Payments: length control
         (function () {
             const list = document.getElementById('recentPaymentsList');
             const sel = document.getElementById('paymentsShowCount');
@@ -590,17 +582,11 @@
             function applyLength() {
                 const max = parseInt(sel.value, 10) || 10;
                 items.forEach((li, idx) => {
-                    // use Bootstrap's d-none so it plays nice with .d-flex
-                    if (idx < max) {
-                        li.classList.remove('d-none');
-                    } else {
-                        li.classList.add('d-none');
-                    }
+                    li.classList.toggle('d-none', idx >= max);
                 });
             }
 
             sel.addEventListener('change', applyLength);
-            // Initial render
             applyLength();
         })();
     </script>
@@ -613,10 +599,10 @@
 
             const routes = {
                 finances: "{{ route('admin.finances') }}",
-                settings: "{{ route('admin.settings') }}",
-                addSubject: "{{ route('admin.settings') }}?tab=subjects",
+                settings: "{{ route('admin.settings.index') }}",
+                addSubject: "{{ route('admin.settings.index') }}?tab=subjects",
                 enroll: "{{ route('admin.students.create') }}",
-                students: "{{ route('admin.students') }}",
+                students: "{{ route('admin.students.index') }}",
                 grades: "{{ route('admin.grades') }}"
             };
 
