@@ -169,7 +169,7 @@
                             </div>
                         </div>
 
-                        <!-- We’ll show the existing paid/balance so editors understand what will be preserved -->
+                        <!-- Info fields -->
                         <div class="row g-2 mt-1">
                             <div class="col-md-6">
                                 <div class="form-floating">
@@ -221,6 +221,9 @@
 
     // Tuition map from server
     const TUITION_MAP = {!! json_encode($__tuitionMap ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!};
+
+    // ✅ Use named route template (avoids hardcoding /admin)
+    const UPDATE_URL_TEMPLATE = @json(route('admin.students.update', ['id' => '___ID___']));
 
     function applyTuitionFromGrade(gradeLevel) {
         const t = TUITION_MAP[gradeLevel];
@@ -280,7 +283,8 @@
         editStudentModal.querySelector('#edit-guardian').value = guardian ?? '';
         editStudentModal.querySelector('#edit-guardianemail').value = guardianEmail ?? '';
         editStudentModal.querySelector('#edit-status').value = status ?? 'Enrolled';
-        // Ensure the enum values are used
+
+        // Ensure enum values are used
         const paySel = editStudentModal.querySelector('#edit-payment');
         paySel.value = ['Paid','Unpaid','Partial'].includes(payment) ? payment : 'Unpaid';
 
@@ -311,8 +315,8 @@
             if (balField) balField.value  = (isFinite(balVal) ? balVal : 0).toFixed(2);
         }
 
-        // Correct form action (admin namespace)
+        // ✅ Correct form action via named route template
         const form = editStudentModal.querySelector('#editStudentForm');
-        form.action = `/admin/students/${id}`;
+        form.action = UPDATE_URL_TEMPLATE.replace('___ID___', id);
     });
 </script>

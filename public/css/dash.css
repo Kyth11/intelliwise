@@ -1,4 +1,11 @@
 /* ===== Base ===== */
+
+/* NEW — global scale vars */
+:root {
+    --ui-scale: 0.8;                 /* 20% smaller */
+    --ui-inverse-scale: calc(1 / var(--ui-scale));
+}
+
 body {
     margin: 0;
     height: 100vh;
@@ -24,6 +31,20 @@ body {
     box-shadow: none;
     overflow: hidden;
     transition: all 0.3s ease;
+
+    /* NEW — primary scale (Chromium/Edge/Opera) */
+    zoom: var(--ui-scale);
+}
+
+/* NEW — Firefox fallback for zoom */
+@supports not (zoom: 1) {
+    .dashboard-wrapper {
+        transform: scale(var(--ui-scale));
+        transform-origin: top left;
+        /* Expand canvas so scaled content still fills the viewport */
+        width: calc(100% * var(--ui-inverse-scale));
+        height: calc(100% * var(--ui-inverse-scale));
+    }
 }
 
 /* ===== Sidebar ===== */
@@ -536,4 +557,12 @@ h3 {
     }
     .btn-print-card, .toolbar, .filters, #pageSearch { display: none !important; }
     .payments-scroll { max-height: none !important; overflow: visible !important; }
+
+    /* NEW — avoid tiny prints */
+    .dashboard-wrapper {
+        zoom: 1 !important;
+        transform: none !important;
+        width: 100% !important;
+        height: auto !important;
+    }
 }

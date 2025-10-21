@@ -54,7 +54,14 @@ class ProfileController extends Controller
             if ($request->filled('password')) {
                 $user->password = bcrypt($request->input('password'));
             }
-            $user->save();
+           try {
+    $user->save();
+} catch (\Exception $e) {
+    // Log or display the error message
+    logger()->error($e->getMessage());
+    // Optionally, you can re-throw the exception if needed
+    throw $e;
+}
         });
 
         return back()->with('success', 'Profile created and linked.');

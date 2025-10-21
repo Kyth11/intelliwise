@@ -257,13 +257,16 @@ class StudentController extends Controller
             }
             $student->optionalFees()->sync($sync);
 
+            // ✅ FIX: use existing named route 'admin.students.index'
             $role  = Auth::user()?->role;
-            $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.students';
+            $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.students.index';
             return redirect()->route($route)->with('success', 'Student updated successfully.');
         } catch (\Exception $e) {
             Log::error('Student update failed: '.$e->getMessage(), ['exception' => $e]);
+
+            // ✅ FIX: use existing named route 'admin.students.index'
             $role  = Auth::user()?->role;
-            $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.students';
+            $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.students.index';
             return redirect()->route($route)->with('error', 'Failed to update student.');
         }
     }
