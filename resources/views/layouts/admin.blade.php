@@ -55,6 +55,7 @@
                 class="sidebar-link {{ request()->routeIs('admin.faculties') ? 'active' : '' }}">
                 <i class="bi bi-person-workspace"></i></i><span> Schedule </span>
             </a>
+
             {{-- Finances --}}
             <a href="{{ route('admin.finances') }}"
                 class="sidebar-link {{ request()->routeIs('admin.finances') ? 'active' : '' }}">
@@ -66,13 +67,10 @@
                 <i class="bi bi-people"></i><span> Students</span>
             </a>
 
-
             <a href="{{ route('admin.grades') }}"
                 class="sidebar-link {{ request()->routeIs('admin.grades') ? 'active' : '' }}">
                 <i class="bi bi-journal-check"></i><span> Grades</span>
             </a>
-
-
 
             {{-- NEW: Reports (Enrollment) --}}
             <a href="{{ route('admin.reports.enrollments') }}"
@@ -85,9 +83,17 @@
                 <i class="bi bi-gear"></i><span> Settings</span>
             </a>
 
-            <a href="{{ route('login') }}">
+            {{-- Logout (SweetAlert confirm) --}}
+            <a href="{{ route('login') }}" class="sidebar-link js-logout" role="button">
                 <i class="bi bi-box-arrow-right"></i><span> Logout</span>
             </a>
+
+            {{-- Hidden logout form (Laravel POST route) --}}
+            @if(Route::has('logout'))
+                <form id="logoutForm" action="{{ route('logout') }}" method="POST" class="d-none">
+                    @csrf
+                </form>
+            @endif
         </div>
 
         <!-- Main Content -->
@@ -109,8 +115,11 @@
         </div>
     </div>
 
-    <!-- Bootstrap JS -->
+    <!-- Bootstrap JS (CDN duplicate kept as-is in your layout) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <!-- Sidebar Collapse Toggle -->
     <script>
@@ -139,6 +148,42 @@
                 document.body.classList.toggle('theme-dark', t === 'dark');
             } catch (e) { }
         })();
+    </script>
+
+    <!-- Logout confirmation -->
+    <script>
+        document.addEventListener('click', function (e) {
+            const link = e.target.closest('.js-logout');
+            if (!link) return;
+
+            e.preventDefault();
+
+            Swal.fire({
+                title: 'Sign out?',
+                text: 'You will be returned to the login screen.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, log me out',
+                cancelButtonText: 'Cancel',
+                reverseButtons: true,
+                background: '#fff',
+                backdrop: false,
+                allowOutsideClick: true,
+                allowEscapeKey: true
+            }).then((result) => {
+                if (!result.isConfirmed) return;
+
+                // Prefer Laravel POST logout if available, else fall back to href
+                const form = document.getElementById('logoutForm');
+                if (form) {
+                    form.submit();
+                } else {
+                    window.location.href = link.getAttribute('href') || '{{ route('login') }}';
+                }
+            });
+        });
     </script>
 
     <!-- Auto-dismiss Flash Messages -->

@@ -173,16 +173,16 @@
                             <label class="form-label fw-semibold">LEARNER’S NAME</label>
                             <div class="row g-2">
                                 <div class="col-md-4">
-                                    <input type="text" class="form-control" name="s_lastname" placeholder="LAST NAME"
-                                        required>
-                                </div>
-                                <div class="col-md-4">
                                     <input type="text" class="form-control" name="s_firstname" placeholder="FIRST NAME"
                                         required>
                                 </div>
                                 <div class="col-md-4">
                                     <input type="text" class="form-control" name="s_middlename"
                                         placeholder="MIDDLE NAME (optional)">
+                                </div>
+                                <div class="col-md-4">
+                                    <input type="text" class="form-control" name="s_lastname" placeholder="LAST NAME"
+                                        required>
                                 </div>
                             </div>
                         </div>

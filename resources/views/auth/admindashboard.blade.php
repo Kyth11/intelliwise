@@ -10,6 +10,20 @@
 @endpush
 
 @section('content')
+@php
+    use App\Models\PaymentReceipt;
+    use Illuminate\Support\Facades\Storage;
+
+    // Pending GCash receipts (for the notification panel)
+    $pendingReceipts = PaymentReceipt::with(['student','guardian'])
+        ->where('status','Pending')
+        ->latest()
+        ->take(8)
+        ->get();
+
+    $pendingReceiptsCount = PaymentReceipt::where('status','Pending')->count();
+@endphp
+
     <div class="card section p-4">
         <!-- =========================
              Header: Intro | KPIs | Right: Quick Actions
@@ -72,6 +86,64 @@
             </div>
         </div>
 
+        {{-- =========================
+             NEW: Pending GCash Receipts
+        ========================== --}}
+        <div class="row g-3 mb-3">
+            <div class="col-12 col-xl-6">
+                <div class="card p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Pending GCash Receipts</h6>
+                        <span class="badge {{ $pendingReceiptsCount ? 'bg-warning text-dark' : 'bg-secondary' }}">
+                            {{ $pendingReceiptsCount }}
+                        </span>
+                    </div>
+                    @if($pendingReceipts->isEmpty())
+                        <p class="text-muted small mb-0">No pending GCash receipts.</p>
+                    @else
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Student</th>
+                                        <th>Amount</th>
+                                        <th>Ref No.</th>
+                                        <th>Submitted</th>
+                                        <th class="text-end">Receipt</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($pendingReceipts as $r)
+@php $url = $r->image_path ? Storage::disk('public')->url($r->image_path) : null; @endphp
+
+                                        <tr>
+                                            <td>
+                                                {{ optional($r->student)->s_firstname }} {{ optional($r->student)->s_lastname }}
+                                                <div class="small text-muted">{{ optional($r->guardian)->guardian_name ?: '—' }}</div>
+                                            </td>
+                                            <td>₱{{ number_format($r->amount, 2) }}</td>
+                                            <td>{{ $r->reference_no ?: '—' }}</td>
+                                            <td>{{ $r->created_at?->format('Y-m-d g:i A') ?: '—' }}</td>
+                                            <td class="text-end">
+                                                @if($url)
+                                                    <a href="{{ $url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                        <i class="bi bi-box-arrow-up-right me-1"></i> View
+                                                    </a>
+                                                @else
+                                                    —
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <small class="text-muted d-block mt-2">Approve/record these in Finances once verified.</small>
+                    @endif
+                </div>
+            </div>
+        </div>
+
         <!-- =========================
              Below Header: Left (charts + Announcements + Schedule) | Right (Recent Payments)
         ========================== -->
@@ -109,13 +181,13 @@
                 $paid = max($originalTotal - $currentBalance, 0);
 
                 $paidTotal += $paid;
-                $balTotal += $currentBalance;
+                $balTotal  += $currentBalance;
 
                 $g = $s->guardian ?? null;
                 $mFirst = trim(collect([data_get($g, 'm_firstname'), data_get($g, 'm_middlename')])->filter()->implode(' '));
-                $mLast = (string) data_get($g, 'm_lastname', '');
+                $mLast  = (string) data_get($g, 'm_lastname', '');
                 $fFirst = trim(collect([data_get($g, 'f_firstname'), data_get($g, 'f_middlename')])->filter()->implode(' '));
-                $fLast = (string) data_get($g, 'f_lastname', '');
+                $fLast  = (string) data_get($g, 'f_lastname', '');
                 $motherFull = trim(($mFirst ? $mFirst . ' ' : '') . $mLast);
                 $fatherFull = trim(($fFirst ? $fFirst . ' ' : '') . $fLast);
 
@@ -124,7 +196,7 @@
                     if ($motherFull && $fatherFull) {
                         if ($mLast && $fLast && strcasecmp($mLast, $fLast) === 0) {
                             $firstToUse = $fFirst ?: $mFirst;
-                            $lastToUse = $fLast ?: $mLast;
+                            $lastToUse  = $fLast ?: $mLast;
                             $parents = 'Mr. & Mrs. ' . trim(($firstToUse ? $firstToUse . ' ' : '') . $lastToUse);
                         } else {
                             $parents = $motherFull . ' & ' . $fatherFull;
@@ -150,22 +222,18 @@
                 if ($paid > 0) {
                     $recentPaymentsView->push([
                         'household' => $household,
-                        'student' => trim(($s->s_firstname ?? '') . ' ' . ($s->s_middlename ?? '') . ' ' . ($s->s_lastname ?? '')) ?: 'Unknown Student',
-                        'grade' => $gradeKey,
-                        'paid' => $paid,
-                        'balance' => $currentBalance,
-                        'when' => optional($s->updated_at)->format('Y-m-d g:i A'),
-                        'raw_when' => optional($s->updated_at)->timestamp ?? 0,
+                        'student'   => trim(($s->s_firstname ?? '') . ' ' . ($s->s_middlename ?? '') . ' ' . ($s->s_lastname ?? '')) ?: 'Unknown Student',
+                        'grade'     => $gradeKey,
+                        'paid'      => $paid,
+                        'balance'   => $currentBalance,
+                        'when'      => optional($s->updated_at)->format('Y-m-d g:i A'),
+                        'raw_when'  => optional($s->updated_at)->timestamp ?? 0,
                     ]);
                 }
             }
 
-            $gradeCounts = collect($gradeCounts)->sortKeys();
-
-            $recentPaymentsView = $recentPaymentsView
-                ->sortByDesc('raw_when')
-                ->take(20)
-                ->values();
+            $gradeCounts        = collect($gradeCounts)->sortKeys();
+            $recentPaymentsView = $recentPaymentsView->sortByDesc('raw_when')->take(20)->values();
         @endphp
 
         <div class="below-header">
@@ -178,8 +246,7 @@
                             <div class="card h-100">
                                 <div class="card-header d-flex justify-content-between align-items-center">
                                     <h6 class="mb-0">Students per Grade Level</h6>
-                                    <a href="{{ route('admin.students.index') }}" class="btn btn-sm btn-outline-primary">View
-                                        details</a>
+                                    <a href="{{ route('admin.students.index') }}" class="btn btn-sm btn-outline-primary">View details</a>
                                 </div>
                                 <div class="card-body chart-wrap">
                                     <canvas id="chartGradeLevels"></canvas>
@@ -190,8 +257,7 @@
                             <div class="card h-100">
                                 <div class="card-header d-flex justify-content-between align-items-center">
                                     <h6 class="mb-0">Paid vs Outstanding Balance</h6>
-                                    <a href="{{ route('admin.finances') }}" class="btn btn-sm btn-outline-primary">View
-                                        details</a>
+                                    <a href="{{ route('admin.finances') }}" class="btn btn-sm btn-outline-primary">View details</a>
                                 </div>
                                 <div class="card-body chart-wrap">
                                     <canvas id="chartPaidBalance"></canvas>
@@ -417,6 +483,23 @@
     {{-- Chart.js for graphs --}}
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
+    {{-- Toast notify if there are pending receipts --}}
+    @if($pendingReceiptsCount > 0)
+    <script>
+        if (window.Swal) {
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'info',
+                title: '{{ $pendingReceiptsCount }} GCash receipt{{ $pendingReceiptsCount>1?'s':'' }} awaiting review',
+                showConfirmButton: false,
+                timer: 3500,
+                timerProgressBar: true
+            });
+        }
+    </script>
+    @endif
+
     <script>
         // SweetAlert2 delete
         (function () {
@@ -506,7 +589,7 @@
         // Charts
         (function () {
             const gradeLabels = {!! $gradeCounts->keys()->values()->toJson() !!};
-            const gradeData = {!! $gradeCounts->values()->toJson() !!};
+            const gradeData   = {!! $gradeCounts->values()->toJson() !!};
 
             const ctxA = document.getElementById('chartGradeLevels');
             if (ctxA) {
@@ -522,7 +605,7 @@
             }
 
             const totalPaid = {{ (float) $paidTotal }};
-            const totalBal = {{ (float) $balTotal }};
+            const totalBal  = {{ (float) $balTotal }};
             const ctxB = document.getElementById('chartPaidBalance');
             if (ctxB) {
                 new Chart(ctxB, {
@@ -574,7 +657,7 @@
         // Recent Payments: length control
         (function () {
             const list = document.getElementById('recentPaymentsList');
-            const sel = document.getElementById('paymentsShowCount');
+            const sel  = document.getElementById('paymentsShowCount');
             if (!list || !sel) return;
 
             const items = Array.from(list.querySelectorAll('.recent-payment-item'));

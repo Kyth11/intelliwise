@@ -4,7 +4,7 @@
 
 @push('styles')
 <style>
-    /* ===== Table/editor tweaks ===== */
+    /* ===== Table/editor tweaks (screen) ===== */
     .table-report thead th { position: sticky; top: 0; background: var(--bs-body-bg); z-index: 1; }
     .qcell { width: 88px; }
     .finalcell { width: 110px; }
@@ -12,7 +12,7 @@
     .badge-lock { background: #ffe9e9; color:#a40000; border:1px solid #ffcccc; }
     .badge-open { background: #e9fff1; color:#0a7e2f; border:1px solid #c9f2d9; }
 
-    /* ===== Report (print target) styling to match admin look ===== */
+    /* ===== Report (screen) ===== */
     .report-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; background: #fff; }
     .report-card .report-header h5 { margin: 0; }
     .report-meta {
@@ -29,27 +29,56 @@
     .report-table th, .report-table td { padding: 6px 8px; }
     .report-table td { word-wrap: break-word; }
 
-    /* ===== Print: only the report card ===== */
-    @page { size: A4 portrait; margin: 10mm 12mm; }
+    /* ===== Print: fit A4, larger text ===== */
+    @page {
+        size: A4 portrait;
+        margin: 10mm 15mm 12mm 12mm; /* top | right | bottom | left */
+    }
     @media print {
+        * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         html, body { background: #fff !important; }
+
         /* Hide everything by default */
         body * { visibility: hidden !important; }
+
         /* Show only the report */
         #reportCard, #reportCard * { visibility: visible !important; }
+
+        /* Layout/fitting */
         #reportCard {
             position: static !important;
             margin: 0 auto !important;
             box-shadow: none !important;
-            width: auto !important;
-            max-width: 100% !important;
+            width: 100% !important;
+            max-width: none !important;
+            box-sizing: border-box !important;
+            overflow: visible !important;
+            page-break-inside: avoid;
+            font-size: 14px; /* base size up for print */
+            line-height: 1.35;
         }
-        /* Keep table tidy on paper */
-        .report-table { font-size: 11px; }
+
+        /* Bigger header & meta */
+        #reportCard .report-header h5 { font-size: 1.35rem; }
+        #reportCard .report-header .text-muted { font-size: 0.95rem; }
+        #reportCard .report-meta { gap: .4rem 1.2rem; }
+        #reportCard .report-meta .kv { grid-template-columns: 130px 1fr; }
+        #reportCard .report-meta .k { font-size: 0.95rem; }
+        #reportCard .report-meta .v { font-size: 1rem; }
+
+        /* Larger table text & touch more padding */
+        .report-table { font-size: 13.5px; table-layout: fixed; width: 100%; }
+        .report-table th, .report-table td { padding: 7px 10px; }
+        .report-table th:first-child, .report-table td:first-child { min-width: 200px; }
+
+        /* Keep table rows/headers together */
         .report-table tr, .report-table td, .report-table th { page-break-inside: avoid; }
-        .report-meta .kv { grid-template-columns: 120px 1fr; }
-        /* Never print UI chrome */
+
+        /* No UI chrome */
         .no-print { display: none !important; }
+
+        /* Top-half layout when single report */
+        #reportCard.print-halfpage { margin-bottom: 50vh !important; }
     }
 </style>
 @endpush
@@ -103,18 +132,6 @@
         </div>
 
         <div class="kpi-strip">
-            <div class="kpi-card">
-                <div class="kpi-number">{{ count($allStudentsList) }}</div>
-                <div class="kpi-label">Students</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-number">{{ collect($gradelvls ?? [])->count() }}</div>
-                <div class="kpi-label">Grade Levels</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-number">{{ collect($schoolyrs ?? [])->count() }}</div>
-                <div class="kpi-label">School Years</div>
-            </div>
             <div class="kpi-card">
                 <div class="kpi-number">{{ collect($quartersOpen)->filter()->count() }}/4</div>
                 <div class="kpi-label">Open Quarters</div>
@@ -593,6 +610,15 @@ function syncReportFromEditor() {
     }
 }
 
+/* ===== Half-page layout when printing a single report ===== */
+function applyHalfPageIfSingle() {
+    const rc = document.getElementById('reportCard');
+    if (!rc) return;
+    // If there is only one report-card on page, occupy the top half
+    const count = document.querySelectorAll('.report-card').length;
+    rc.classList.toggle('print-halfpage', count === 1);
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     const gradeSel = document.getElementById('gradeLevelFilter');
     const stuSel   = document.getElementById('studentSelect');
@@ -628,10 +654,13 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     computeGA();
 
-    // Ensure report reflects editor values at print time
-    window.addEventListener('beforeprint', syncReportFromEditor);
+    // Ensure report reflects editor values and layout at print time
+    window.addEventListener('beforeprint', () => { syncReportFromEditor(); applyHalfPageIfSingle(); });
+    window.addEventListener('afterprint',  () => { document.getElementById('reportCard')?.classList.remove('print-halfpage'); });
+
     printBtn?.addEventListener('click', () => {
         syncReportFromEditor();
+        applyHalfPageIfSingle();
         window.print();
     });
 });

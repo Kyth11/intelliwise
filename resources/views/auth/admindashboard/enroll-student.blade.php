@@ -172,10 +172,7 @@
                         <div class="col-12">
                             <label class="form-label fw-semibold">LEARNER’S NAME</label>
                             <div class="row g-2">
-                                <div class="col-md-4">
-                                    <input type="text" class="form-control" name="s_lastname" placeholder="LAST NAME"
-                                           value="{{ old('s_lastname') }}" required>
-                                </div>
+
                                 <div class="col-md-4">
                                     <input type="text" class="form-control" name="s_firstname" placeholder="FIRST NAME"
                                            value="{{ old('s_firstname') }}" required>
@@ -184,6 +181,10 @@
                                     <input type="text" class="form-control" name="s_middlename"
                                            value="{{ old('s_middlename') }}"
                                            placeholder="MIDDLE NAME (optional)">
+                                </div>
+                                                                <div class="col-md-4">
+                                    <input type="text" class="form-control" name="s_lastname" placeholder="LAST NAME"
+                                           value="{{ old('s_lastname') }}" required>
                                 </div>
                             </div>
                         </div>

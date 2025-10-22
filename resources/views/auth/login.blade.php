@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IGCA - Login </title>
-    
+
 <!-- Local Bootstrap CSS -->
 <link rel="stylesheet" href="{{ asset('vendor/bootstrap/css/bootstrap.min.css') }}">
 
@@ -17,44 +17,6 @@
 <script src="{{ asset('vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 
     <link rel="stylesheet" href="{{ asset('css/login.css') }}">
-    <style>
-        .invalid-icon {
-            color: #dc3545; /* Bootstrap danger red */
-            font-size: 1.2rem;
-            margin-left: 8px;
-            align-self: center;
-        }
-        .input-group-custom {
-            display: flex;
-            align-items: center;
-        }
-        .input-group-custom .form-floating {
-            flex: 1; /* Input expands full width */
-        }
-        .contact-info {
-            margin-top: 20px;
-            text-align: left;
-        }
-        .contact-info p {
-            margin: 8px 0;
-            font-size: 0.80rem;
-            display: flex;
-            align-items: center;
-
-        }
-        .contact-info i {
-            font-size: .9rem;
-            margin-right: 10px;
-            color: #c0d9ff; /* Bootstrap primary blue */
-        }
-        .contact-info a {
-            color: inherit;
-            text-decoration: none;
-        }
-        .contact-info a:hover {
-            text-decoration: underline darkkhaki;
-        }
-    </style>
 </head>
 
 <body>

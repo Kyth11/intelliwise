@@ -1,3 +1,4 @@
+{{-- resources/views/layouts/guardian.blade.php --}}
 <!DOCTYPE html>
 <html lang="en">
 
@@ -19,14 +20,14 @@
     <title>@yield('title', 'IGCA - Guardian Dashboard')</title>
     @stack('styles')
 
-<!-- Local Bootstrap CSS -->
-<link rel="stylesheet" href="{{ asset('vendor/bootstrap/css/bootstrap.min.css') }}">
+    <!-- Local Bootstrap CSS -->
+    <link rel="stylesheet" href="{{ asset('vendor/bootstrap/css/bootstrap.min.css') }}">
 
-<!-- Local Bootstrap Icons -->
-<link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.css') }}">
+    <!-- Local Bootstrap Icons -->
+    <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.css') }}">
 
-<!-- Local Bootstrap JS -->
-<script src="{{ asset('vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <!-- Local Bootstrap JS -->
+    <script src="{{ asset('vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 
     <link rel="stylesheet" href="{{ asset('css/dash.css') }}">
 </head>
@@ -58,9 +59,15 @@
             <i class="bi bi-gear"></i><span> Settings</span>
         </a>
 
-        <a href="{{ route('login') }}">
+        {{-- Logout (SweetAlert confirm) --}}
+        <a href="{{ route('login') }}" class="sidebar-link js-logout" role="button">
             <i class="bi bi-box-arrow-right"></i><span> Logout</span>
         </a>
+        @if(Route::has('logout'))
+            <form id="logoutForm" action="{{ route('logout') }}" method="POST" class="d-none">
+                @csrf
+            </form>
+        @endif
     </div>
 
     <!-- Main Content -->
@@ -83,6 +90,8 @@
 
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <!-- Sidebar Collapse Toggle + Theme -->
 <script>
@@ -111,10 +120,36 @@
             document.body.classList.toggle('theme-dark', t === 'dark');
         } catch (e) {}
     })();
-</script>
 
-<!-- Auto-dismiss Flash Messages -->
-<script>
+    // Logout confirmation
+    document.addEventListener('click', function (e) {
+        const link = e.target.closest('.js-logout');
+        if (!link) return;
+        e.preventDefault();
+
+        Swal.fire({
+            title: 'Sign out?',
+            text: 'You will be returned to the login screen.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, log me out',
+            cancelButtonText: 'Cancel',
+            reverseButtons: true,
+            background: '#fff',
+            backdrop: false,
+            allowOutsideClick: true,
+            allowEscapeKey: true
+        }).then((r) => {
+            if (!r.isConfirmed) return;
+            const form = document.getElementById('logoutForm');
+            if (form) form.submit();
+            else window.location.href = link.getAttribute('href') || '{{ route('login') }}';
+        });
+    });
+
+    // Auto-dismiss Flash Messages
     setTimeout(() => {
         document.querySelectorAll('.flash-messages .alert').forEach(el => new bootstrap.Alert(el).close());
     }, 2000);

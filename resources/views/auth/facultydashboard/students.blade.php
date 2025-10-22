@@ -39,17 +39,6 @@
             </div>
         </div>
 
-        <div class="kpi-strip">
-            <div class="kpi-card">
-                <div class="kpi-number">{{ collect($studentsByGrade)->flatten(1)->count() }}</div>
-                <div class="kpi-label">Students</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-number">{{ collect($studentsByGrade)->keys()->count() }}</div>
-                <div class="kpi-label">Grade Levels</div>
-            </div>
-        </div>
-
         <div class="pay-card p-3 text-center">
             <h6 class="mb-1">Quick Action</h6>
             <p class="text-muted mb-3 small">Print this page.</p>
