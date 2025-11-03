@@ -3,11 +3,16 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class OptionalFee extends Model
 {
-    protected $fillable = ['name', 'amount', 'active'];
+
+    use SoftDeletes;
+
+    protected $fillable = ['name', 'amount', 'active', 'schoolyr_id',];
 
     protected $casts = [
         'active' => 'boolean',
@@ -32,5 +37,9 @@ class OptionalFee extends Model
             'student_id'              // FK to students
         )->withTimestamps();
         // ->withPivot('amount_override'); // not present in your schema
+    }
+    public function schoolyr(): BelongsTo
+    {
+        return $this->belongsTo(Schoolyr::class, 'schoolyr_id');
     }
 }

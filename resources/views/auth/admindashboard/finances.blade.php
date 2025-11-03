@@ -25,7 +25,7 @@
         {{-- Intro --}}
         <div class="intro rounded">
             <div>
-                <h5 class="mb-1">Finances</h5>
+                <h5 class="mb-1">Payables</h5>
                 <div class="text-muted small">Tuition, optional fees, and payments overview.</div>
             </div>
         </div>
@@ -346,31 +346,31 @@
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
     {{-- SweetAlert2 --}}
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script>
-        // Delete confirms (tuition + fees)
-        document.addEventListener('click', (e) => {
-            const btn = e.target.closest('.js-delete-btn');
-            if (!btn) return;
-            e.preventDefault();
-            const form = btn.closest('form.js-confirm-delete');
-            const msg  = form?.dataset?.confirm || "Delete this record?";
-            Swal.fire({
-                title: 'Are you sure?',
-                text: "You can't undo this action.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Yes, proceed',
-                reverseButtons: true,
-                background: '#fff',
-                backdrop: false,
-                allowOutsideClick: true,
-                allowEscapeKey: true
-            }).then(res => { if (res.isConfirmed) form.submit(); });
-        });
-    </script>
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        <script>
+            // Delete confirms (tuition + fees)
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest('.js-delete-btn');
+                if (!btn) return;
+                e.preventDefault();
+                const form = btn.closest('form.js-confirm-delete');
+                const msg  = form?.dataset?.confirm || "Delete this record?";
+                Swal.fire({
+                    title: 'Are you sure?',
+                    text: "You can't undo this action.",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Yes, proceed',
+                    reverseButtons: true,
+                    background: '#fff',
+                    backdrop: false,
+                    allowOutsideClick: true,
+                    allowEscapeKey: true
+                }).then(res => { if (res.isConfirmed) form.submit(); });
+            });
+        </script>
 
     <script>
         // DataTables for Tuition & Fees tables

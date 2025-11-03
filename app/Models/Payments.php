@@ -4,9 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Payments extends Model
 {
+
+    use SoftDeletes;
+
     protected $table = 'payments';
 
     protected $fillable = [
@@ -15,15 +19,20 @@ class Payments extends Model
         'payment_status',   // 'Paid' | 'Unpaid' | 'Partial'
         'balance',
         'tuition_id',
+        'schoolyr_id',
     ];
 
     protected $casts = [
-        'amount'  => 'decimal:2',
+        'amount' => 'decimal:2',
         'balance' => 'decimal:2',
     ];
 
     public function tuition(): BelongsTo
     {
         return $this->belongsTo(Tuition::class, 'tuition_id');
+    }
+    public function schoolyr(): BelongsTo
+    {
+        return $this->belongsTo(Schoolyr::class, 'schoolyr_id');
     }
 }

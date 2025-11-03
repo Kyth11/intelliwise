@@ -6,10 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;  // <---- added
 
 class Student extends Model
 {
+
+     use SoftDeletes; // <---- added
+
     protected $fillable = [
+        // existing...
         's_firstname','s_middlename','s_lastname',
         's_birthdate','s_address','s_citizenship','s_religion',
         's_contact','s_email',
@@ -18,8 +23,8 @@ class Student extends Model
         's_tuition_sum','tuition_id',
         's_optional_total','s_total_due',
         'enrollment_status','payment_status',
+        'schoolyr_id', // <---- added
     ];
-
     protected $casts = [
         's_optional_total' => 'decimal:2',
         's_total_due'      => 'decimal:2',
@@ -117,4 +122,6 @@ class Student extends Model
         $bal  = ($this->base_tuition + $this->optional_sum) - $paid;
         return $bal > 0 ? round($bal, 2) : 0.0;
     }
+
+      public function schoolyr(): BelongsTo { return $this->belongsTo(Schoolyr::class, 'schoolyr_id'); }
 }

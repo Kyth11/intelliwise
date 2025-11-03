@@ -13,6 +13,7 @@
 @php
     use App\Models\PaymentReceipt;
     use Illuminate\Support\Facades\Storage;
+    use Illuminate\Support\Str;
 
     // Pending GCash receipts (for the notification panel)
     $pendingReceipts = PaymentReceipt::with(['student','guardian'])
@@ -87,7 +88,7 @@
         </div>
 
         {{-- =========================
-             NEW: Pending GCash Receipts
+             Pending GCash Receipts + VERIFY FLOW
         ========================== --}}
         <div class="row g-3 mb-3">
             <div class="col-12 col-xl-6">
@@ -110,35 +111,90 @@
                                         <th>Ref No.</th>
                                         <th>Submitted</th>
                                         <th class="text-end">Receipt</th>
+                                        <th class="text-end">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach($pendingReceipts as $r)
-@php $url = $r->image_path ? Storage::disk('public')->url($r->image_path) : null; @endphp
+@php
+    // === Normalize + embed receipt image (no 404 even without public/storage symlink) ===
+    $rawPath = $r->image_path;
+    $receiptServeSrc = null;      // <img src>
+    $receiptResolvedClean = null; // e.g. "receipts/filename.jpg"
+    $receiptExists = false;
 
-                                        <tr>
+    if ($rawPath) {
+        $candidate = str_replace('\\','/',$rawPath);
+        $candidate = preg_replace('#^/?:?storage/#i', '', ltrim($candidate, '/'));
+        $candidate = preg_replace('#^public/#i', '', $candidate);
+        if (preg_match('#storage/app/public/(.+)$#i', $candidate, $m)) { $candidate = $m[1]; }
+        if (preg_match('#[A-Za-z]:/.*?/storage/app/public/(.+)$#', $candidate, $m)) { $candidate = $m[1]; }
+        $candidate = ltrim($candidate, '/');
+        $receiptResolvedClean = $candidate;
+
+        $receiptExists = $receiptResolvedClean && Storage::disk('public')->exists($receiptResolvedClean);
+        if ($receiptExists) {
+            try {
+                $bytes = Storage::disk('public')->get($receiptResolvedClean);
+                $mime  = Storage::disk('public')->mimeType($receiptResolvedClean) ?? 'image/jpeg';
+                $receiptServeSrc = 'data:' . $mime . ';base64,' . base64_encode($bytes);
+            } catch (\Throwable $e) {
+                $receiptServeSrc = null; // viewer will show a note
+            }
+        }
+    }
+
+    $studentName = trim(collect([optional($r->student)->s_firstname, optional($r->student)->s_middlename, optional($r->student)->s_lastname])->filter()->implode(' '));
+    $guardianId  = optional($r->guardian)->id ?? '';
+    $studentId   = optional($r->student)->id ?? '';
+    $balanceRaw  = optional($r->student)->s_total_due ?? 0;
+    $balanceStr  = number_format((float) $balanceRaw, 2, '.', '');
+    $amountStr   = number_format((float) $r->amount, 2, '.', '');
+@endphp
+                                        <tr data-receipt-row="{{ $r->id }}">
                                             <td>
-                                                {{ optional($r->student)->s_firstname }} {{ optional($r->student)->s_lastname }}
+                                                {{ $studentName ?: 'Unknown Student' }}
                                                 <div class="small text-muted">{{ optional($r->guardian)->guardian_name ?: '—' }}</div>
                                             </td>
                                             <td>₱{{ number_format($r->amount, 2) }}</td>
                                             <td>{{ $r->reference_no ?: '—' }}</td>
                                             <td>{{ $r->created_at?->format('Y-m-d g:i A') ?: '—' }}</td>
                                             <td class="text-end">
-                                                @if($url)
-                                                    <a href="{{ $url }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                                        <i class="bi bi-box-arrow-up-right me-1"></i> View
-                                                    </a>
+                                                @if($receiptServeSrc)
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-primary js-view-receipt"
+                                                            data-img="{{ $receiptServeSrc }}"
+                                                            data-title="GCash Receipt">
+                                                        <i class="bi bi-image me-1"></i> View
+                                                    </button>
                                                 @else
-                                                    —
+                                                    <span class="text-muted">No image</span>
                                                 @endif
+                                            </td>
+                                            <td class="text-end">
+                                                <button type="button"
+                                                    class="btn btn-sm btn-success js-verify-receipt"
+                                                    title="Verify & Apply to Balance"
+                                                    data-guardian="{{ $guardianId }}"
+                                                    data-student="{{ $studentId }}"
+                                                    data-student-name="{{ $studentName }}"
+                                                    data-amount="{{ $amountStr }}"
+                                                    data-balance="{{ $balanceStr }}"
+                                                    data-reference="{{ $r->reference_no ?? '' }}"
+                                                    data-receipt-id="{{ $r->id }}">
+                                                    <i class="bi bi-check2-circle me-1"></i>
+                                                    Verify & Apply
+                                                </button>
+                                                {{-- OPTIONAL: if you add an endpoint to auto-delete later, put it here:
+                                                data-delete-url="{{ url('/admin/payment-receipts/'.$r->id) }}"
+                                                --}}
                                             </td>
                                         </tr>
                                     @endforeach
                                 </tbody>
                             </table>
                         </div>
-                        <small class="text-muted d-block mt-2">Approve/record these in Finances once verified.</small>
+                        <small class="text-muted d-block mt-2">Use “Verify & Apply” to pre-fill a payment using this receipt.</small>
                     @endif
                 </div>
             </div>
@@ -468,6 +524,22 @@
     {{-- Include Modals --}}
     @include('auth.admindashboard.partials.add-announcement-modal')
     @include('auth.admindashboard.partials.add-schedule-modal')
+    @include('auth.admindashboard.partials.pay-student-modal') {{-- NEW: separated modal --}}
+
+    {{-- Receipt Viewer (shared) --}}
+    <div class="modal fade" id="receiptViewModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 id="receiptViewTitle" class="modal-title">Receipt</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body text-center">
+            <img id="receiptViewImg" src="" alt="Receipt" class="img-fluid rounded border">
+          </div>
+        </div>
+      </div>
+    </div>
 @endsection
 
 @push('scripts')
@@ -674,39 +746,187 @@
         })();
     </script>
 
+    {{-- ===== Receipt Viewer (no-404, uses embedded data URL) + Verify flow with countdown ===== --}}
     <script>
-        // Quick Actions Search
-        (function () {
-            const input = document.getElementById('quickSearch');
-            if (!input) return;
+    document.addEventListener('DOMContentLoaded', function () {
+      /* ===== Receipt viewer ===== */
+      const rvModal = document.getElementById('receiptViewModal');
+      const rvImg   = document.getElementById('receiptViewImg');
+      const rvTitle = document.getElementById('receiptViewTitle');
+      document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.js-view-receipt');
+        if (!btn) return;
+        rvImg.src = btn.dataset.img || '';
+        rvTitle.textContent = btn.dataset.title || 'Receipt';
+        bootstrap.Modal.getOrCreateInstance(rvModal).show();
+      });
 
-            const routes = {
-                finances: "{{ route('admin.finances') }}",
-                settings: "{{ route('admin.settings.index') }}",
-                addSubject: "{{ route('admin.settings.index') }}?tab=subjects",
-                enroll: "{{ route('admin.students.create') }}",
-                students: "{{ route('admin.students.index') }}",
-                grades: "{{ route('admin.grades') }}"
-            };
+      /* ===== Verify & Apply (modal is in partial) ===== */
+      const modalEl = document.getElementById('payStudentModal');
+      const paymentModal = bootstrap.Modal.getOrCreateInstance(modalEl);
 
-            function go(q) {
-                q = (q || '').toLowerCase().trim();
-                if (!q) return;
+      const f_guardian   = document.getElementById('pm_guardian_id');
+      const f_student    = document.getElementById('pm_student_id');
+      const f_studentDisp= document.getElementById('pm_student_display');
+      const f_balance    = document.getElementById('pm_current_balance');
+      const f_balanceDisp= document.getElementById('pm_balance_display');
+      const f_amount     = document.getElementById('pm_amount');
+      const f_method     = document.getElementById('pm_method');
+      const f_notes      = document.getElementById('pm_notes');
+      const f_source     = document.getElementById('pm_payment_source');
+      const f_form       = document.getElementById('paymentForm');
 
-                if (q.includes('pay') || q.includes('balance') || q.includes('finance')) { location.href = routes.finances; return; }
-                if (q.includes('setting')) { location.href = routes.settings; return; }
-                if (q.includes('subject')) { location.href = routes.addSubject; return; }
-                if (q.includes('enroll')) { location.href = routes.enroll; return; }
-                if (q.includes('student')) { location.href = routes.students; return; }
-                if (q.includes('grade')) { location.href = routes.grades; return; }
+      // countdown helpers
+      const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+      const LS_KEY = 'receiptCountdowns'; // map: { [id]: epoch_ms }
 
-                const moneyish = ['payment', 'receipt', 'fee', 'tuition', 'cash', 'ledger', 'invoice'];
-                if (moneyish.some(w => q.includes(w))) { location.href = routes.finances; return; }
+      function loadCountdowns() {
+        try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); }
+        catch { return {}; }
+      }
+      function saveCountdowns(map) {
+        localStorage.setItem(LS_KEY, JSON.stringify(map || {}));
+      }
+      const countdowns = loadCountdowns();
 
-                location.href = routes.settings;
+      function formatHMS(ms) {
+        ms = Math.max(ms, 0);
+        const s = Math.floor(ms / 1000);
+        const hh = String(Math.floor(s / 3600)).padStart(2,'0');
+        const mm = String(Math.floor((s % 3600) / 60)).padStart(2,'0');
+        const ss = String(s % 60).padStart(2,'0');
+        return `${hh}:${mm}:${ss}`;
+      }
+
+      function startCountdownForBtn(btn, expiryMs) {
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-secondary', 'disabled');
+        btn.disabled = true;
+
+        function tick() {
+          const now = Date.now();
+          const left = expiryMs - now;
+          if (left <= 0) {
+            btn.innerHTML = `<i class="bi bi-check2-circle me-1"></i> Deleting…`;
+            // OPTIONAL: if you have a delete endpoint, call it here using btn.dataset.deleteUrl
+            // if (btn.dataset.deleteUrl) fetch(btn.dataset.deleteUrl, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' } }).finally(()=>location.reload());
+            clearInterval(timer);
+            return;
+          }
+          btn.innerHTML = `<i class="bi bi-check2-circle me-1"></i> Verified — deleting in ${formatHMS(left)}`;
+        }
+        tick();
+        const timer = setInterval(tick, 1000);
+      }
+
+      // Restore countdowns on load
+      document.querySelectorAll('.js-verify-receipt').forEach(btn => {
+        const id = btn.dataset.receiptId;
+        if (id && countdowns[id]) {
+          startCountdownForBtn(btn, countdowns[id]);
+        }
+      });
+
+      // Open modal prefilled
+      document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.js-verify-receipt');
+        if (!btn) return;
+
+        const guardianId = btn.dataset.guardian || '';
+        const studentId  = btn.dataset.student || '';
+        const studentNm  = btn.dataset['studentName'] || 'Unknown Student';
+        const amount     = btn.dataset.amount || '';
+        const balance    = btn.dataset.balance || '';
+        const reference  = btn.dataset.reference || '';
+        const receiptId  = btn.dataset.receiptId || '';
+
+        // Prefill locked fields
+        f_guardian.value     = guardianId || '';
+        f_student.value      = studentId || '';
+        f_studentDisp.value  = studentNm;
+        f_amount.value       = amount;
+        f_method.value       = 'G-cash';
+        f_balance.value      = parseFloat(balance || 0);
+        f_balanceDisp.value  = (parseFloat(balance || 0)).toFixed(2);
+        f_notes.value        = reference ? `GCash Ref: ${reference}` : '';
+        f_source.value       = receiptId ? `gcash_receipt:${receiptId}` : '';
+
+        paymentModal.show();
+
+        // keep the source button reference to gray out after success
+        modalEl.dataset.sourceButtonId = btn.dataset.receiptId || '';
+      });
+
+      // Submit handler (Ajax with SweetAlert confirm)
+      f_form?.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const studentId = f_student.value;
+        const amount    = parseFloat(f_amount.value || '0');
+        const method    = f_method.value || 'G-cash';
+        const balance   = parseFloat(f_balance.value || '0');
+
+        if (!studentId || !amount || amount <= 0 || isNaN(balance) || amount > balance) {
+          Swal.fire('Invalid Payment', 'Please review student, amount, and balance.', 'error');
+          return;
+        }
+
+        Swal.fire({
+          title: 'Confirm Payment?',
+          html: `<p>Amount: ₱${amount.toFixed(2)}</p>
+                 <p>Current Balance: ₱${balance.toFixed(2)}</p>
+                 <p>New Balance: ₱${Math.max(balance - amount,0).toFixed(2)}</p>`,
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonText: 'Yes, Apply',
+        }).then(result => {
+          if (!result.isConfirmed) return;
+
+          fetch("{{ route('admin.payments.store') }}", {
+            method: 'POST',
+            headers: {
+              'X-CSRF-TOKEN': '{{ csrf_token() }}',
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              guardian_id: f_guardian.value || null,
+              student_id: studentId,
+              amount: amount,
+              payment_method: method,
+              current_balance: balance,
+              notes: f_notes.value || null,
+              payment_source: f_source.value || null
+            })
+          })
+          .then(async res => {
+            try { const data = await res.json(); return { ok: res.ok, data }; }
+            catch { return { ok: res.ok, reload: true }; }
+          })
+          .then(({ ok, data, reload }) => {
+            if (reload) { paymentModal.hide(); window.location.reload(); return; }
+            if (!ok || !data?.success) {
+              Swal.fire('Error', (data && data.message) || 'Payment failed', 'error');
+              return;
             }
 
-            input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(input.value); });
-        })();
+            // Success: close modal, grey the source button, start 1-day countdown
+            paymentModal.hide();
+
+            const rid = (modalEl.dataset.sourceButtonId || '').toString();
+            const srcBtn = document.querySelector(`.js-verify-receipt[data-receipt-id="${rid}"]`);
+            if (srcBtn) {
+              const expiry = Date.now() + ONE_DAY_MS;
+              countdowns[rid] = expiry;
+              saveCountdowns(countdowns);
+              startCountdownForBtn(srcBtn, expiry);
+            }
+
+            Swal.fire('Payment Applied', 'Receipt has been verified and applied.', 'success');
+          })
+          .catch(() => Swal.fire('Error', 'Server error', 'error'));
+        });
+      });
+    });
     </script>
 @endpush

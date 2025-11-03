@@ -1,16 +1,19 @@
 <?php
 
 namespace App\Models;
-
+use App\Models\Student;
 use Illuminate\Database\Eloquent\Model;
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Guardian extends Model
 {
+
+     use SoftDeletes;
+
     protected $fillable = [
+
+        'name','address','contact','email','relation','schoolyr_id',
         // ✅ Guardian (g_*) — used by your controller
         'g_firstname','g_middlename','g_lastname',
         'g_address','g_contact','g_email',
@@ -32,5 +35,10 @@ class Guardian extends Model
     {
         return $this->hasOne(User::class, 'guardian_id');
     }
+    public function schoolyr(): BelongsTo
+    {
+        return $this->belongsTo(Schoolyr::class, 'schoolyr_id');
+    }
 }
+
 

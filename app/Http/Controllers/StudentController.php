@@ -1,8 +1,8 @@
 <?php
-// app/Http/Controllers/StudentController.php
 
 namespace App\Http\Controllers;
 
+use App\Mail\ParentAccountCredentials;
 use App\Models\Student;
 use App\Models\Guardian;
 use App\Models\User;
@@ -12,8 +12,11 @@ use App\Models\OptionalFee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Schema;
 
 class StudentController extends Controller
 {
@@ -59,6 +62,76 @@ class StudentController extends Controller
         return view($view, compact('guardians', 'optionalFees'));
     }
 
+    // Live search for the suggest dropdowns
+    public function search(Request $request)
+    {
+        $q = trim((string) $request->query('q', ''));
+        if ($q === '' || mb_strlen($q) < 2) {
+            return response()->json([]);
+        }
+
+        $rows = Student::query()
+            ->select(['id','s_firstname','s_middlename','s_lastname'])
+            ->where(function($w) use ($q) {
+                $w->where('s_firstname','like',"%{$q}%")
+                  ->orWhere('s_lastname','like',"%{$q}%");
+            })
+            ->orderBy('s_lastname')->orderBy('s_firstname')
+            ->limit(20)->get();
+
+        $items = $rows->map(function (Student $s) {
+            $mid = trim($s->s_middlename ?? '');
+            $name = trim($s->s_firstname . ' ' . ($mid ? $mid.' ' : '') . $s->s_lastname);
+            return ['id' => (string) $s->id, 'name' => $name];
+        });
+
+        return response()->json($items);
+    }
+
+    // Prefill payload for a picked suggestion
+    public function prefill($id)
+    {
+        $s = Student::with(['guardian'])->where('id', $id)->firstOrFail();
+
+        $religion = $s->s_religion ?? $s->religion ?? '';
+
+        $payload = [
+            'id'               => $s->id,
+            's_firstname'      => $s->s_firstname,
+            's_middlename'     => $s->s_middlename,
+            's_lastname'       => $s->s_lastname,
+            's_gender'         => $s->s_gender,
+            's_birthdate'      => $s->s_birthdate ? substr((string)$s->s_birthdate, 0, 10) : '',
+            's_citizenship'    => $s->s_citizenship,
+            's_address'        => $s->s_address,
+            's_religion'       => $religion,
+            's_contact'        => $s->s_contact,
+            's_email'          => $s->s_email,
+            'sped_has'         => $s->sped_has,
+            'sped_desc'        => $s->sped_desc,
+            's_gradelvl'       => $s->s_gradelvl,
+            'previous_school'  => $s->previous_school,
+
+            'guardian_id'      => optional($s->guardian)->id,
+            'g_address'        => optional($s->guardian)->g_address,
+            'm_firstname'      => optional($s->guardian)->m_firstname,
+            'm_middlename'     => optional($s->guardian)->m_middlename,
+            'm_lastname'       => optional($s->guardian)->m_lastname,
+            'm_contact'        => optional($s->guardian)->m_contact,
+            'm_email'          => optional($s->guardian)->m_email,
+            'm_occupation'     => optional($s->guardian)->m_occupation,
+            'f_firstname'      => optional($s->guardian)->f_firstname,
+            'f_middlename'     => optional($s->guardian)->f_middlename,
+            'f_lastname'       => optional($s->guardian)->f_lastname,
+            'f_contact'        => optional($s->guardian)->f_contact,
+            'f_email'          => optional($s->guardian)->f_email,
+            'f_occupation'     => optional($s->guardian)->f_occupation,
+            'alt_guardian_details' => optional($s->guardian)->alt_guardian_details,
+        ];
+
+        return response()->json($payload);
+    }
+
     public function store(Request $request)
     {
         $request->validate([
@@ -71,87 +144,52 @@ class StudentController extends Controller
             's_religion'    => 'nullable|string',
             'student_optional_fee_ids'   => ['array'],
             'student_optional_fee_ids.*' => ['integer', 'exists:optional_fees,id'],
+            'guardian_id'   => 'required'
         ]);
 
         DB::beginTransaction();
         try {
-            $guardian_id = null;
-
+            // Guardian upsert
             if ($request->guardian_id === 'new') {
                 $hasMother = $request->filled('m_firstname') || $request->filled('m_lastname');
                 $hasFather = $request->filled('f_firstname') || $request->filled('f_lastname');
                 if (!$hasMother && !$hasFather) {
-                    return back()->with('error', 'Please provide at least Mother or Father details.')->withInput();
+                    return back()->with('error', 'Provide at least Mother or Father details.')->withInput();
                 }
 
-                $request->validate([
-                    'g_address'    => 'nullable|string',
-                    'm_firstname'  => 'nullable|string',
-                    'm_middlename' => 'nullable|string',
-                    'm_lastname'   => 'nullable|string',
-                    'm_contact'    => 'nullable|string',
-                    'm_email'      => 'nullable|email',
-                    'f_firstname'  => 'nullable|string',
-                    'f_middlename' => 'nullable|string',
-                    'f_lastname'   => 'nullable|string',
-                    'f_contact'    => 'nullable|string',
-                    'f_email'      => 'nullable|email',
-                    'username'     => 'nullable|string|unique:users,username',
-                    'password'     => 'nullable|string|min:6',
-                ]);
-
-                $guardian = Guardian::create([
+                $guardianData = [
                     'g_address'    => $request->g_address,
                     'g_contact'    => $request->m_contact ?: ($request->f_contact ?: null),
-                    'g_email'      => $request->m_email   ?: ($request->f_email   ?: null),
+                    'g_email'      => $request->g_email ?: ($request->m_email ?: ($request->f_email ?: null)),
                     'm_firstname'  => $request->m_firstname,
                     'm_middlename' => $request->m_middlename,
                     'm_lastname'   => $request->m_lastname,
                     'm_contact'    => $request->m_contact,
                     'm_email'      => $request->m_email,
+                    'm_occupation' => $request->m_occupation,
                     'f_firstname'  => $request->f_firstname,
                     'f_middlename' => $request->f_middlename,
                     'f_lastname'   => $request->f_lastname,
                     'f_contact'    => $request->f_contact,
                     'f_email'      => $request->f_email,
-                ]);
-                $guardian_id = $guardian->id;
-
-                if ($request->has('has_login')) {
-                    $motherName  = trim(collect([$guardian->m_firstname, $guardian->m_lastname])->filter()->implode(' '));
-                    $fatherName  = trim(collect([$guardian->f_firstname, $guardian->f_lastname])->filter()->implode(' '));
-                    $displayName = $motherName && $fatherName ? ($motherName.' & '.$fatherName)
-                                  : ($motherName ?: ($fatherName ?: 'Guardian Account'));
-
-                    $username = $request->username ?: Str::slug(($guardian->m_lastname ?: $guardian->f_lastname) . '.parents');
-                    $password = $request->password ?: Str::random(8);
-                    $base = $username; $i = 1;
-                    while (User::where('username', $username)->exists()) {
-                        $username = $base . $i; $i++;
-                    }
-
-                    User::create([
-                        'name'        => $displayName,
-                        'username'    => $username,
-                        'password'    => bcrypt($password),
-                        'role'        => 'guardian',
-                        'guardian_id' => $guardian->id,
-                    ]);
-                }
-            } elseif (!empty($request->guardian_id)) {
-                $guardian_id = $request->guardian_id;
+                    'f_occupation' => $request->f_occupation,
+                    'alt_guardian_details' => $request->alt_guardian_details,
+                ];
+                $guardian = Guardian::create($this->filterColumns('guardians', $guardianData));
+            } else {
+                $guardian = Guardian::lockForUpdate()->findOrFail((int)$request->guardian_id);
             }
 
+            // Tuition & optional fees
             [$tuitionId, $baseTotal] = $this->resolveTuition($request->s_gradelvl);
-
             $studentOptIds = collect($request->input('student_optional_fee_ids', []))->filter()->unique()->values();
             $studentOptSum = $studentOptIds->isNotEmpty()
                 ? (float) OptionalFee::whereIn('id', $studentOptIds)->sum('amount')
                 : 0.0;
-
             $total = round($baseTotal + $studentOptSum, 2);
 
-            $student = Student::create([
+            // Student create (only existing columns)
+            $studentData = [
                 's_firstname'        => $request->s_firstname,
                 's_middlename'       => $request->s_middlename,
                 's_lastname'         => $request->s_lastname,
@@ -163,34 +201,88 @@ class StudentController extends Controller
                 's_email'            => $request->s_email,
                 's_gradelvl'         => $request->s_gradelvl,
                 'enrollment_status'  => $request->enrollment_status ?? 'Enrolled',
-                // new enum default is Unpaid
                 'payment_status'     => $request->payment_status ?? 'Unpaid',
                 's_tuition_sum'      => $baseTotal,
                 's_optional_total'   => round($studentOptSum, 2),
-                's_total_due'        => $total, // initial balance = total
+                's_total_due'        => $total,
                 'tuition_id'         => $tuitionId,
-                'guardian_id'        => $guardian_id,
-            ]);
+                'guardian_id'        => $guardian->id,
+                's_gender'           => $request->s_gender,
+                'previous_school'    => $request->previous_school,
+                'sped_has'           => $request->sped_has, // tolerate name in form
+                'sped_desc'          => $request->sped_desc,
+            ];
+            $student = Student::create($this->filterColumns('students', $studentData));
 
-            if ($studentOptIds->isNotEmpty()) {
+            if ($studentOptIds->isNotEmpty() && method_exists($student, 'optionalFees')) {
                 $attach = [];
-                foreach ($studentOptIds as $fid) {
-                    $attach[$fid] = [];
+                foreach ($studentOptIds as $fid) { $attach[$fid] = []; }
+                try { $student->optionalFees()->attach($attach); } catch (\Throwable $e) {
+                    Log::warning('Optional fee attach failed', ['err' => $e->getMessage()]);
                 }
-                $student->optionalFees()->attach($attach);
+            }
+
+            // Email credentials (create or reset)
+            $emailTarget = trim((string)($guardian->g_email ?: $guardian->m_email ?: $guardian->f_email ?: ''));
+            $emailed = false;
+
+            $usernameBase  = $this->buildUsernameBase($student->s_lastname, $student->s_firstname);
+            $passwordPlain = $this->buildPassword($student->s_lastname);
+            $displayName   = $this->guardianDisplayName($guardian);
+
+            $existingUser = User::where('guardian_id', $guardian->id)->first();
+            if ($existingUser) {
+                $username = $existingUser->username ?: $usernameBase;
+                if ($this->hasColumn('users','password')) {
+                    $existingUser->password = Hash::make($passwordPlain);
+                }
+                if ($this->hasColumn('users','email') && !$existingUser->email && $emailTarget) {
+                    $existingUser->email = $emailTarget;
+                }
+                $existingUser->save();
+            } else {
+                $username = $this->uniqueUsername($usernameBase);
+                $user = new User();
+                $user->name = $displayName;
+                if ($this->hasColumn('users','username'))    $user->username = $username;
+                if ($this->hasColumn('users','password'))    $user->password = Hash::make($passwordPlain);
+                if ($this->hasColumn('users','role'))        $user->role = 'guardian';
+                if ($this->hasColumn('users','email'))       $user->email = $emailTarget ?: null;
+                if ($this->hasColumn('users','guardian_id')) $user->guardian_id = $guardian->id;
+                $user->save();
+            }
+
+            if ($emailTarget !== '') {
+                try {
+                    // immediate send; relies on your .env SMTP creds
+                    Mail::to($emailTarget)->send(new ParentAccountCredentials(
+                        guardianName: $displayName,
+                        studentName:  trim(($student->s_firstname ?? '').' '.($student->s_lastname ?? '')),
+                        username:     $username,
+                        password:     $passwordPlain,
+                        appUrl:       config('app.url')
+                    ));
+                    $emailed = true;
+                } catch (\Throwable $e) {
+                    Log::warning('Email send failed: '.$e->getMessage());
+                }
+            } else {
+                Log::info('No email target for guardian_id='.$guardian->id.'; skipping email.');
             }
 
             DB::commit();
 
             $role  = Auth::user()?->role;
             $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.dashboard';
-            return redirect()->route($route)->with('success', 'Student enrolled successfully!');
+            return redirect()->route($route)->with('success',
+                $emailed ? 'Student saved. Credentials emailed to parent/guardian.' : 'Student saved. No email on file.'
+            );
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Student store failed: '.$e->getMessage(), ['exception' => $e]);
             $role  = Auth::user()?->role;
             $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.dashboard';
-            return redirect()->route($route)->with('error', 'Failed to enroll student. Please check your input.');
+            return redirect()->route($route)->with('error', 'Failed to enroll student. Check inputs/logs.');
         }
     }
 
@@ -211,10 +303,9 @@ class StudentController extends Controller
         try {
             $student = Student::findOrFail($id);
 
-            // --- Preserve paid amount ---
-            $old_base = (float) ($student->s_tuition_sum ?? 0);
-            $old_opt  = (float) ($student->s_optional_total ?? 0);
-            $old_total = $old_base + $old_opt;
+            $old_base   = (float) ($student->s_tuition_sum ?? 0);
+            $old_opt    = (float) ($student->s_optional_total ?? 0);
+            $old_total  = $old_base + $old_opt;
             $old_balance = (float) ($student->s_total_due ?? $old_total);
             $paid_so_far = max($old_total - $old_balance, 0);
 
@@ -226,13 +317,11 @@ class StudentController extends Controller
                 ? (float) OptionalFee::whereIn('id', $studentOptIds)->sum('amount')
                 : 0.0;
 
-            $new_total = round($baseTotal + $studentOptSum, 2);
+            $new_total   = round($baseTotal + $studentOptSum, 2);
             $new_balance = max($new_total - $paid_so_far, 0);
+            $new_status  = $new_balance <= 0 ? 'Paid' : ($paid_so_far > 0 ? 'Partial' : 'Unpaid');
 
-            // derive payment status from balance / paid
-            $new_status = $new_balance <= 0 ? 'Paid' : ($paid_so_far > 0 ? 'Partial' : 'Unpaid');
-
-            $student->update([
+            $updateData = [
                 's_firstname'       => $request->s_firstname,
                 's_middlename'      => $request->s_middlename,
                 's_lastname'        => $request->s_lastname,
@@ -244,27 +333,30 @@ class StudentController extends Controller
                 's_email'           => $request->s_email,
                 's_gradelvl'        => $grade,
                 'enrollment_status' => $request->enrollment_status ?? $student->enrollment_status,
-                'payment_status'    => $new_status, // override with computed status
+                'payment_status'    => $new_status,
                 's_tuition_sum'     => $baseTotal,
                 's_optional_total'  => round($studentOptSum, 2),
-                's_total_due'       => $new_balance, // <-- PRESERVE paid amount
+                's_total_due'       => $new_balance,
                 'tuition_id'        => $tuitionId,
-            ]);
+                's_gender'          => $request->s_gender ?? $student->s_gender,
+                'previous_school'   => $request->previous_school ?? $student->previous_school,
+                'sped_has'          => $request->sped_has ?? $student->sped_has,
+                'sped_desc'         => $request->sped_desc ?? $student->sped_desc,
+            ];
+
+            $student->update($this->filterColumns('students', $updateData));
 
             $sync = [];
-            foreach ($studentOptIds as $fid) {
-                $sync[$fid] = [];
+            foreach ($studentOptIds as $fid) { $sync[$fid] = []; }
+            if (method_exists($student, 'optionalFees')) {
+                $student->optionalFees()->sync($sync);
             }
-            $student->optionalFees()->sync($sync);
 
-            // ✅ FIX: use existing named route 'admin.students.index'
             $role  = Auth::user()?->role;
             $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.students.index';
             return redirect()->route($route)->with('success', 'Student updated successfully.');
         } catch (\Exception $e) {
             Log::error('Student update failed: '.$e->getMessage(), ['exception' => $e]);
-
-            // ✅ FIX: use existing named route 'admin.students.index'
             $role  = Auth::user()?->role;
             $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.students.index';
             return redirect()->route($route)->with('error', 'Failed to update student.');
@@ -284,9 +376,7 @@ class StudentController extends Controller
 
     private function resolveTuition(?string $gradeLevel): array
     {
-        if (!$gradeLevel) {
-            return [null, 0];
-        }
+        if (!$gradeLevel) return [null, 0];
 
         $t = Tuition::where('grade_level', $gradeLevel)
             ->orderByDesc('updated_at')
@@ -294,5 +384,53 @@ class StudentController extends Controller
             ->first();
 
         return [$t?->id, (float) ($t?->total_yearly ?? 0)];
+    }
+
+    private function filterColumns(string $table, array $data): array
+    {
+        $kept = [];
+        foreach ($data as $k => $v) {
+            if (Schema::hasColumn($table, $k)) {
+                $kept[$k] = $v;
+            }
+        }
+        return $kept;
+    }
+
+    private function hasColumn(string $table, string $column): bool
+    {
+        try { return Schema::hasColumn($table, $column); }
+        catch (\Throwable $e) { return false; }
+    }
+
+    private function guardianDisplayName(Guardian $g): string
+    {
+        $mother = trim(collect([$g->m_firstname, $g->m_lastname])->filter()->implode(' '));
+        $father = trim(collect([$g->f_firstname, $g->f_lastname])->filter()->implode(' '));
+        return $mother && $father ? ($mother.' & '.$father) : ($mother ?: ($father ?: 'Parent/Guardian'));
+    }
+
+    private function buildUsernameBase(?string $last, ?string $first): string
+    {
+        $last  = strtolower(preg_replace('/[^a-z0-9]/i', '', (string)$last));
+        $first = strtolower(preg_replace('/[^a-z0-9]/i', '', (string)$first));
+        $initial = $first !== '' ? substr($first, 0, 1) : 'p';
+        return ($last !== '' ? $last : 'parent') . $initial; // e.g., davisd
+    }
+
+    private function uniqueUsername(string $base): string
+    {
+        $u = $base; $i = 2;
+        while (User::where('username', $u)->exists()) {
+            $u = $base . $i; $i++;
+            if ($i > 9999) break;
+        }
+        return $u;
+    }
+
+    private function buildPassword(?string $last): string
+    {
+        $last = strtolower(preg_replace('/[^a-z0-9]/i', '', (string)$last));
+        return ($last !== '' ? $last : 'parent') . '123'; // e.g., davis123
     }
 }

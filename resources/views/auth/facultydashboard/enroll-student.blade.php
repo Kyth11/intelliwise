@@ -404,127 +404,215 @@
 @endsection
 
 @push('scripts')
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const form = document.querySelector('form.needs-validation');
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.querySelector('form.needs-validation');
 
-            // Helper: custom "required" message
-            function applyRequiredMessage(el) {
-                if (!el) return;
-                el.addEventListener('invalid', function () {
-                    if (el.validity.valueMissing) el.setCustomValidity('You are required to fill this field');
-                });
-                ['input', 'change'].forEach(evt => el.addEventListener(evt, () => el.setCustomValidity('')));
-            }
-            form.querySelectorAll('[required]').forEach(applyRequiredMessage);
-
-            // Age auto-calc
-            const birth = document.getElementById('s_birthdate');
-            const age = document.getElementById('s_age');
-            function calcAge() {
-                if (!birth.value) { age.value = ''; return; }
-                const b = new Date(birth.value), t = new Date();
-                let a = t.getFullYear() - b.getFullYear();
-                const m = t.getMonth() - b.getMonth();
-                if (m < 0 || (m === 0 && t.getDate() < b.getDate())) a--;
-                age.value = isNaN(a) ? '' : a;
-            }
-            birth.addEventListener('change', calcAge); calcAge();
-
-            // SPED toggle
-            const spedHas = document.getElementById('sped_has');
-            const spedDesc = document.getElementById('sped_desc');
-            spedHas.addEventListener('change', () => {
-                const yes = spedHas.value === 'Yes';
-                spedDesc.disabled = !yes;
-                if (!yes) spedDesc.value = '';
-            });
-
-            // Guardian block logic
-            const guardianSelect = document.getElementById('guardian_id');
-            const newGuardianFields = document.getElementById('newGuardianFields');
-            const hasLoginCheckbox = document.getElementById('hasLogin');
-            const guardianLoginFields = document.getElementById('guardianLoginFields');
-            const sameAddress = document.getElementById('sameAddress');
-            const studentAddress = document.getElementById('s_address');
-
-            const requiredWhenNew = [
-                'input[name="g_address"]',
-                'input[name="m_firstname"]',
-                'input[name="m_lastname"]',
-                'input[name="m_contact"]',
-                'input[name="f_firstname"]',
-                'input[name="f_lastname"]',
-                'input[name="f_contact"]',
-            ];
-            const loginRequired = ['input[name="username"]', 'input[name="password"]'];
-
-            function setRequiredForNewGuardian(isNew) {
-                requiredWhenNew.forEach(sel => {
-                    const el = newGuardianFields.querySelector(sel);
-                    if (!el) return;
-                    if (isNew) { el.setAttribute('required', 'required'); applyRequiredMessage(el); }
-                    else { el.removeAttribute('required'); el.setCustomValidity(''); }
-                });
-                loginRequired.forEach(sel => {
-                    const el = newGuardianFields.querySelector(sel);
-                    if (!el) return;
-                    const needLogin = isNew && hasLoginCheckbox.checked;
-                    if (needLogin) { el.setAttribute('required', 'required'); applyRequiredMessage(el); }
-                    else { el.removeAttribute('required'); el.setCustomValidity(''); }
-                });
-            }
-
-            applyRequiredMessage(guardianSelect);
-
-            guardianSelect.addEventListener('change', function () {
-                const isNew = this.value === 'new';
-                newGuardianFields.classList.toggle('d-none', !isNew);
-                if (!isNew) {
-                    newGuardianFields.querySelectorAll('input').forEach(i => { i.value = ''; i.setCustomValidity(''); });
-                    hasLoginCheckbox.checked = false;
-                    guardianLoginFields.classList.add('d-none');
-                }
-                setRequiredForNewGuardian(isNew);
-            });
-
-            hasLoginCheckbox.addEventListener('change', function () {
-                guardianLoginFields.classList.toggle('d-none', !this.checked);
-                setRequiredForNewGuardian(guardianSelect.value === 'new');
-                if (!this.checked) {
-                    guardianLoginFields.querySelectorAll('input').forEach(i => {
-                        i.value = ''; i.setCustomValidity(''); i.removeAttribute('required');
-                    });
-                }
-            });
-
-            sameAddress.addEventListener('change', function () {
-                const hhAddress = document.querySelector('input[name="g_address"]');
-                if (this.checked && hhAddress) hhAddress.value = studentAddress.value;
-            });
-
-            // Show/hide password
-            document.querySelectorAll('.toggle-password').forEach(btn => {
-                btn.addEventListener('click', function () {
-                    const input = document.getElementById(this.dataset.target);
-                    input.type = input.type === 'password' ? 'text' : 'password';
-                });
-            });
-
-            // Submit guard
-            form.addEventListener('submit', function (e) {
-                setRequiredForNewGuardian(guardianSelect.value === 'new');
-                if (!form.checkValidity()) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    form.classList.add('was-validated');
-                    const firstInvalid = form.querySelector(':invalid');
-                    if (firstInvalid) {
-                        firstInvalid.focus({ preventScroll: true });
-                        firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                }
-            }, false);
+    // === Helper: required messages ===
+    function applyRequiredMessage(el) {
+        if (!el) return;
+        el.addEventListener('invalid', function () {
+            if (el.validity.valueMissing) el.setCustomValidity('You are required to fill this field');
         });
-    </script>
+        ['input','change'].forEach(evt => el.addEventListener(evt, () => el.setCustomValidity('')));
+    }
+    form.querySelectorAll('[required]').forEach(applyRequiredMessage);
+
+    // Refs
+    const birth = document.getElementById('s_birthdate');
+    const age = document.getElementById('s_age');
+    const spedHas = document.getElementById('sped_has');
+    const spedDesc = document.getElementById('sped_desc');
+
+    function calcAge() {
+        if (!birth.value) { age.value = ''; return; }
+        const b = new Date(birth.value), t = new Date();
+        let a = t.getFullYear() - b.getFullYear();
+        const m = t.getMonth() - b.getMonth();
+        if (m < 0 || (m === 0 && t.getDate() < b.getDate())) a--;
+        age.value = isNaN(a) ? '' : a;
+    }
+    birth.addEventListener('change', calcAge); calcAge();
+
+    spedHas.addEventListener('change', () => {
+        const yes = spedHas.value === 'Yes';
+        spedDesc.disabled = !yes;
+        if (!yes) spedDesc.value = '';
+    });
+
+    // Guardian block logic
+    const guardianSelect = document.getElementById('guardian_id');
+    const newGuardianFields = document.getElementById('newGuardianFields');
+    const sameAddress = document.getElementById('sameAddress');
+    const studentAddress = document.getElementById('s_address');
+    const requiredWhenNew = [
+        'input[name="g_address"]',
+        'input[name="m_firstname"]','input[name="m_lastname"]','input[name="m_contact"]',
+        'input[name="f_firstname"]','input[name="f_lastname"]','input[name="f_contact"]',
+    ];
+    applyRequiredMessage(guardianSelect);
+
+    function setRequiredForNewGuardian(isNew) {
+        requiredWhenNew.forEach(sel => {
+            const el = newGuardianFields.querySelector(sel);
+            if (!el) return;
+            if (isNew) { el.setAttribute('required','required'); applyRequiredMessage(el); }
+            else { el.removeAttribute('required'); el.setCustomValidity(''); }
+        });
+    }
+    function toggleGuardianUI() {
+        const isNew = guardianSelect.value === 'new';
+        newGuardianFields.classList.toggle('d-none', !isNew);
+        if (!isNew) {
+            newGuardianFields.querySelectorAll('input').forEach(i => { if (!document.body.dataset.initialized) return; i.value=''; i.setCustomValidity(''); });
+        }
+        setRequiredForNewGuardian(isNew);
+    }
+    guardianSelect.addEventListener('change', toggleGuardianUI);
+    sameAddress?.addEventListener('change', function () {
+        const hhAddress = document.getElementById('g_address');
+        if (this.checked && hhAddress) hhAddress.value = studentAddress.value;
+    });
+
+    // === Student suggestions ===
+    const first = document.getElementById('s_firstname');
+    const last  = document.getElementById('s_lastname');
+    const suggestFirst = document.getElementById('suggest_first');
+    const suggestLast  = document.getElementById('suggest_last');
+    const pickHidden = document.getElementById('picked_student_id');
+
+    const fillMap = {
+        s_middlename:'s_middlename', s_gender:'s_gender', s_birthdate:'s_birthdate',
+        s_citizenship:'s_citizenship', s_address:'s_address', s_religion:'s_religion',
+        s_contact:'s_contact', s_email:'s_email', sped_has:'sped_has', sped_desc:'sped_desc',
+        s_gradelvl:'s_gradelvl', previous_school:'previous_school',
+        // guardian
+        g_address:'g_address',
+        m_firstname:'m_firstname', m_middlename:'m_middlename', m_lastname:'m_lastname', m_contact:'m_contact', m_email:'m_email', m_occupation:'m_occupation',
+        f_firstname:'f_firstname', f_middlename:'f_middlename', f_lastname:'f_lastname', f_contact:'f_contact', f_email:'f_email', f_occupation:'f_occupation',
+        alt_guardian_details:'alt_guardian_details'
+    };
+
+    function debounce(fn, ms=250){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms);} }
+
+    // Build URLs from named routes (robust)
+    const SEARCH_URL = @json(route('admin.students.search'));
+    const PREFILL_URL_TEMPLATE = @json(route('admin.students.prefill', ['id' => 'ID_PLACEHOLDER']));
+
+    async function fetchSuggest(term) {
+        if (!term || term.trim().length < 2) return [];
+        try {
+            const r = await fetch(`${SEARCH_URL}?q=${encodeURIComponent(term)}`, { headers:{'Accept':'application/json'} });
+            if (!r.ok) { console.error('Search HTTP error', r.status); return []; }
+            const ct = (r.headers.get('content-type') || '').toLowerCase();
+            if (!ct.includes('application/json')) {
+                console.warn('Search returned non-JSON'); return [];
+            }
+            return await r.json();
+        } catch (e) {
+            console.error('Search fetch failed', e);
+            return [];
+        }
+    }
+
+    function renderList(el, items) {
+        if (!items.length) { el.classList.add('d-none'); el.innerHTML=''; return; }
+        el.innerHTML = items.map(i => `<div class="suggest-item" data-id="${i.id}">${i.name}</div>`).join('');
+        el.classList.remove('d-none');
+    }
+
+    async function handleType(targetInput, listEl) {
+        const term = targetInput.value.trim();
+        const items = await fetchSuggest(term);
+        renderList(listEl, items);
+    }
+
+    const onTypeFirst = debounce(()=>handleType(first, suggestFirst), 250);
+    const onTypeLast  = debounce(()=>handleType(last, suggestLast), 250);
+    first.addEventListener('input', onTypeFirst);
+    last.addEventListener('input', onTypeLast);
+
+    async function prefillById(id) {
+        pickHidden.value = id;
+        const url = PREFILL_URL_TEMPLATE.replace('ID_PLACEHOLDER', encodeURIComponent(id));
+        try {
+            const r = await fetch(url, { headers:{'Accept':'application/json'} });
+            if (!r.ok) { console.error('Prefill HTTP error', r.status); return; }
+            const ct = (r.headers.get('content-type') || '').toLowerCase();
+            if (!ct.includes('application/json')) {
+                const txt = await r.text();
+                console.warn('Prefill non-JSON response. First 200 chars:', txt.slice(0,200));
+                alert('Could not prefill. Check if you are logged in and the route is accessible.');
+                return;
+            }
+            const data = await r.json();
+
+            // Names first
+            if (data.s_firstname) first.value = data.s_firstname || '';
+            if (data.s_middlename) document.getElementById('s_middlename').value = data.s_middlename || '';
+            if (data.s_lastname)   last.value  = data.s_lastname  || '';
+
+            // Fill the rest
+            Object.entries(fillMap).forEach(([serverKey, fieldId])=>{
+                const el = document.getElementById(fieldId);
+                if (!el) return;
+                const val = (data[serverKey] ?? '');
+                if (el.tagName === 'SELECT') {
+                    Array.from(el.options).forEach(o=>o.selected = (o.value === String(val)));
+                    el.dispatchEvent(new Event('change'));
+                } else {
+                    el.value = val;
+                    el.dispatchEvent(new Event('input'));
+                    el.dispatchEvent(new Event('change'));
+                }
+            });
+
+            // Switch guardian select to existing if we got an id
+            if (data.guardian_id) {
+                guardianSelect.value = data.guardian_id;
+                guardianSelect.dispatchEvent(new Event('change'));
+            }
+            calcAge();
+        } catch (e) {
+            console.error('Prefill fetch failed', e);
+            alert('Prefill failed. See console for details.');
+        }
+    }
+
+    function attachPick(listEl) {
+        listEl.addEventListener('click', (e)=>{
+            const item = e.target.closest('.suggest-item');
+            if (!item) return;
+            listEl.classList.add('d-none');
+            const id = item.dataset.id;
+            prefillById(id);
+        });
+    }
+    attachPick(suggestFirst);
+    attachPick(suggestLast);
+
+    // Close lists on outside click
+    document.addEventListener('click', (e)=>{
+        if (!suggestFirst.contains(e.target) && e.target !== first) suggestFirst.classList.add('d-none');
+        if (!suggestLast.contains(e.target) && e.target !== last)   suggestLast.classList.add('d-none');
+    });
+
+    // Submit validation + scroll
+    form.addEventListener('submit', function (e) {
+        setRequiredForNewGuardian(guardianSelect.value === 'new');
+        if (!form.checkValidity()) {
+            e.preventDefault(); e.stopPropagation();
+            form.classList.add('was-validated');
+            const firstInvalid = form.querySelector(':invalid');
+            if (firstInvalid) {
+                firstInvalid.focus({ preventScroll: true });
+                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    }, false);
+
+    document.body.dataset.initialized = 'true';
+    toggleGuardianUI();
+});
+</script>
 @endpush

@@ -4,45 +4,35 @@
 
 @push('styles')
     <style>
-        .theme-chip {
-            cursor: pointer;
-            user-select: none;
-        }
+        .theme-chip { cursor: pointer; user-select: none; }
 
         .form-control.is-valid {
             border-color: #198754 !important;
             box-shadow: 0 0 0 .2rem rgba(25, 135, 84, .25) !important;
         }
-
         .form-control.is-invalid {
             border-color: #dc3545 !important;
             box-shadow: 0 0 0 .2rem rgba(220, 53, 69, .25) !important;
         }
 
-        .pw-hint {
-            font-size: .85rem;
-        }
+        .pw-hint { font-size: .85rem; }
 
         .quick-actions .icon-left {
-            position: absolute;
-            left: .5rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #94a3b8;
+            position: absolute; left: .5rem; top: 50%;
+            transform: translateY(-50%); color: #94a3b8;
         }
+        .quick-actions input { padding-left: 1.75rem; }
 
-        .quick-actions input {
-            padding-left: 1.75rem;
-        }
-
-        .qr-preview {
-            max-height: 340px;
-        }
+        .qr-preview { max-height: 340px; }
 
         /* ensure tables/cards line up nicely on taller content */
-        .card.h-100 .table-responsive {
-            min-height: 120px;
-        }
+        .card.h-100 .table-responsive { min-height: 120px; }
+
+        /* right column stacked cards */
+        .right-stack { display: grid; gap: .75rem; align-content: start; }
+        .card-title-tight { display:flex; align-items:center; justify-content:space-between; }
+        .muted-hint { font-size: .8rem; color:#6c757d; }
+        .path-note { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: .78rem; word-break: break-all; }
     </style>
 @endpush
 
@@ -51,34 +41,104 @@
         use Illuminate\Support\Str;
         use Illuminate\Support\Facades\Storage;
 
-        $raw = \App\Models\AppSetting::get('gcash_qr_path'); // may be "gcash/..", "public/gcash/..", "/storage/gcash/..", or a full URL
-        $gcashQrUrl = null;
+        // ==== GCash QR: normalize any kind of path and ensure it renders even without public/storage symlink ====
+        $raw = \App\Models\AppSetting::get('gcash_qr_path'); // could be URL, /storage/..., public/..., Windows absolute path
         $gcashQrExists = false;
+        $gcashServeSrc = null;         // what <img src> will use (URL or data:)
+        $gcashResolvedClean = null;    // e.g. "gcash/filename.webp"
+        $gcashResolvedUrl = null;      // e.g. "/storage/gcash/filename.webp"
+        $gcashResolvedDisk = 'public'; // disk used
+        $gcashResolvedMime = null;
+        $gcashResolutionNote = null;   // display hint
+
         if ($raw) {
+            // 1) Absolute web URL -> render as-is
             if (Str::startsWith($raw, ['http://', 'https://'])) {
-                // absolute URL saved
-                $gcashQrUrl = $raw;
-                $gcashQrExists = true; // we can’t ping here; assume OK to render
+                $gcashServeSrc = $raw;
+                $gcashQrExists = true;         // assume reachable; we don't ping in Blade
+                $gcashResolvedClean = $raw;
+                $gcashResolvedUrl = $raw;
+                $gcashResolutionNote = 'Using absolute URL.';
             } else {
-                // normalize legacy prefixes
-                $clean = ltrim(preg_replace('#^(public/|storage/)#', '', $raw), '/');
-                $gcashQrExists = Storage::disk('public')->exists($clean);
-                $gcashQrUrl = Storage::disk('public')->url($clean);
+                // 2) Normalize anything else into a "public" disk relative path (forward slashes)
+                $candidate = str_replace('\\', '/', $raw); // Windows -> Unix slashes
+
+                // If it starts with /storage/... strip that prefix
+                $candidate = preg_replace('#^/?:?storage/#i', '', ltrim($candidate, '/'));
+
+                // If it starts with public/ strip it
+                $candidate = preg_replace('#^public/#i', '', $candidate);
+
+                // If it contains storage/app/public/... pull the tail after it
+                if (preg_match('#storage/app/public/(.+)$#i', $candidate, $m)) {
+                    $candidate = $m[1];
+                }
+
+                // If it still contains full absolute path with .../storage/app/public/..., capture after that
+                if (preg_match('#[A-Za-z]:/.*?/storage/app/public/(.+)$#', $candidate, $m)) {
+                    $candidate = $m[1];
+                }
+
+                // Clean leading slashes just in case
+                $candidate = ltrim($candidate, '/');
+
+                // Final clean relative path inside public disk
+                $gcashResolvedClean = $candidate;
+
+                // Existence on disk
+                $gcashQrExists = $gcashResolvedClean ? Storage::disk($gcashResolvedDisk)->exists($gcashResolvedClean) : false;
+
+                // Preferred public URL via disk (requires public/storage symlink)
+                $gcashResolvedUrl = $gcashResolvedClean ? Storage::disk($gcashResolvedDisk)->url($gcashResolvedClean) : null;
+
+                // Check if public/storage symlink is present. If missing, embed as base64 to guarantee render.
+                $publicSymlinkPresent = is_dir(public_path('storage'));
+
+                if ($gcashQrExists) {
+                    if ($publicSymlinkPresent && $gcashResolvedUrl) {
+                        $gcashServeSrc = $gcashResolvedUrl;
+                        $gcashResolutionNote = 'Using public URL via storage symlink.';
+                    } else {
+                        // Fallback: data URI
+                        try {
+                            $bytes = Storage::disk($gcashResolvedDisk)->get($gcashResolvedClean);
+                            // Try get MIME; if fails, default to image/png
+                            try {
+                                $gcashResolvedMime = Storage::disk($gcashResolvedDisk)->mimeType($gcashResolvedClean);
+                            } catch (\Throwable $e) {
+                                $gcashResolvedMime = 'image/png';
+                            }
+                            $gcashServeSrc = 'data:' . $gcashResolvedMime . ';base64,' . base64_encode($bytes);
+                            $gcashResolutionNote = 'Public symlink missing; embedding image as data URL.';
+                        } catch (\Throwable $e) {
+                            $gcashServeSrc = null;
+                            $gcashResolutionNote = 'File found on disk but failed to read for preview.';
+                        }
+                    }
+                } else {
+                    $gcashServeSrc = null;
+                    $gcashResolutionNote = 'Path normalized, but file not found on public disk.';
+                }
             }
         }
 
+        // ==== KPIs and toggles ====
         $studentsCount = \App\Models\Student::count();
         $teachersCount = \App\Models\Faculty::count();
         $usersCount = \App\Models\User::count();
         $announcementsCount = \App\Models\Announcement::count();
         $feOn = (bool) (\App\Models\AppSetting::get('faculty_enrollment_enabled', true));
 
-        // You must pass $admins and $subjects from your controller as before
+        // ---- Current School Year (pin to 2025-2026 if present) ----
+        /** @var \App\Models\Schoolyr|null $current */
+        $current = $current
+            ?? \App\Models\Schoolyr::where('school_year', '2025-2026')->first()
+            ?? \App\Models\Schoolyr::orderBy('school_year')->first();
     @endphp
 
     <div class="card section p-4">
         <!-- =========================
-             Header: Intro | KPIs | Right: Quick Actions (+ GCash QR upload)
+             Header: Intro | KPIs | Right: (Quick Actions) + Separate Cards: School Year | GCash QR
         ========================== -->
         <div id="dashboard-header" class="mb-3">
             <!-- Intro -->
@@ -108,8 +168,9 @@
                 </div>
             </div>
 
-            <!-- Right: Quick Actions + GCash QR upload -->
+            <!-- Right column: stacked cards -->
             <div class="right-stack">
+                <!-- Quick Actions -->
                 <div class="card quick-actions p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h6 class="mb-0">Quick Actions</h6>
@@ -119,37 +180,6 @@
                         <input type="text" id="quickSearch" class="form-control form-control-sm"
                             placeholder="Type e.g. “pay balance”, “settings”, “add subject”, “students”… then Enter">
                     </div>
-
-                    <div class="mb-3">
-                        <h6 class="mb-2">GCash QR</h6>
-                        <div class="row g-2 align-items-center">
-                            <div class="col-auto">
-                                @if($gcashQrUrl && $gcashQrExists)
-                                    <img src="{{ $gcashQrUrl }}" class="border rounded qr-preview" alt="GCash QR">
-                                @elseif($gcashQrUrl && !$gcashQrExists)
-                                    <div class="text-danger small">
-                                        QR path saved but file not found on public disk.<br>
-                                        <code>{{ $gcashQrUrl }}</code>
-                                    </div>
-                                @else
-                                    <div class="text-muted small">No GCash QR uploaded.</div>
-                                @endif
-                            </div>
-                            <div class="col-auto">
-                                <form action="{{ route('admin.settings.gcashqr.upload') }}" method="POST"
-                                    enctype="multipart/form-data" class="d-flex flex-column gap-2">
-                                    @csrf
-                                    <input type="file" name="gcash_qr" class="form-control form-control-sm"
-                                        accept=".jpg,.jpeg,.png,.webp" required>
-                                    <button class="btn btn-sm btn-outline-primary" type="submit">
-                                        <i class="bi bi-upload me-1"></i> Upload / Replace QR
-                                    </button>
-                                    <small class="text-muted">PNG/JPG/WEBP up to 5MB.</small>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
 
                     <div class="d-grid gap-2 flex-wrap">
                         {{-- Faculty Enrollment quick toggle chip (visual; state saved in modal form below) --}}
@@ -164,6 +194,136 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- School Year (separate card) -->
+                <div class="card p-3">
+                    <div class="card-title-tight mb-2">
+                        <h6 class="mb-0">School Year</h6>
+                    </div>
+                    @if($current)
+                        <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+                            <span class="badge bg-light text-dark border">
+                                Current: {{ $current->school_year ?? $current->display_label }}
+                            </span>
+
+                            <form class="d-inline js-proceed-sy" action="{{ route('admin.settings.schoolyear.proceed', $current->id) }}" method="POST">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-danger">
+                                    <i class="bi bi-arrow-repeat me-1"></i> Proceed to next SY
+                                </button>
+                            </form>
+                        </div>
+                        <small class="text-muted d-block">
+                            Archives current data (soft delete) and clones required records into the new school year.
+                        </small>
+                    @else
+                        <div class="text-muted small">No School Year found.</div>
+                    @endif
+                </div>
+
+    <!-- GCash QR (separate card) -->
+<div class="card p-3">
+    <div class="card-title-tight mb-2"><h6 class="mb-0">GCash QR</h6></div>
+
+    @php
+
+
+        $raw = \App\Models\AppSetting::get('gcash_qr_path');    // should be "gcash/....jpg"
+        $gcashResolvedClean = null;
+        $gcashResolvedUrl = null; // "/storage/gcash/.."
+        $gcashServeSrc = null;    // <img src>
+        $gcashQrExists = false;
+        $gcashResolutionNote = null;
+
+        if ($raw) {
+            if (Str::startsWith($raw, ['http://','https://'])) {
+                // Absolute URL saved (rare case). We will still prefer embedding to guarantee render.
+                $gcashResolvedClean = null;
+                $gcashResolvedUrl = $raw;
+                try {
+                    // Can't read remote; so just use URL
+                    $gcashServeSrc = $gcashResolvedUrl;
+                    $gcashQrExists = true;
+                    $gcashResolutionNote = 'Absolute URL saved; rendering via URL.';
+                } catch (\Throwable $e) {
+                    $gcashServeSrc = null;
+                    $gcashResolutionNote = 'Absolute URL saved but not readable.';
+                }
+            } else {
+                // Normalize any junk to a public-disk-relative path
+                $candidate = str_replace('\\','/',$raw);
+                $candidate = preg_replace('#^/?:?storage/#i', '', ltrim($candidate, '/'));
+                $candidate = preg_replace('#^public/#i', '', $candidate);
+                if (preg_match('#storage/app/public/(.+)$#i', $candidate, $m)) { $candidate = $m[1]; }
+                if (preg_match('#[A-Za-z]:/.*?/storage/app/public/(.+)$#', $candidate, $m)) { $candidate = $m[1]; }
+                $candidate = ltrim($candidate, '/');
+
+                $gcashResolvedClean = $candidate;
+                $gcashQrExists = $gcashResolvedClean && Storage::disk('public')->exists($gcashResolvedClean);
+                $gcashResolvedUrl = $gcashQrExists ? Storage::disk('public')->url($gcashResolvedClean) : null;
+
+                if ($gcashQrExists) {
+                    // ✅ FORCE EMBED: read bytes and embed as data URL so it renders even if /storage returns 404
+                    try {
+                        $bytes = Storage::disk('public')->get($gcashResolvedClean);
+                        $mime  = Storage::disk('public')->mimeType($gcashResolvedClean) ?? 'image/png';
+                        $gcashServeSrc = 'data:' . $mime . ';base64,' . base64_encode($bytes);
+                        $gcashResolutionNote = 'Embedded as data URL (server URL not required).';
+                    } catch (\Throwable $e) {
+                        // Fallback to public URL if embedding fails for any reason
+                        $gcashServeSrc = $gcashResolvedUrl;
+                        $gcashResolutionNote = 'Embed failed; falling back to public URL.';
+                    }
+                } else {
+                    $gcashServeSrc = null;
+                    $gcashResolutionNote = 'Path normalized, but file not found on public disk.';
+                }
+            }
+        }
+    @endphp
+
+    <div class="row g-2 align-items-start">
+        <div class="col-12 col-md-auto">
+            @if($gcashServeSrc && $gcashQrExists)
+                <img src="{{ $gcashServeSrc }}" class="border rounded qr-preview" alt="GCash QR">
+            @elseif($gcashResolvedClean && !$gcashQrExists)
+                <div class="text-danger small">QR path saved but file not found on public disk.</div>
+            @else
+                <div class="text-muted small">No GCash QR uploaded.</div>
+            @endif
+
+            @if($raw)
+                <div class="mt-2" style="font-size:.8rem;color:#6c757d">
+                    <div style="font-family:Consolas,monospace"><strong>Saved:</strong> {{ $raw }}</div>
+                    @if($gcashResolvedClean)
+                        <div style="font-family:Consolas,monospace"><strong>Resolved:</strong> {{ $gcashResolvedClean }}</div>
+                    @endif
+                    @if($gcashResolvedUrl)
+                        <div style="font-family:Consolas,monospace"><strong>URL:</strong> {{ $gcashResolvedUrl }}</div>
+                    @endif
+                    @if($gcashResolutionNote)
+                        <div style="font-family:Consolas,monospace"><strong>Note:</strong> {{ $gcashResolutionNote }}</div>
+                    @endif
+                </div>
+            @endif
+        </div>
+
+        <div class="col-12 col-md-auto">
+            <form action="{{ route('admin.settings.gcashqr.upload') }}" method="POST"
+                  enctype="multipart/form-data" class="d-flex flex-column gap-2">
+                @csrf
+                <input type="file" name="gcash_qr" class="form-control form-control-sm"
+                       accept=".jpg,.jpeg,.png,.webp" required>
+                <button class="btn btn-sm btn-outline-primary" type="submit">
+                    <i class="bi bi-upload me-1"></i> Upload / Replace QR
+                </button>
+                <small class="text-muted">PNG/JPG/WEBP up to 5MB. Stored on <code>public</code> disk under <code>storage/app/public/gcash</code>.</small>
+            </form>
+        </div>
+    </div>
+</div>
+
+</div>
             </div>
         </div>
 
@@ -391,7 +551,7 @@
         </div>
     </div>
 
-    {{-- Edit Subject Modal (example placeholder) --}}
+    {{-- Edit Subject Modal --}}
     <div class="modal fade" id="editSubjectModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -453,7 +613,7 @@
             });
         })();
 
-        // Delete confirm (delegated)
+        // Delete confirm (delegated) — generic
         (function () {
             function confirmDelete(form, msg, btn) {
                 if (!window.Swal) { form.submit(); return; }
@@ -615,6 +775,36 @@
                 chip.classList.toggle('bg-success', on);
                 chip.classList.toggle('bg-secondary', !on);
             });
+        })();
+
+        // ===== Proceed to NEXT School Year (SweetAlert confirm) =====
+        (function () {
+            document.addEventListener('submit', function (e) {
+                const form = e.target.closest('form.js-proceed-sy');
+                if (!form) return;
+                e.preventDefault();
+
+                const submitBtn = form.querySelector('button[type="submit"]');
+                Swal.fire({
+                    title: 'Proceed to next school year?',
+                    text: 'This will archive (soft-delete) current year records and clone them for the new year.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Yes, proceed',
+                    reverseButtons: true,
+                    background: '#fff',
+                    backdrop: false,
+                    allowOutsideClick: true,
+                    allowEscapeKey: true
+                }).then(res => {
+                    if (res.isConfirmed) {
+                        if (submitBtn) submitBtn.disabled = true;
+                        form.submit();
+                    }
+                });
+            }, true);
         })();
     </script>
 @endpush

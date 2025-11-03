@@ -59,7 +59,7 @@
             {{-- Finances --}}
             <a href="{{ route('admin.finances') }}"
                 class="sidebar-link {{ request()->routeIs('admin.finances') ? 'active' : '' }}">
-                <i class="bi bi-cash-coin"></i><span> Finances</span>
+                <i class="bi bi-cash-coin"></i><span> Payables</span>
             </a>
 
             <a href="{{ route('admin.students.index') }}"

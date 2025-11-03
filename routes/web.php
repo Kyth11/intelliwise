@@ -1,31 +1,34 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Mail;
 
 // ---------- Auth & Dashboards ----------
+use Illuminate\Support\Facades\Route;
+use App\Mail\ParentAccountCredentials;
+use App\Http\Controllers\GradesController;
+use App\Http\Controllers\StudentController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\PaymentsController;
+
+// ---------- Admin CRUD (split controllers) ----------
+use App\Http\Controllers\FacultyGradesController;
+use App\Http\Controllers\Admin\SchoolYearController;
+use App\Http\Controllers\EnrollmentReportController;
+use App\Http\Controllers\Admin\GradeQuarterController;
 use App\Http\Controllers\Auth\AdminDashboardController;
 use App\Http\Controllers\Auth\FacultyDashboardController;
 use App\Http\Controllers\Auth\GuardianDashboardController;
-use App\Http\Controllers\Auth\PaymentsController;
-use App\Http\Controllers\Guardian\PaymentReceiptController as GuardianPaymentReceiptController;
-
-// ---------- Admin CRUD (split controllers) ----------
-use App\Http\Controllers\Admin\AnnouncementController as AdminAnnouncementController;
-use App\Http\Controllers\Admin\ScheduleController as AdminScheduleController;
-use App\Http\Controllers\Admin\TuitionController as AdminTuitionController;
-use App\Http\Controllers\Admin\OptionalFeeController as AdminOptionalFeeController;
-use App\Http\Controllers\Admin\SubjectController as AdminSubjectController;
-use App\Http\Controllers\Admin\SettingController as AdminSettingController;
 use App\Http\Controllers\Admin\FacultyController as AdminFacultyController;
-use App\Http\Controllers\Admin\GuardianController as AdminGuardianController;
-use App\Http\Controllers\Admin\GradeQuarterController;
+use App\Http\Controllers\Admin\SettingController as AdminSettingController;
 
 // ---------- Shared / other controllers ----------
-use App\Http\Controllers\StudentController;
-use App\Http\Controllers\GradesController;
-use App\Http\Controllers\FacultyGradesController;
-use App\Http\Controllers\EnrollmentReportController;
+use App\Http\Controllers\Admin\SubjectController as AdminSubjectController;
+use App\Http\Controllers\Admin\TuitionController as AdminTuitionController;
+use App\Http\Controllers\Admin\GuardianController as AdminGuardianController;
+use App\Http\Controllers\Admin\ScheduleController as AdminScheduleController;
+use App\Http\Controllers\Admin\OptionalFeeController as AdminOptionalFeeController;
+use App\Http\Controllers\Admin\AnnouncementController as AdminAnnouncementController;
+use App\Http\Controllers\Guardian\PaymentReceiptController as GuardianPaymentReceiptController;
 
 // Home → Login
 Route::get('/', fn() => redirect()->route('login'));
@@ -54,7 +57,7 @@ Route::middleware(['auth', 'role:admin'])
         Route::get('/accounts', [AdminDashboardController::class, 'accounts'])->name('accounts');
         Route::get('/grades', [GradesController::class, 'index'])->name('grades');
 
-        // Settings (view-only here; actions below)
+        // Settings (view-only)
         Route::get('/settings', [AdminDashboardController::class, 'settings'])->name('settings.index');
 
         // Settings actions
@@ -63,17 +66,21 @@ Route::middleware(['auth', 'role:admin'])
             Route::post('/admins', [AdminSettingController::class, 'storeAdmin'])->name('admins.store');
             Route::delete('/admins/{id}', [AdminSettingController::class, 'destroyAdmin'])->name('admins.destroy');
             Route::post('/school-year', [AdminSettingController::class, 'storeSchoolYear'])->name('schoolyear.store');
-
             Route::post('/gcash-qr', [AdminSettingController::class, 'uploadGcashQr'])->name('gcashqr.upload');
+            Route::post('/school-year/{id}/proceed', [SchoolYearController::class, 'proceed'])->name('schoolyear.proceed');
         });
 
-        // Students (admin-managed)
+        // Students
         Route::prefix('students')->name('students.')->group(function () {
             Route::get('/', [StudentController::class, 'index'])->name('index');
             Route::get('/enroll', [StudentController::class, 'create'])->name('create');
             Route::post('/store', [StudentController::class, 'store'])->name('store');
             Route::put('/{id}', [StudentController::class, 'update'])->name('update');
             Route::delete('/{id}', [StudentController::class, 'destroy'])->name('destroy');
+
+            // Clean endpoints used by JS
+            Route::get('/search', [StudentController::class, 'search'])->name('search');         // admin.students.search
+            Route::get('/prefill/{id}', [StudentController::class, 'prefill'])->name('prefill'); // admin.students.prefill
         });
 
         // Faculties (admin account management)
@@ -92,7 +99,7 @@ Route::middleware(['auth', 'role:admin'])
             Route::delete('/{id}', [AdminGuardianController::class, 'destroy'])->name('destroy');
         });
 
-        // Announcements (Admin CRUD)
+        // Announcements
         Route::prefix('announcements')->name('announcements.')->group(function () {
             Route::post('/store', [AdminAnnouncementController::class, 'store'])->name('store');
             Route::put('/{id}', [AdminAnnouncementController::class, 'update'])->name('update');
@@ -107,7 +114,7 @@ Route::middleware(['auth', 'role:admin'])
             Route::delete('/{id}', [AdminScheduleController::class, 'destroy'])->name('destroy');
         });
 
-        // Tuition (Admin CRUD)
+        // Tuition
         Route::prefix('tuitions')->name('tuitions.')->group(function () {
             Route::post('/', [AdminTuitionController::class, 'store'])->name('store');
             Route::put('/{id}', [AdminTuitionController::class, 'update'])->name('update');
@@ -115,7 +122,7 @@ Route::middleware(['auth', 'role:admin'])
         });
         Route::delete('/tuition/{id}', [AdminTuitionController::class, 'destroy'])->name('tuition.destroy');
 
-        // Optional Fees (Admin CRUD)
+        // Optional Fees
         Route::prefix('optional-fees')->name('optionalfees.')->group(function () {
             Route::post('/', [AdminOptionalFeeController::class, 'store'])->name('store');
             Route::put('/{id}', [AdminOptionalFeeController::class, 'update'])->name('update');
@@ -138,7 +145,7 @@ Route::middleware(['auth', 'role:admin'])
             Route::get('/enrollments/export', [EnrollmentReportController::class, 'export'])->name('enrollments.export');
         });
 
-        // Subjects (Admin CRUD)
+        // Subjects
         Route::prefix('subjects')->name('subjects.')->group(function () {
             Route::post('/', [AdminSubjectController::class, 'store'])->name('store');
             Route::put('/{id}', [AdminSubjectController::class, 'update'])->name('update');
@@ -194,8 +201,29 @@ Route::middleware(['auth', 'role:guardian'])
 
         Route::match(['post', 'put'], '/self', [\App\Http\Controllers\Guardian\ProfileController::class, 'upsert'])->name('self.upsert');
         Route::put('/{id}', [\App\Http\Controllers\Guardian\ProfileController::class, 'update'])->name('self.update');
-        // ✅ Receipt upload (GCash) — this is the route your modal posts to
+
         Route::prefix('payment-receipts')->name('payment-receipts.')->group(function () {
             Route::post('/', [GuardianPaymentReceiptController::class, 'store'])->name('store');
         });
-    });
+
+if (app()->environment('local')) {
+    Route::get('/_test-mail', function () {
+        try {
+            Mail::to('occ.davidkieth@gmail.com')->send(
+                new ParentAccountCredentials(
+                    guardianName: 'Test Parent',
+                    studentName:  'Test Student',
+                    username:     'testparent',
+                    password:     'test12345',
+                    appUrl:       config('app.url')
+                )
+            );
+            return response('Mail dispatched OK.', 200);
+        } catch (\Throwable $e) {
+            // Show the error right in the browser so you don't have to dig through logs
+            return response('MAIL ERROR: '.$e->getMessage(), 500);
+        }
+    })->name('_test-mail');
+}
+});
+

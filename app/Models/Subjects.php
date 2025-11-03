@@ -1,13 +1,16 @@
 <?php
 
 namespace App\Models;
-
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Subjects extends Model
 {
+
+    use SoftDeletes;
+
     // Table name is non-standard plural for a model; keep it explicit.
     protected $table = 'subjects';
 
@@ -16,6 +19,7 @@ class Subjects extends Model
         'subject_code',
         'description',
         'gradelvl_id',
+        'schoolyr_id',
     ];
 
     /**
@@ -32,5 +36,9 @@ class Subjects extends Model
     public function schedules(): HasMany
     {
         return $this->hasMany(Schedule::class, 'subject_id');
+    }
+    public function schoolyr(): BelongsTo
+    {
+        return $this->belongsTo(Schoolyr::class, 'schoolyr_id');
     }
 }

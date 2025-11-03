@@ -94,25 +94,26 @@ class SettingController extends Controller
     public function uploadGcashQr(Request $request)
     {
         $request->validate([
-            // keep QR as an image (PDFs won’t render in <img>)
             'gcash_qr' => ['required', 'file', 'mimes:png,jpg,jpeg,webp', 'max:5120'], // 5MB
         ]);
 
-        // Delete the old file if present (normalize legacy values too)
-        $old = AppSetting::get('gcash_qr_path'); // e.g. "gcash/old.png"
+        // delete old file if we previously saved one
+        $old = AppSetting::get('gcash_qr_path'); // may be messy; normalize
         if ($old) {
-            $oldNormalized = Str::startsWith($old, 'public/') ? Str::after($old, 'public/') : $old;
-            if (Storage::disk('public')->exists($oldNormalized)) {
-                try { Storage::disk('public')->delete($oldNormalized); } catch (\Throwable $e) {}
-            } elseif (Storage::exists($old)) {
-                try { Storage::delete($old); } catch (\Throwable $e) {}
+            $oldClean = str_replace('\\','/', $old);
+            $oldClean = ltrim(preg_replace('#^(public/|/?storage/)#i', '', $oldClean), '/');
+            if (preg_match('#storage/app/public/(.+)$#i', $oldClean, $m)) {
+                $oldClean = $m[1];
+            }
+            if (Storage::disk('public')->exists($oldClean)) {
+                try { Storage::disk('public')->delete($oldClean); } catch (\Throwable $e) {}
             }
         }
 
-        // Save to PUBLIC disk; returns e.g. "gcash/XYZ123.png"
-        $path = $request->file('gcash_qr')->store('gcash', 'public');
+        // store new file under public disk
+        $path = $request->file('gcash_qr')->store('gcash', 'public'); // "gcash/XXXXXXXX.jpg"
 
-        // Persist only the relative path
+        // save only the clean relative path
         AppSetting::set('gcash_qr_path', $path);
 
         return back()->with('success', 'GCash QR updated.');
