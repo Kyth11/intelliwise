@@ -9,7 +9,7 @@ return new class extends Migration {
     {
         Schema::create('payment_receipts', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('student_id')->index();
+            $table->char('student_id', 12)->index();
             $table->unsignedBigInteger('guardian_id')->nullable()->index();
             $table->unsignedBigInteger('payment_id')->nullable()->index(); // optional link to payments
             $table->decimal('amount', 10, 2);
@@ -22,15 +22,11 @@ return new class extends Migration {
             $table->timestamp('reviewed_at')->nullable();
             $table->timestamps();
 
-            $table->foreign('student_id')->references('id')->on('students')->cascadeOnUpdate()->restrictOnDelete();
+            $table->foreign('student_id')->references('lrn')->on('students')->cascadeOnUpdate()->restrictOnDelete();
             $table->foreign('guardian_id')->references('id')->on('guardians')->cascadeOnUpdate()->nullOnDelete();
             $table->foreign('payment_id')->references('id')->on('payments')->cascadeOnUpdate()->nullOnDelete();
             $table->foreign('reviewed_by')->references('id')->on('users')->cascadeOnUpdate()->nullOnDelete();
         });
     }
 
-    public function down(): void
-    {
-        Schema::dropIfExists('payment_receipts');
-    }
 };

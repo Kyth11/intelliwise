@@ -28,7 +28,7 @@ class ParentAccountCredentials extends Mailable
     public function build()
     {
         return $this->subject('Your Parent/Guardian Account Credentials')
-            ->view('emails.parent_credentials')            // HTML view
-            ->text('emails.parent_credentials_plain');     // Plain-text fallback
+            ->view('emails.parent_credentials')        // HTML view
+            ->text('emails.parent_credentials_plain'); // Plain-text fallback
     }
 }

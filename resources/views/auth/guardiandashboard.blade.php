@@ -177,8 +177,10 @@
 
                                     $paymentsSum = 0.0;
                                     $lastPay = null;
+
                                     if (method_exists($st, 'payments')) {
-                                        $pq = $st->payments()->where('student_id', $st->id);
+                                        // NOTE: payments() relation should already be scoped to this student
+                                        $pq = $st->payments();
                                         $paymentsSum = (float) ($pq->sum('amount') ?? 0);
                                         $lastPay = $pq->latest()->first();
                                     }
@@ -261,7 +263,7 @@
 
                                 <div class="mb-2">
                                     <label class="form-label">Student</label>
-                                    <select name="student_id" class="form-select" required>
+                                    <select name="student_lrn" class="form-select" required>
                                         @foreach(($children ?? collect()) as $st)
                                             @php
                                                 $nm = trim(implode(' ', array_filter([$st->s_firstname ?? '', $st->s_middlename ?? '', $st->s_lastname ?? ''])));

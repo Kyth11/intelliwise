@@ -17,11 +17,5 @@ return new class extends Migration {
         });
     }
 
-    public function down(): void
-    {
-        Schema::table('students', function (Blueprint $table) {
-            // safe no-op on down
-            // $table->dropColumn(['s_optional_total', 's_total_due']);
-        });
-    }
+
 };

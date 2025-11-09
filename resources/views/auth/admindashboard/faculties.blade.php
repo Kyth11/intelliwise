@@ -11,14 +11,13 @@
 
 @section('content')
     <div class="card section p-4">
-
         @php
             $facCount     = $faculties->count();
             $schedCount   = $faculties->sum(fn($f) => $f->schedules?->count() ?? 0);
             $subjectCount = $faculties
                 ->flatMap(fn($f) => $f->schedules ?? collect())
                 ->filter()
-                ->map(fn($s) => optional($s->subject)->subject_name)
+                ->map(fn($s) => optional($s->subject)->name)
                 ->filter()
                 ->unique()
                 ->count();
@@ -27,52 +26,55 @@
         <!-- =========================
              Header: Intro | KPIs | Right: Quick Actions
         ========================== -->
-        <div id="dashboard-header" class="mb-3">
-            <!-- Intro -->
-            <div class="intro">
-                <div>
+        <div id="dashboard-header" class="mb-3 d-grid gap-3" style="grid-template-columns: 1fr auto;">
+            <!-- Intro + KPIs -->
+            <div>
+                <div class="intro mb-3">
                     <h5 class="mb-1">Faculty Schedule Management</h5>
                     <div class="text-muted small">View, edit, and manage faculty schedules.</div>
                 </div>
-            </div>
 
-            <!-- KPI strip -->
-            <div class="kpi-strip">
-                <div class="kpi-card">
-                    <div class="kpi-number">{{ $facCount }}</div>
-                    <div class="kpi-label">Faculty</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-number">{{ $schedCount }}</div>
-                    <div class="kpi-label">Total Schedules</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-number">{{ $subjectCount }}</div>
-                    <div class="kpi-label">Subjects</div>
+                <!-- KPI strip -->
+                <div class="kpi-strip d-flex gap-2">
+                    <div class="kpi-card border rounded p-3 text-center">
+                        <div class="kpi-number fs-4 fw-bold">{{ $facCount }}</div>
+                        <div class="kpi-label text-muted small">Faculty</div>
+                    </div>
+                    <div class="kpi-card border rounded p-3 text-center">
+                        <div class="kpi-number fs-4 fw-bold">{{ $schedCount }}</div>
+                        <div class="kpi-label text-muted small">Total Schedules</div>
+                    </div>
+                    <div class="kpi-card border rounded p-3 text-center">
+                        <div class="kpi-number fs-4 fw-bold">{{ $subjectCount }}</div>
+                        <div class="kpi-label text-muted small">Subjects</div>
+                    </div>
                 </div>
             </div>
 
             <!-- Right: Quick Actions -->
-            <div class="right-stack">
+            <div class="right-stack" style="width: 320px;">
                 <div class="card quick-actions p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h6 class="mb-0">Quick Actions</h6>
                     </div>
                     <div class="position-relative mb-2">
-                        <i class="bi bi-search icon-left"></i>
-                        <input type="text" id="qaFacultySearch" class="form-control form-control-sm"
-                               placeholder="Filter faculty… (press Enter)">
+                        <i class="bi bi-search icon-left" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.6"></i>
+                        <input
+                            type="text"
+                            id="qaFacultySearch"
+                            class="form-control form-control-sm ps-5"
+                            placeholder="Filter faculty… (press Enter)">
                     </div>
                     <div class="d-grid gap-2">
-                        <!-- NEW: Add Schedule (opens the shared modal) -->
-                <button class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addScheduleModal">
-                    <i class="bi bi-calendar-plus me-1"></i> Add Schedule
-                </button>
+                        <button class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addScheduleModal">
+                            <i class="bi bi-calendar-plus me-1"></i> Add Schedule
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- Table -->
         <div class="card mt-3 p-3">
             <div class="table-responsive">
                 <table id="facultySchedTable" class="table table-bordered table-striped align-middle">
@@ -86,14 +88,14 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse ($faculties as $faculty)
+                        @foreach ($faculties as $faculty)
                             <tr>
                                 <td class="text-center">{{ $faculty->id }}</td>
-                                <td>{{ $faculty->f_firstname }} {{ $faculty->f_lastname }}</td>
-                                <td>{{ $faculty->f_email ?? '-' }}</td>
-                                <td>{{ $faculty->f_contact ?? '-' }}</td>
+                                <td>{{ $faculty->first_name }} {{ $faculty->last_name }}</td>
+                                <td>{{ $faculty->email ?? '-' }}</td>
+                                <td>{{ $faculty->contact ?? '-' }}</td>
                                 <td>
-                                    @if($faculty->schedules->isNotEmpty())
+                                    @if($faculty->schedules && $faculty->schedules->isNotEmpty())
                                         <div class="table-responsive">
                                             <table class="table table-sm table-bordered mb-0">
                                                 <thead class="table-light text-center">
@@ -107,25 +109,39 @@
                                                 <tbody>
                                                     @foreach($faculty->schedules as $schedule)
                                                         <tr>
-                                                            <td>{{ $schedule->subject->subject_name ?? '-' }}</td>
-                                                            <td>{{ $schedule->gradelvl->grade_level ?? '-' }}</td>
-                                                            <td>{{ $schedule->day }} {{ $schedule->class_start }}-{{ $schedule->class_end }}</td>
+                                                            <td>{{ optional($schedule->subject)->name ?? '-' }}</td>
+                                                            <td>{{ optional($schedule->gradelvl)->name ?? '-' }}</td>
+                                                            <td>
+                                                                {{ $schedule->day_of_week ?? '-' }}
+                                                                @php
+                                                                    $st = $schedule->start_time ? substr($schedule->start_time, 0, 5) : '';
+                                                                    $et = $schedule->end_time ? substr($schedule->end_time, 0, 5) : '';
+                                                                @endphp
+                                                                {{ $st && $et ? " $st-$et" : '' }}
+                                                            </td>
                                                             <td class="text-center text-nowrap">
                                                                 <div class="d-flex gap-2 justify-content-center">
                                                                     <!-- EDIT -->
-                                                                    <button class="btn btn-sm btn-warning" title="Edit Schedule"
+                                                                    <button
+                                                                        class="btn btn-sm btn-warning"
+                                                                        title="Edit Schedule"
                                                                         data-bs-toggle="modal"
                                                                         data-bs-target="#editFacultyScheduleModal{{ $schedule->id }}">
                                                                         <i class="bi bi-pencil-square"></i>
                                                                     </button>
 
                                                                     <!-- DELETE -->
-                                                                    <form action="{{ route('admin.schedules.destroy', $schedule->id) }}" method="POST"
-                                                                          class="d-inline delete-form">
+                                                                    <form
+                                                                        action="{{ route('admin.schedules.destroy', $schedule->id) }}"
+                                                                        method="POST"
+                                                                        class="d-inline delete-form">
                                                                         @csrf
                                                                         @method('DELETE')
-                                                                        <button type="button" class="btn btn-sm btn-danger delete-btn"
-                                                                                title="Delete Schedule" data-confirm="Delete this schedule?">
+                                                                        <button
+                                                                            type="button"
+                                                                            class="btn btn-sm btn-danger delete-btn"
+                                                                            title="Delete Schedule"
+                                                                            data-confirm="Delete this schedule?">
                                                                             <i class="bi bi-archive"></i>
                                                                         </button>
                                                                     </form>
@@ -141,11 +157,8 @@
                                     @endif
                                 </td>
                             </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="text-center text-muted">No faculty records found.</td>
-                            </tr>
-                        @endforelse
+                        @endforeach
+                        {{-- IMPORTANT: no colspan "empty" row; DataTables shows emptyTable message --}}
                     </tbody>
                 </table>
             </div>
@@ -158,7 +171,7 @@
             @endforeach
         @endforeach
 
-        {{-- Add Schedule modal from dashboard --}}
+        {{-- Add Schedule modal --}}
         @includeIf('auth.admindashboard.partials.add-schedule-modal')
     </div>
 @endsection
@@ -168,14 +181,16 @@
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <script>
-        // Delete confirm
-        document.querySelectorAll('.delete-btn').forEach(button => {
+        // Delete confirm (SweetAlert2)
+        document.querySelectorAll('.delete-btn').forEach((button) => {
             button.addEventListener('click', function () {
                 const form = this.closest('form.delete-form');
                 if (!form) return;
 
                 const message = this.dataset.confirm || 'Are you sure you want to delete this item?';
+
                 Swal.fire({
                     title: 'Are you sure?',
                     text: "You can't undo this action.",
@@ -195,7 +210,7 @@
             });
         });
 
-        // DataTables
+        // DataTables init
         $(function () {
             const table = $('#facultySchedTable').DataTable({
                 dom: 'lrtip',
@@ -203,11 +218,14 @@
                 lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, 'All']],
                 order: [],
                 columnDefs: [
-                    { targets: -1, orderable: false }
-                ]
+                    { targets: -1, orderable: false } // make last column (Schedules) unsortable
+                ],
+                language: {
+                    emptyTable: 'No faculty records found.'
+                }
             });
 
-            // Quick filter
+            // Quick filter (press Enter)
             const qa = document.getElementById('qaFacultySearch');
             qa?.addEventListener('keydown', (e) => {
                 if (e.key !== 'Enter') return;

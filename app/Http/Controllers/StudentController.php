@@ -15,8 +15,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 class StudentController extends Controller
 {
@@ -55,14 +55,14 @@ class StudentController extends Controller
         $optionalFees = OptionalFee::where('active', true)->orderBy('name')->get();
 
         $role = Auth::user()?->role;
-        $view = $role === 'faculty'
+        $view = ($role === 'faculty')
             ? 'auth.facultydashboard.enroll-student'
             : 'auth.admindashboard.enroll-student';
 
         return view($view, compact('guardians', 'optionalFees'));
     }
 
-    // Live search for the suggest dropdowns
+    /** Live search (names or LRN) for suggest dropdowns */
     public function search(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
@@ -71,10 +71,11 @@ class StudentController extends Controller
         }
 
         $rows = Student::query()
-            ->select(['id','s_firstname','s_middlename','s_lastname'])
+            ->select(['lrn','s_firstname','s_middlename','s_lastname'])
             ->where(function($w) use ($q) {
                 $w->where('s_firstname','like',"%{$q}%")
-                  ->orWhere('s_lastname','like',"%{$q}%");
+                  ->orWhere('s_lastname','like',"%{$q}%")
+                  ->orWhere('lrn','like', "%{$q}%");
             })
             ->orderBy('s_lastname')->orderBy('s_firstname')
             ->limit(20)->get();
@@ -82,21 +83,21 @@ class StudentController extends Controller
         $items = $rows->map(function (Student $s) {
             $mid = trim($s->s_middlename ?? '');
             $name = trim($s->s_firstname . ' ' . ($mid ? $mid.' ' : '') . $s->s_lastname);
-            return ['id' => (string) $s->id, 'name' => $name];
+            return ['id' => (string) $s->lrn, 'name' => $name]; // id = LRN for the UI
         });
 
         return response()->json($items);
     }
 
-    // Prefill payload for a picked suggestion
+    /** Prefill payload for a picked suggestion (LRN-based) */
     public function prefill($id)
     {
-        $s = Student::with(['guardian'])->where('id', $id)->firstOrFail();
+        $s = Student::with(['guardian'])->where('lrn', $id)->firstOrFail();
 
         $religion = $s->s_religion ?? $s->religion ?? '';
 
         $payload = [
-            'id'               => $s->id,
+            'id'               => $s->lrn,
             's_firstname'      => $s->s_firstname,
             's_middlename'     => $s->s_middlename,
             's_lastname'       => $s->s_lastname,
@@ -134,22 +135,32 @@ class StudentController extends Controller
 
     public function store(Request $request)
     {
+        // LRN rule: new/transferee -> unique; old -> exists
+        $type = (string) $request->input('enroll_type', 'new');
+        $lrnRules = ['required','digits_between:10,12'];
+        if ($type === 'old') {
+            $lrnRules[] = Rule::exists('students','lrn');
+        } else {
+            $lrnRules[] = Rule::unique('students','lrn');
+        }
+
         $request->validate([
-            's_firstname'   => 'required|string',
-            's_lastname'    => 'required|string',
-            's_address'     => 'required|string',
-            's_birthdate'   => 'required|date',
-            's_gradelvl'    => 'required|string',
-            's_citizenship' => 'nullable|string',
-            's_religion'    => 'nullable|string',
+            'lrn'          => $lrnRules,
+            's_firstname'  => 'required|string',
+            's_lastname'   => 'required|string',
+            's_address'    => 'required|string',
+            's_birthdate'  => 'required|date',
+            's_gradelvl'   => 'required|string',
+            's_citizenship'=> 'nullable|string',
+            's_religion'   => 'nullable|string',
             'student_optional_fee_ids'   => ['array'],
             'student_optional_fee_ids.*' => ['integer', 'exists:optional_fees,id'],
-            'guardian_id'   => 'required'
+            'guardian_id'  => 'required'
         ]);
 
         DB::beginTransaction();
         try {
-            // Guardian upsert
+            // ----- Guardian upsert
             if ($request->guardian_id === 'new') {
                 $hasMother = $request->filled('m_firstname') || $request->filled('m_lastname');
                 $hasFather = $request->filled('f_firstname') || $request->filled('f_lastname');
@@ -180,7 +191,7 @@ class StudentController extends Controller
                 $guardian = Guardian::lockForUpdate()->findOrFail((int)$request->guardian_id);
             }
 
-            // Tuition & optional fees
+            // ----- Tuition & optional fees
             [$tuitionId, $baseTotal] = $this->resolveTuition($request->s_gradelvl);
             $studentOptIds = collect($request->input('student_optional_fee_ids', []))->filter()->unique()->values();
             $studentOptSum = $studentOptIds->isNotEmpty()
@@ -188,47 +199,63 @@ class StudentController extends Controller
                 : 0.0;
             $total = round($baseTotal + $studentOptSum, 2);
 
-            // Student create (only existing columns)
+            // ----- Shared student fields
             $studentData = [
-                's_firstname'        => $request->s_firstname,
-                's_middlename'       => $request->s_middlename,
-                's_lastname'         => $request->s_lastname,
-                's_birthdate'        => $request->s_birthdate,
-                's_address'          => $request->s_address,
-                's_citizenship'      => $request->s_citizenship,
-                's_religion'         => $request->s_religion,
-                's_contact'          => $request->s_contact,
-                's_email'            => $request->s_email,
-                's_gradelvl'         => $request->s_gradelvl,
-                'enrollment_status'  => $request->enrollment_status ?? 'Enrolled',
-                'payment_status'     => $request->payment_status ?? 'Unpaid',
-                's_tuition_sum'      => $baseTotal,
-                's_optional_total'   => round($studentOptSum, 2),
-                's_total_due'        => $total,
-                'tuition_id'         => $tuitionId,
-                'guardian_id'        => $guardian->id,
-                's_gender'           => $request->s_gender,
-                'previous_school'    => $request->previous_school,
-                'sped_has'           => $request->sped_has, // tolerate name in form
-                'sped_desc'          => $request->sped_desc,
+                'lrn'               => $request->lrn,
+                's_firstname'       => $request->s_firstname,
+                's_middlename'      => $request->s_middlename,
+                's_lastname'        => $request->s_lastname,
+                's_birthdate'       => $request->s_birthdate,
+                's_address'         => $request->s_address,
+                's_citizenship'     => $request->s_citizenship,
+                's_religion'        => $request->s_religion,
+                's_contact'         => $request->s_contact,
+                's_email'           => $request->s_email,
+                's_gradelvl'        => $request->s_gradelvl,
+                'enrollment_status' => $request->enrollment_status ?? 'Enrolled',
+                'payment_status'    => $request->payment_status ?? 'Unpaid',
+                's_tuition_sum'     => $baseTotal,
+                's_optional_total'  => round($studentOptSum, 2),
+                's_total_due'       => $total,
+                'tuition_id'        => $tuitionId,
+                'guardian_id'       => $guardian->id,
+                's_gender'          => $request->s_gender,
+                'previous_school'   => $request->previous_school,
+                'sped_has'          => $request->sped_has,
+                'sped_desc'         => $request->sped_desc,
             ];
-            $student = Student::create($this->filterColumns('students', $studentData));
 
-            if ($studentOptIds->isNotEmpty() && method_exists($student, 'optionalFees')) {
-                $attach = [];
-                foreach ($studentOptIds as $fid) { $attach[$fid] = []; }
-                try { $student->optionalFees()->attach($attach); } catch (\Throwable $e) {
-                    Log::warning('Optional fee attach failed', ['err' => $e->getMessage()]);
+            if ($type === 'old') {
+                // Update existing by LRN (not PK)
+                $student = Student::where('lrn', $request->lrn)->lockForUpdate()->firstOrFail();
+                $student->fill($this->filterColumns('students', $studentData));
+                $student->save();
+
+                // Sync optional fees
+                $sync = [];
+                foreach ($studentOptIds as $fid) { $sync[$fid] = []; }
+                if (method_exists($student, 'optionalFees')) {
+                    $student->optionalFees()->sync($sync);
+                }
+            } else {
+                // Create new record for new/transferee
+                $student = Student::create($this->filterColumns('students', $studentData));
+
+                if ($studentOptIds->isNotEmpty() && method_exists($student, 'optionalFees')) {
+                    $attach = [];
+                    foreach ($studentOptIds as $fid) { $attach[$fid] = []; }
+                    try { $student->optionalFees()->attach($attach); } catch (\Throwable $e) {
+                        Log::warning('Optional fee attach failed', ['err' => $e->getMessage()]);
+                    }
                 }
             }
 
-            // Email credentials (create or reset)
-            $emailTarget = trim((string)($guardian->g_email ?: $guardian->m_email ?: $guardian->f_email ?: ''));
-            $emailed = false;
-
-            $usernameBase  = $this->buildUsernameBase($student->s_lastname, $student->s_firstname);
-            $passwordPlain = $this->buildPassword($student->s_lastname);
-            $displayName   = $this->guardianDisplayName($guardian);
+            // ----- Create/Reset guardian user credentials + send email
+            $emailTarget  = trim((string)($guardian->g_email ?: $guardian->m_email ?: $guardian->f_email ?: ''));
+            $emailed      = false;
+            $usernameBase = $this->buildUsernameBase($student->s_lastname, $student->s_firstname);
+            $passwordPlain= $this->buildPassword($student->s_lastname);
+            $displayName  = $this->guardianDisplayName($guardian);
 
             $existingUser = User::where('guardian_id', $guardian->id)->first();
             if ($existingUser) {
@@ -254,7 +281,6 @@ class StudentController extends Controller
 
             if ($emailTarget !== '') {
                 try {
-                    // immediate send; relies on your .env SMTP creds
                     Mail::to($emailTarget)->send(new ParentAccountCredentials(
                         guardianName: $displayName,
                         studentName:  trim(($student->s_firstname ?? '').' '.($student->s_lastname ?? '')),
@@ -264,29 +290,33 @@ class StudentController extends Controller
                     ));
                     $emailed = true;
                 } catch (\Throwable $e) {
-                    Log::warning('Email send failed: '.$e->getMessage());
+                    Log::warning('Email send failed', ['error' => $e->getMessage(), 'guardian_id' => $guardian->id]);
                 }
             } else {
-                Log::info('No email target for guardian_id='.$guardian->id.'; skipping email.');
+                Log::info('No guardian email on file; skipping credentials email.', ['guardian_id' => $guardian->id]);
             }
 
             DB::commit();
 
+            // Redirect to the proper list
             $role  = Auth::user()?->role;
-            $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.dashboard';
+            $route = $role === 'faculty' ? 'faculty.students' : 'admin.students.index';
             return redirect()->route($route)->with('success',
-                $emailed ? 'Student saved. Credentials emailed to parent/guardian.' : 'Student saved. No email on file.'
+                ($type === 'old' ? 'Student updated. ' : 'Student saved. ')
+                . ($emailed ? 'Credentials emailed to parent/guardian.' : 'No email on file.')
             );
+
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Student store failed: '.$e->getMessage(), ['exception' => $e]);
+            Log::error('Student store failed', ['error' => $e->getMessage()]);
             $role  = Auth::user()?->role;
-            $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.dashboard';
+            $route = $role === 'faculty' ? 'faculty.students' : 'admin.students.index';
             return redirect()->route($route)->with('error', 'Failed to enroll student. Check inputs/logs.');
         }
     }
 
-    public function update(Request $request, $id)
+    /** Route param is {lrn}; do not rely on PK */
+    public function update(Request $request, $lrn)
     {
         $request->validate([
             's_firstname'   => 'required|string',
@@ -301,7 +331,7 @@ class StudentController extends Controller
         ]);
 
         try {
-            $student = Student::findOrFail($id);
+            $student = Student::where('lrn', $lrn)->firstOrFail();
 
             $old_base   = (float) ($student->s_tuition_sum ?? 0);
             $old_opt    = (float) ($student->s_optional_total ?? 0);
@@ -353,20 +383,20 @@ class StudentController extends Controller
             }
 
             $role  = Auth::user()?->role;
-            $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.students.index';
+            $route = $role === 'faculty' ? 'faculty.students' : 'admin.students.index';
             return redirect()->route($route)->with('success', 'Student updated successfully.');
         } catch (\Exception $e) {
-            Log::error('Student update failed: '.$e->getMessage(), ['exception' => $e]);
+            Log::error('Student update failed', ['error' => $e->getMessage(), 'lrn' => $lrn]);
             $role  = Auth::user()?->role;
-            $route = $role === 'faculty' ? 'faculty.dashboard' : 'admin.students.index';
+            $route = $role === 'faculty' ? 'faculty.students' : 'admin.students.index';
             return redirect()->route($route)->with('error', 'Failed to update student.');
         }
     }
 
-    public function destroy($id)
+    public function destroy($lrn)
     {
         try {
-            $student = Student::findOrFail($id);
+            $student = Student::where('lrn', $lrn)->firstOrFail();
             $student->delete();
             return redirect()->back()->with('success', 'Student archived successfully.');
         } catch (\Exception $e) {

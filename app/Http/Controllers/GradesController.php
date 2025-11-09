@@ -16,18 +16,18 @@ class GradesController extends Controller
      */
     public function index(Request $request)
     {
-        $schoolyrs = Schoolyr::orderByDesc('id')->get();
+        $schoolyrs   = Schoolyr::orderByDesc('id')->get();
 
         // Optional filters coming from the form
-        $schoolyrId = $request->input('schoolyr_id');
-        $gradeLevel = $request->input('grade_level'); // e.g., "Grade 1"
-        $studentId  = $request->input('student_id');
+        $schoolyrId  = $request->input('schoolyr_id');
+        $gradeLevel  = $request->input('grade_level');  // e.g., "Grade 1"
+        $studentLrn  = $request->input('student_lrn');  // ✅ matches the view
 
         // Grade levels for the filter
-        $gradelvls = Gradelvl::orderBy('grade_level')->get();
+        $gradelvls   = Gradelvl::orderBy('grade_level')->get();
 
         // Students list (filtered by grade level when selected)
-        $students = Student::select('id', 's_firstname', 's_middlename', 's_lastname', 's_gradelvl')
+        $students = Student::select('lrn', 's_firstname', 's_middlename', 's_lastname', 's_gradelvl')
             ->when($gradeLevel, fn ($q) => $q->where('s_gradelvl', $gradeLevel))
             ->orderBy('s_lastname')->orderBy('s_firstname')
             ->get();
@@ -36,9 +36,9 @@ class GradesController extends Controller
         $rows = collect();
         $generalAverage = null;
 
-        if ($schoolyrId && $studentId) {
+        if ($schoolyrId && $studentLrn) {
             $grades = Grade::with('subject')
-                ->where('student_id', $studentId)
+                ->where('student_id', $studentLrn) // ✅ char FK to students.lrn
                 ->where('schoolyr_id', $schoolyrId)
                 ->get();
 
@@ -61,7 +61,8 @@ class GradesController extends Controller
                 [$desc, $abbr] = $this->depedDescriptor($final);
 
                 return [
-                    'subject'          => optional($g->subject)->name ?? '—',
+                    // ✅ subjects table uses `subject_name`
+                    'subject'          => optional($g->subject)->subject_name ?? '—',
                     'q1'               => $g->q1,
                     'q2'               => $g->q2,
                     'q3'               => $g->q3,
@@ -74,7 +75,7 @@ class GradesController extends Controller
             });
 
             if ($rows->isNotEmpty()) {
-                $ga = $rows->pluck('final')->avg(); // can be 0..100 or null
+                $ga = $rows->pluck('final')->avg();
                 $generalAverage = $ga !== null ? (int) round($ga) : null;
             }
         }
@@ -82,13 +83,14 @@ class GradesController extends Controller
         // Quarter flags for the selected School Year + Grade (default: all open)
         $quartersOpen = QuarterLock::flags($schoolyrId, $gradeLevel);
 
+        // NOTE: adjust to your actual view path
         return view('auth.admindashboard.grades', compact(
             'schoolyrs',
             'gradelvls',
             'students',
             'schoolyrId',
             'gradeLevel',
-            'studentId',
+            'studentLrn',
             'rows',
             'generalAverage',
             'quartersOpen'

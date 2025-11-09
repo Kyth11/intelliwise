@@ -22,18 +22,4 @@ return new class extends Migration
         });
     }
 
-    public function down(): void
-    {
-        Schema::table('announcements', function (Blueprint $table) {
-            if (Schema::hasColumn('announcements', 'gradelvl_id')) {
-                $table->dropConstrainedForeignId('gradelvl_id');
-            }
-            if (Schema::hasColumn('announcements', 'deadline')) {
-                $table->dropColumn('deadline');
-            }
-            if (Schema::hasColumn('announcements', 'date_of_event')) {
-                $table->dropColumn('date_of_event');
-            }
-        });
-    }
 };

@@ -113,7 +113,7 @@
             <select id="studentSelect" class="form-select">
                 <option value="">— All Students —</option>
             </select>
-            <input type="hidden" name="student_id" id="studentIdInput" value="{{ $student_id }}">
+            <input type="hidden" name="student_lrn" id="studentIdInput" value="{{ $student_id }}">
         </div>
 
         {{-- Client-only filters --}}
@@ -132,7 +132,7 @@
                 <option value="">All</option>
                 <option>Paid</option>
                 <option>Partial</option>
-                <option>Not Paid</option>
+                <option>Unpaid</option>
             </select>
         </div>
     </form>
@@ -185,7 +185,7 @@
                             $paid    = min($paidRecords, $total);
                             $balance = max(0, round($total - $paid, 2));
                         }
-                        $derivedPay = $balance <= 0.01 ? 'Paid' : ($paid > 0 ? 'Partial' : 'Not Paid');
+                        $derivedPay = $balance <= 0.01 ? 'Paid' : ($paid > 0 ? 'Partial' : 'Unpaid');
 
                         // Names / contacts
                         $mFirst = trim(collect([data_get($g,'m_firstname'), data_get($g,'m_middlename')])->filter()->implode(' '));

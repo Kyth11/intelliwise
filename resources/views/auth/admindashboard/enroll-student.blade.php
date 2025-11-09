@@ -45,15 +45,83 @@
 
         .signature-line { border-top: 1px solid #000; width: 320px; margin-top: 2.25rem; text-align: center; padding-top: .25rem; font-size: .95rem; }
 
-        /* Address 4-up grid */
+        /* Address 4-up grid (Province ▸ City/Town ▸ Barangay ▸ Details) */
         .addr-grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:.75rem; }
         @media (min-width: 992px) {
             .addr-grid { grid-template-columns: repeat(4, minmax(0,1fr)); }
+        }
+
+        /* Small helper text blocks */
+        .hint { font-size: .85rem; color: #6c757d; }
+        .note { font-size: .9rem; }
+        .note.success { color: #0a7e2f; }
+        .note.warn { color: #a15c00; }
+        .note.danger { color: #a40000; }
+
+        .fieldset-soft { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: .5rem; padding: .75rem; }
+
+        /* Old-Student view visibility helper */
+        .d-none { display: none !important; }
+
+        /* Error list */
+        #formErrors ul { margin: 0; padding-left: 1rem; }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        .loading-overlay.active {
+            display: flex;
+        }
+        .loading-overlay .loading-box {
+            background: #ffffff;
+            padding: 1.5rem 2rem;
+            border-radius: .75rem;
+            box-shadow: 0 0.5rem 1.5rem rgba(0,0,0,.15);
+            text-align: center;
+            max-width: 260px;
+        }
+        .loading-spinner {
+            width: 2.75rem;
+            height: 2.75rem;
+            border-radius: 50%;
+            border: .35rem solid #dee2e6;
+            border-top-color: #0d6efd;
+            animation: spin 0.75s linear infinite;
+            margin: 0 auto .75rem;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 @endpush
 
 @section('content')
+    @php
+        // Safe fallbacks for AJAX endpoints used by the JS
+        $searchUrl   = \Illuminate\Support\Facades\Route::has('admin.students.search')
+            ? route('admin.students.search')
+            : url('/admin/students/search');
+        $prefillBase = \Illuminate\Support\Facades\Route::has('admin.students.prefill')
+            ? preg_replace('/\/\d+$/', '', route('admin.students.prefill', ['id' => 0])) // strip example id
+            : url('/admin/students/prefill');
+
+        // PSGC APIs (regions + provinces) – kept for compatibility, not used in new PSGC GitLab dropdown
+        $psgcRegionsUrl = \Illuminate\Support\Facades\Route::has('api.psgc.regions')
+            ? route('api.psgc.regions')
+            : url('/api/psgc/regions');
+
+        $psgcProvincesUrl = \Illuminate\Support\Facades\Route::has('api.psgc.provinces')
+            ? route('api.psgc.provinces')
+            : url('/api/psgc/provinces');
+    @endphp
+
     <div class="container-fluid py-3">
         <div class="enroll-page">
 
@@ -90,16 +158,111 @@
                     Please make sure to submit a <strong>CLEAR COPY</strong> of the <strong>CHILD’S BIRTH CERTIFICATE</strong>.
                 </div>
 
-                <form action="{{ route('admin.students.store') }}" method="POST" class="needs-validation" novalidate>
+                {{-- Error box (AJAX validation) --}}
+                <div id="formErrors" class="alert alert-danger d-none">
+                    <strong>There were some problems with your input:</strong>
+                    <ul class="mb-0"></ul>
+                </div>
+
+                {{-- FORM --}}
+                <form
+                    id="enrollForm"
+                    action="{{ route('admin.students.store') }}"
+                    method="POST"
+                    class="needs-validation"
+                    novalidate
+                    data-redirect="{{ route('admin.students.index') }}"
+                    data-search-url="{{ $searchUrl }}"
+                    data-prefill-base="{{ rtrim($prefillBase, '/') }}"
+                    data-psgc-regions="{{ $psgcRegionsUrl }}"
+                    data-psgc-provinces="{{ $psgcProvincesUrl }}"
+                >
                     @csrf
                     <input type="hidden" name="auto_create_login" value="1">
+                    <input type="hidden" id="picked_student_id" name="picked_student_id" value="">
+
+                    {{-- Enrollment Type + LRN --}}
+                    <div class="fieldset-soft mb-3">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Enrollment Type</label>
+                                <select id="enroll_type" name="enroll_type" class="form-select" required>
+                                    <option value="new" {{ old('enroll_type','new')==='new' ? 'selected' : '' }}>New Enrollee (Default)</option>
+                                    <option value="old" {{ old('enroll_type')==='old' ? 'selected' : '' }}>Old Student / Returnee</option>
+                                    <option value="transferee" {{ old('enroll_type')==='transferee' ? 'selected' : '' }}>Transferee</option>
+                                </select>
+                                <div class="hint mt-1">Choose how this learner is enrolling.</div>
+                            </div>
+
+                            <div class="col-md-4 suggest-wrap">
+                                <label class="form-label fw-semibold">LRN (Learner Reference Number)</label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    id="lrn"
+                                    name="lrn"
+                                    inputmode="numeric"
+                                    pattern="\d{10,12}"
+                                    maxlength="12"
+                                    placeholder="Enter 10–12 digits"
+                                    value="{{ old('lrn') }}"
+                                    required
+                                >
+                                <div id="suggest_lrn" class="suggest-list d-none"></div>
+                                <div class="hint mt-1">LRN is required for ALL enrollment types.</div>
+                                @error('lrn')
+                                    <div class="text-danger small">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            {{-- Old Student helper --}}
+                            <div class="col-md-4 d-none" id="oldStudentHelper">
+                                <label class="form-label fw-semibold">Old Student Options</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="old_retain_chk">
+                                    <label class="form-check-label" for="old_retain_chk">
+                                        Retain same grade (allowed to re-enroll same grade)
+                                    </label>
+                                </div>
+                                <div id="oldEligibilityNote" class="note mt-1"></div>
+                            </div>
+                        </div>
+
+                        {{-- Transferee extra fields --}}
+                        <div id="transfereeFields" class="row g-2 mt-2 d-none">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Previous School</label>
+                                <input type="text" class="form-control" id="prev_school_proxy" placeholder="Type previous school name">
+                                <div class="hint mt-1">This will also fill the “Previous School” field below.</div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">Previous Grade Level</label>
+                                <select id="prev_grade" class="form-select">
+                                    <option value="">—</option>
+                                    <option>Nursery</option>
+                                    <option>Kindergarten 1</option>
+                                    <option>Kindergarten 2</option>
+                                    @for ($i = 1; $i <= 6; $i++)
+                                        <option>Grade {{ $i }}</option>
+                                    @endfor
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">GWA (General Weighted Average)</label>
+                                <input type="number" class="form-control" id="prev_gwa" min="60" max="100" step="0.01" placeholder="e.g., 84.5">
+                                <div class="hint mt-1">GWA ≥ 75 → proceed to next grade; GWA ≤ 74 → retained.</div>
+                            </div>
+                            <div class="col-12">
+                                <div id="transEligibilityNote" class="note mt-1"></div>
+                            </div>
+                        </div>
+                    </div>
+                    {{-- /Enrollment Type + LRN --}}
 
                     {{-- Learner’s section --}}
                     <div class="row g-3">
                         <div class="col-12">
                             <label class="form-label fw-semibold">LEARNER’S NAME</label>
-
-                            {{-- Suggestion search binds to FIRST and LAST name fields. --}}
                             <div class="row g-2">
                                 <div class="col-md-4 suggest-wrap">
                                     <input type="text" class="form-control" name="s_firstname" id="s_firstname"
@@ -116,11 +279,9 @@
                                     <div id="suggest_last" class="suggest-list d-none"></div>
                                 </div>
                             </div>
-
-                            {{-- Selected existing student id (if user picked from suggestions) --}}
-                            <input type="hidden" id="picked_student_id" name="picked_student_id" value="">
                         </div>
 
+                        {{-- Basic details kept visible even in Old view --}}
                         <div class="col-md-3">
                             <label class="form-label">Gender</label>
                             <select class="form-select" name="s_gender" id="s_gender">
@@ -137,7 +298,8 @@
                                    value="{{ old('s_birthdate') }}" required>
                         </div>
 
-                        <div class="col-md-3">
+                        {{-- old-hide: hide these in Old view --}}
+                        <div class="col-md-3 old-hide">
                             <label class="form-label">Citizenship</label>
                             <input type="text"
                                    class="form-control"
@@ -175,8 +337,8 @@
                             <input type="number" class="form-control" id="s_age" placeholder="Auto" readonly>
                         </div>
 
-                        {{-- Address (PH cascade + details) --}}
-                        <div class="col-12">
+                        {{-- Address (PH cascade + details) (hide in Old view) --}}
+                        <div class="col-12 old-hide">
                             <label class="form-label">Address (Philippines)</label>
                             <div class="addr-grid">
                                 <div>
@@ -195,15 +357,15 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <input type="text" id="addr_details" class="form-control" placeholder="Street / Sitio / House #" autocomplete="off">
+                                    <input type="text" id="addr_details" class="form-control" placeholder="Street / Sitio / House # (optional)" autocomplete="off">
                                 </div>
                             </div>
-                            {{-- Hidden combined field used by backend --}}
-                            <input type="hidden" name="s_address" id="s_address" value="{{ old('s_address') }}">
+                            {{-- Keep this enabled even in OLD mode so it submits --}}
+                            <input type="hidden" name="s_address" id="s_address" value="{{ old('s_address') }}" data-keep-enabled="1">
                             <div class="form-text">We’ll assemble the full address for you.</div>
                         </div>
 
-                        <div class="col-md-3">
+                        <div class="col-md-3 old-hide">
                             <label class="form-label">Religion</label>
                             <input type="text" class="form-control" name="s_religion" id="s_religion"
                                    list="religionsList" placeholder="Choose or type"
@@ -231,19 +393,19 @@
                             </datalist>
                         </div>
 
-                        <div class="col-md-3">
+                        <div class="col-md-3 old-hide">
                             <label class="form-label">Contact No. (optional)</label>
                             <input type="text" class="form-control" name="s_contact" id="s_contact"
                                    value="{{ old('s_contact') }}">
                         </div>
 
-                        <div class="col-md-6">
+                        <div class="col-md-6 old-hide">
                             <label class="form-label">Email (optional)</label>
                             <input type="email" class="form-control" name="s_email" id="s_email"
                                    value="{{ old('s_email') }}">
                         </div>
 
-                        <div class="col-md-6">
+                        <div class="col-md-6 old-hide">
                             <label class="form-label">Does the learner have Special Education needs or disabilities?</label>
                             <div class="input-group">
                                 <select class="form-select" id="sped_has" name="sped_has" aria-label="SPED has">
@@ -258,7 +420,8 @@
                             </div>
                         </div>
 
-                        <div class="col-md-6">
+                        {{-- Grade Level block: visible for New/Old; hidden for Transferee --}}
+                        <div id="gradeLevelBlock" class="col-md-6">
                             <label class="form-label">GRADE LEVEL TO ENROLL</label>
                             <select name="s_gradelvl" id="s_gradelvl" class="form-select" required>
                                 <option value="">-</option>
@@ -271,19 +434,20 @@
                                     </option>
                                 @endfor
                             </select>
+                            <div class="hint mt-1" id="gradeHint"></div>
                         </div>
 
-                        <div class="col-md-6">
+                        <div class="col-md-6 old-hide">
                             <label class="form-label">Name of the previous school (if applicable)</label>
                             <input type="text" class="form-control" name="previous_school" id="previous_school"
                                    value="{{ old('previous_school') }}" placeholder="N/A if none">
                         </div>
                     </div> {{-- /row --}}
 
-                    {{-- Optional Fees (if provided by the controller) --}}
+                    {{-- Optional Fees --}}
                     @if (!empty($optionalFees) && $optionalFees->count())
-                        <hr class="my-4">
-                        <div>
+                        <hr class="my-4 old-hide">
+                        <div class="old-hide" id="optionalFeesBlock">
                             <label class="form-label fw-semibold">Optional Fees</label>
                             <div class="row g-2">
                                 @foreach ($optionalFees as $fee)
@@ -327,6 +491,7 @@
                             </select>
                         </div>
 
+                        {{-- New Guardian fields (still appear if user picks "new", even in Old view) --}}
                         <div id="newGuardianFields" class="{{ old('guardian_id') === 'new' ? '' : 'd-none' }}">
                             {{-- Household Address --}}
                             <div class="col-12">
@@ -398,7 +563,16 @@
                         </button>
                     </div>
                 </form>
+                {{-- /FORM --}}
             </div>
+        </div>
+    </div>
+
+    {{-- Loading overlay --}}
+    <div id="loadingOverlay" class="loading-overlay no-print">
+        <div class="loading-box">
+            <div class="loading-spinner"></div>
+            <div>Saving enrollment record…</div>
         </div>
     </div>
 @endsection
@@ -407,468 +581,637 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.querySelector('form.needs-validation');
+    const errorBox = document.getElementById('formErrors');
+    const errorList = errorBox?.querySelector('ul');
+    const loadingOverlay = document.getElementById('loadingOverlay');
 
-    /* ======================
-       Helpers / Validation
-       ====================== */
-    function applyRequiredMessage(el) {
-        if (!el) return;
-        el.addEventListener('invalid', function () {
-            if (el.validity.valueMissing) el.setCustomValidity('You are required to fill this field');
-        });
-        ['input','change'].forEach(evt => el.addEventListener(evt, () => el.setCustomValidity('')));
-    }
-    form.querySelectorAll('[required]').forEach(applyRequiredMessage);
+    // ---- Elements
+    const enrollTypeSel   = document.getElementById('enroll_type');
+    const oldHelper       = document.getElementById('oldStudentHelper');
+    const oldRetainChk    = document.getElementById('old_retain_chk');
+    const oldEligibility  = document.getElementById('oldEligibilityNote');
 
-    const birth = document.getElementById('s_birthdate');
-    const age = document.getElementById('s_age');
-    const spedHas = document.getElementById('sped_has');
-    const spedDesc = document.getElementById('sped_desc');
+    const transfWrap      = document.getElementById('transfereeFields');
+    const prevSchoolProxy = document.getElementById('prev_school_proxy');
+    const prevGradeSel    = document.getElementById('prev_grade');
+    const prevGwaInput    = document.getElementById('prev_gwa');
+    const transNote       = document.getElementById('transEligibilityNote');
 
-    function calcAge() {
-        if (!birth.value) { age.value = ''; return; }
-        const b = new Date(birth.value), t = new Date();
-        let a = t.getFullYear() - b.getFullYear();
-        const m = t.getMonth() - b.getMonth();
-        if (m < 0 || (m === 0 && t.getDate() < b.getDate())) a--;
-        age.value = isNaN(a) ? '' : a;
-    }
-    birth.addEventListener('change', calcAge); calcAge();
+    const gradeBlock      = document.getElementById('gradeLevelBlock');
+    const sGradeSel       = document.getElementById('s_gradelvl');
+    const gradeHint       = document.getElementById('gradeHint');
 
-    spedHas.addEventListener('change', () => {
-        const yes = spedHas.value === 'Yes';
-        spedDesc.disabled = !yes;
-        if (!yes) spedDesc.value = '';
-    });
+    const oldHideEls      = document.querySelectorAll('.old-hide');
 
-    /* ======================
-       Guardian block logic
-       ====================== */
-    const guardianSelect = document.getElementById('guardian_id');
-    const newGuardianFields = document.getElementById('newGuardianFields');
-    const sameAddress = document.getElementById('sameAddress');
-    const requiredWhenNew = [
-        'input[name="g_address"]',
-        'input[name="m_firstname"]','input[name="m_lastname"]','input[name="m_contact"]',
-        'input[name="f_firstname"]','input[name="f_lastname"]','input[name="f_contact"]',
-    ];
-    applyRequiredMessage(guardianSelect);
+    const sFirst          = document.getElementById('s_firstname');
+    const sMiddle         = document.getElementById('s_middlename');
+    const sLast           = document.getElementById('s_lastname');
+    const lrnInput        = document.getElementById('lrn');
+    const sBirth          = document.getElementById('s_birthdate');
+    const sAge            = document.getElementById('s_age');
+    const sGender         = document.getElementById('s_gender');
 
-    function setRequiredForNewGuardian(isNew) {
-        requiredWhenNew.forEach(sel => {
-            const el = newGuardianFields.querySelector(sel);
-            if (!el) return;
-            if (isNew) { el.setAttribute('required','required'); applyRequiredMessage(el); }
-            else { el.removeAttribute('required'); el.setCustomValidity(''); }
-        });
-    }
-    function toggleGuardianUI() {
-        const isNew = guardianSelect.value === 'new';
-        newGuardianFields.classList.toggle('d-none', !isNew);
-        if (!isNew) {
-            newGuardianFields.querySelectorAll('input').forEach(i => { if (!document.body.dataset.initialized) return; i.value=''; i.setCustomValidity(''); });
+    const spedHas         = document.getElementById('sped_has');
+    const spedDesc        = document.getElementById('sped_desc');
+
+    // Address controls (Province ▸ City / Town ▸ Barangay ▸ Details)
+    const addrProvince    = document.getElementById('addr_province');
+    const addrCity        = document.getElementById('addr_city');
+    const addrBarangay    = document.getElementById('addr_barangay');
+    const addrDetails     = document.getElementById('addr_details');
+    const sAddressHidden  = document.getElementById('s_address');
+
+    const previousSchool  = document.getElementById('previous_school');
+
+    const guardianSel     = document.getElementById('guardian_id');
+    const newGuardFields  = document.getElementById('newGuardianFields');
+    const sameAddrChk     = document.getElementById('sameAddress');
+    const gAddress        = document.getElementById('g_address');
+
+    const pickedStudentId = document.getElementById('picked_student_id');
+
+    // Suggestions UI & endpoints
+    const suggestFirstBox = document.getElementById('suggest_first');
+    const suggestLastBox  = document.getElementById('suggest_last');
+    const suggestLrnBox   = document.getElementById('suggest_lrn');
+    const searchUrl       = form.dataset.searchUrl || '';
+    const prefillBase     = (form.dataset.prefillBase || '').replace(/\/$/, '');
+
+    function showErrors(map) {
+        if (!errorBox || !errorList) return;
+        errorList.innerHTML = '';
+        const items = [];
+        for (const key in map) {
+            const msgs = Array.isArray(map[key]) ? map[key] : [String(map[key])];
+            msgs.forEach(m => items.push(`<li>${m}</li>`));
         }
-        setRequiredForNewGuardian(isNew);
-    }
-    guardianSelect.addEventListener('change', toggleGuardianUI);
-
-    sameAddress?.addEventListener('change', function () {
-        const hhAddress = document.getElementById('g_address');
-        const sAddress = document.getElementById('s_address');
-        if (this.checked && hhAddress) hhAddress.value = sAddress.value || '';
-    });
-
-    /* ======================
-       Student suggestions
-       ====================== */
-    const first = document.getElementById('s_firstname');
-    const mid   = document.getElementById('s_middlename');
-    const last  = document.getElementById('s_lastname');
-    const suggestFirst = document.getElementById('suggest_first');
-    const suggestLast  = document.getElementById('suggest_last');
-    const pickHidden = document.getElementById('picked_student_id');
-
-    // smarter select match: matches by value OR text, case-insensitive; also maps M/F
-    function selectMatch(selectEl, rawVal) {
-        if (!selectEl) return;
-        const v = String(rawVal ?? '').trim();
-        if (v === '') { selectEl.selectedIndex = 0; selectEl.dispatchEvent(new Event('change')); return; }
-        const normalized = v.toLowerCase();
-
-        // map common gender variants
-        const genderMap = { 'm':'male', 'f':'female', 'boy':'male', 'girl':'female' };
-        const target = genderMap[normalized] || normalized;
-
-        let matched = false;
-        Array.from(selectEl.options).forEach(opt => {
-            const ov = (opt.value ?? '').toString().trim().toLowerCase();
-            const ot = (opt.textContent ?? '').toString().trim().toLowerCase();
-            if (ov === target || ot === target) {
-                opt.selected = true;
-                matched = true;
-            } else {
-                opt.selected = false;
-            }
-        });
-        if (!matched) { selectEl.selectedIndex = 0; }
-        selectEl.dispatchEvent(new Event('change'));
-    }
-
-    function setVal(id, value) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        if (el.tagName === 'SELECT') {
-            selectMatch(el, value);
-        } else {
-            // default Filipino when setting citizenship and nothing came from server
-            if (id === 's_citizenship' && (!value || String(value).trim() === '')) {
-                el.value = 'Filipino';
-            } else {
-                el.value = value ?? '';
-            }
-            el.dispatchEvent(new Event('input'));
-            el.dispatchEvent(new Event('change'));
+        if (!items.length) {
+            errorBox.classList.add('d-none');
+            return;
         }
+        errorList.innerHTML = items.join('');
+        errorBox.classList.remove('d-none');
+        errorBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    const fillMap = {
-        s_middlename:'s_middlename', s_gender:'s_gender', s_birthdate:'s_birthdate',
-        s_citizenship:'s_citizenship', s_address:'s_address', s_religion:'s_religion',
-        s_contact:'s_contact', s_email:'s_email', sped_has:'sped_has', sped_desc:'sped_desc',
-        s_gradelvl:'s_gradelvl', previous_school:'previous_school',
-        // guardian
-        g_address:'g_address',
-        m_firstname:'m_firstname', m_middlename:'m_middlename', m_lastname:'m_lastname', m_contact:'m_contact', m_email:'m_email', m_occupation:'m_occupation',
-        f_firstname:'f_firstname', f_middlename:'f_middlename', f_lastname:'f_lastname', f_contact:'f_contact', f_email:'f_email', f_occupation:'f_occupation',
-        alt_guardian_details:'alt_guardian_details'
-    };
-
-    function debounce(fn, ms=250){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms);} }
-
-    const SEARCH_URL = @json(route('admin.students.search'));
-    const PREFILL_URL_TEMPLATE = @json(route('admin.students.prefill', ['id' => 'ID_PLACEHOLDER']));
-
-    async function fetchSuggest(term) {
-        if (!term || term.trim().length < 2) return [];
-        try {
-            const r = await fetch(`${SEARCH_URL}?q=${encodeURIComponent(term)}`, { headers:{'Accept':'application/json'} });
-            if (!r.ok) { console.error('Search HTTP error', r.status); return []; }
-            const ct = (r.headers.get('content-type') || '').toLowerCase();
-            if (!ct.includes('application/json')) return [];
-            return await r.json();
-        } catch (e) { console.error('Search fetch failed', e); return []; }
-    }
-
-    function renderList(el, items) {
-        if (!items.length) { el.classList.add('d-none'); el.innerHTML=''; return; }
-        el.innerHTML = items.map(i => `<div class="suggest-item" data-id="${i.id}">${i.name}</div>`).join('');
-        el.classList.remove('d-none');
-    }
-
-    async function handleType(targetInput, listEl) {
-        const term = targetInput.value.trim();
-        const items = await fetchSuggest(term);
-        renderList(listEl, items);
-    }
-
-    const onTypeFirst = debounce(()=>handleType(first, suggestFirst), 250);
-    const onTypeLast  = debounce(()=>handleType(last, suggestLast), 250);
-    first.addEventListener('input', onTypeFirst);
-    last.addEventListener('input', onTypeLast);
-
-    async function prefillById(id) {
-        pickHidden.value = id;
-        const url = PREFILL_URL_TEMPLATE.replace('ID_PLACEHOLDER', encodeURIComponent(id));
-        try {
-            const r = await fetch(url, { headers:{'Accept':'application/json'} });
-            if (!r.ok) { console.error('Prefill HTTP error', r.status); return; }
-            const ct = (r.headers.get('content-type') || '').toLowerCase();
-            if (!ct.includes('application/json')) { console.warn('Prefill non-JSON response'); return; }
-            const data = await r.json();
-
-            // Names first
-            setVal('s_firstname',  data.s_firstname);
-            setVal('s_middlename', data.s_middlename);
-            setVal('s_lastname',   data.s_lastname);
-
-            // Fill the rest
-            Object.entries(fillMap).forEach(([serverKey, fieldId])=>{
-                if (fieldId === 's_address') {
-                    setVal('s_address', data[serverKey]);
-                    tryPrefillAddressFromFull(data[serverKey] || '');
-                } else {
-                    setVal(fieldId, data[serverKey]);
+    // ---------- Helpers
+    function setDisabledGroup(groupEls, disabled) {
+        groupEls.forEach(el => {
+            el.classList.toggle('d-none', disabled);
+            el.querySelectorAll('input, select, textarea').forEach(ctrl => {
+                // keep some controls enabled even when visually hidden
+                const keep = ctrl.dataset.keepEnabled === '1';
+                if (disabled && !keep) {
+                    ctrl.setAttribute('data-prev-disabled', ctrl.disabled ? '1' : '');
+                    ctrl.disabled = true;
+                } else if (!disabled) {
+                    const flag = ctrl.getAttribute('data-prev-disabled');
+                    ctrl.disabled = flag === '1';
+                    ctrl.removeAttribute('data-prev_disabled');
+                    ctrl.removeAttribute('data-prev-disabled');
                 }
             });
+        });
+    }
 
-            if (data.guardian_id) {
-                setVal('guardian_id', data.guardian_id);
-            }
-            calcAge();
-        } catch (e) {
-            console.error('Prefill fetch failed', e);
+    function calcAge(isoDate) {
+        if (!isoDate) { sAge.value = ''; return; }
+        const b = new Date(isoDate);
+        if (isNaN(b.getTime())) { sAge.value=''; return; }
+        const today = new Date();
+        let age = today.getFullYear() - b.getFullYear();
+        const m = today.getMonth() - b.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
+        sAge.value = age >= 0 ? age : '';
+    }
+
+    // Compose full address from Province, City/Town, Barangay + details
+    function assembleAddress() {
+        const prov = addrProvince?.options[addrProvince.selectedIndex]?.text || '';
+        const city = addrCity?.options[addrCity.selectedIndex]?.text || '';
+        const brgy = addrBarangay?.options[addrBarangay.selectedIndex]?.text || '';
+        const det  = (addrDetails?.value || '').trim();
+
+        const parts = [];
+        if (det)  parts.push(det);
+        if (brgy) parts.push(brgy);
+        if (city) parts.push(city);
+        if (prov) parts.push(prov);
+
+        sAddressHidden.value = parts.join(', ');
+        syncGuardianAddress();
+    }
+
+    function clearSuggestLists() {
+        [suggestFirstBox, suggestLastBox, suggestLrnBox].forEach(box => {
+            if (!box) return;
+            box.classList.add('d-none');
+            box.innerHTML = '';
+        });
+    }
+
+    function textToGradeValue(txt) {
+        const allowed = [
+            'Nursery','Kindergarten 1','Kindergarten 2',
+            'Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6'
+        ];
+        if (allowed.includes(txt)) return txt;
+        const t = (txt || '').toLowerCase();
+        if (/nursery/.test(t)) return 'Nursery';
+        if (/kindergarten\s*1|k1/.test(t)) return 'Kindergarten 1';
+        if (/kindergarten\s*2|k2/.test(t)) return 'Kindergarten 2';
+        const m = t.match(/grade\s*(\d)/);
+        if (m && m[1]) return `Grade ${m[1]}`;
+        return '';
+    }
+
+    // ---------- Enrollment type toggle
+    function updateEnrollTypeUI() {
+        const t = enrollTypeSel.value;
+        if (t === 'old') {
+            // Old student:
+            oldHelper.classList.remove('d-none');
+            transfWrap.classList.add('d-none');
+            gradeBlock.classList.remove('d-none');
+
+            setDisabledGroup(oldHideEls, true);
+
+            // Ensure s_address is included in submit even if block hidden
+            sAddressHidden.disabled = false;
+
+            sGradeSel.disabled = false;
+            gradeHint.textContent = 'Returning student: search by name or LRN to autofill, then choose grade to re-enroll. Tick "retain same grade" if repeating.';
+            oldEligibility.textContent = oldRetainChk?.checked
+                ? 'Retain same grade checked: student will repeat the same grade level.'
+                : 'Unchecked: set the next appropriate grade level in the selector.';
+        } else if (t === 'transferee') {
+            // Transferee:
+            oldHelper.classList.add('d-none');
+            transfWrap.classList.remove('d-none');
+            gradeBlock.classList.add('d-none'); // hidden per requirement
+            setDisabledGroup(oldHideEls, false); // Collect complete data for transferees
+
+            sGradeSel.disabled = false;
+            gradeHint.textContent = '';
+            computeTransfereeTarget();
+
+            // Clear any old-mode picks
+            pickedStudentId.value = '';
+            clearSuggestLists();
+        } else {
+            // New
+            oldHelper.classList.add('d-none');
+            transfWrap.classList.add('d-none');
+            gradeBlock.classList.remove('d-none');
+            setDisabledGroup(oldHideEls, false);
+
+            sGradeSel.disabled = false;
+            gradeHint.textContent = 'For new enrollee: pick intended grade level.';
+
+            pickedStudentId.value = '';
+            clearSuggestLists();
         }
     }
 
-    function attachPick(listEl) {
-        listEl.addEventListener('click', (e)=>{
+    function computeTransfereeTarget() {
+        const prevGradeText = prevGradeSel.value || '';
+        const gwa = parseFloat(prevGwaInput.value || '');
+        const normalizedPrev = textToGradeValue(prevGradeText);
+        if (!normalizedPrev) {
+            transNote.className = 'note';
+            transNote.textContent = 'Select the previous grade and (optionally) provide GWA to auto-suggest the target grade.';
+            return;
+        }
+        const isAdvance = !isNaN(gwa) ? (gwa >= 75) : true;
+        const mapOrder = ['Nursery','Kindergarten 1','Kindergarten 2','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6'];
+        const idx = mapOrder.indexOf(normalizedPrev);
+        let target = normalizedPrev;
+        if (isAdvance && idx >= 0 && idx < mapOrder.length - 1) {
+            target = mapOrder[idx + 1];
+            transNote.className = 'note success';
+            transNote.textContent = `Eligible to advance based on provided GWA. Target grade set to ${target}.`;
+        } else if (!isAdvance) {
+            transNote.className = 'note warn';
+            transNote.textContent = `GWA indicates retention. Target grade set to ${target}.`;
+        } else {
+            transNote.className = 'note warn';
+            transNote.textContent = `Highest grade reached. Target grade remains ${target}.`;
+        }
+        sGradeSel.value = target;
+    }
+
+    // ---------- SPED toggle
+    function updateSped() {
+        const has = (spedHas.value || '').toLowerCase() === 'yes';
+        spedDesc.disabled = !has;
+        if (!has) spedDesc.value = '';
+    }
+
+    // ---------- Guardian toggle
+    function updateGuardianUI() {
+        const v = guardianSel.value || '';
+        const isNew = v === 'new';
+        newGuardFields.classList.toggle('d-none', !isNew);
+    }
+
+    // Same address checkbox
+    function syncGuardianAddress() {
+        if (sameAddrChk && gAddress && sameAddrChk.checked) {
+            gAddress.value = sAddressHidden.value || '';
+        }
+    }
+
+    function syncGuardianCheckboxChange() {
+        if (sameAddrChk.checked) {
+            gAddress.value = sAddressHidden.value || '';
+        }
+    }
+
+    // ---------- Suggestions (OLD students only) ----------
+    function buildSearchList(box, list) {
+        if (!box) return;
+        if (!Array.isArray(list) || !list.length) { box.classList.add('d-none'); box.innerHTML=''; return; }
+        box.innerHTML = list.map(item => {
+            const id   = item.id || item.lrn || '';
+            const name = item.name || [item.s_firstname, item.s_middlename, item.s_lastname].filter(Boolean).join(' ') || '';
+            const label = [name, id ? `(LRN: ${id})` : ''].filter(Boolean).join(' ');
+            return `<div class="suggest-item" data-id="${String(id)}">${label}</div>`;
+        }).join('');
+        box.classList.remove('d-none');
+    }
+
+    async function searchStudents(term) {
+        if (!searchUrl || !term || term.length < 2) return [];
+        const qs = new URLSearchParams({ q: term });
+        try {
+            const res = await fetch(`${searchUrl}?${qs.toString()}`, { headers: { 'Accept': 'application/json' } });
+            if (!res.ok) return [];
+            const data = await res.json();
+            return Array.isArray(data) ? data : [];
+        } catch { return []; }
+    }
+
+    async function prefillStudentById(id) {
+        if (!id || !prefillBase) return;
+        try {
+            const res = await fetch(`${prefillBase}/${encodeURIComponent(id)}`, { headers: { 'Accept': 'application/json' } });
+            if (!res.ok) return;
+            const rec = await res.json();
+
+            // Fill core fields
+            if (rec.s_firstname) sFirst.value = rec.s_firstname;
+            if (rec.s_middlename !== undefined) sMiddle.value = rec.s_middlename || '';
+            if (rec.s_lastname)  sLast.value = rec.s_lastname;
+            if (rec.id)          lrnInput.value = rec.id;
+
+            if (rec.s_birthdate) { sBirth.value = (rec.s_birthdate || '').substring(0,10); calcAge(sBirth.value); }
+            if (rec.s_gender)    sGender.value = rec.s_gender;
+
+            // Hidden/old-hide values (kept enabled for submit where needed)
+            if (rec.s_address) {
+                sAddressHidden.value = rec.s_address;
+                tryPrefillAddressFromFull(rec.s_address);
+            }
+            if (rec.s_religion)  document.getElementById('s_religion').value = rec.s_religion;
+            if (rec.s_contact)   document.getElementById('s_contact').value  = rec.s_contact;
+            if (rec.s_email)     document.getElementById('s_email').value    = rec.s_email;
+            if (rec.s_citizenship) document.getElementById('s_citizenship').value = rec.s_citizenship;
+
+            if (rec.sped_has)    spedHas.value = rec.sped_has;
+            if (rec.sped_desc)   spedDesc.value = rec.sped_desc;
+            updateSped();
+
+            // Grade level (user can still change it)
+            if (rec.s_gradelvl) {
+                const gv = textToGradeValue(rec.s_gradelvl);
+                if (gv) sGradeSel.value = gv;
+            }
+
+            if (rec.previous_school) previousSchool.value = rec.previous_school;
+
+            // Guardian (select existing)
+            if (rec.guardian_id) {
+                guardianSel.value = String(rec.guardian_id);
+                updateGuardianUI();
+            }
+
+            pickedStudentId.value = rec.id || id;
+        } catch {
+            // ignore
+        }
+    }
+
+    function wireSuggestBox(box) {
+        if (!box) return;
+        box.addEventListener('click', async (e) => {
             const item = e.target.closest('.suggest-item');
             if (!item) return;
-            listEl.classList.add('d-none');
-            prefillById(item.dataset.id);
+            const id = item.getAttribute('data-id') || '';
+            clearSuggestLists();
+            if (id) {
+                await prefillStudentById(id);
+                // Focus next logical field
+                sBirth.focus();
+            }
         });
     }
-    attachPick(suggestFirst);
-    attachPick(suggestLast);
 
-    document.addEventListener('click', (e)=>{
-        if (!suggestFirst.contains(e.target) && e.target !== first) suggestFirst.classList.add('d-none');
-        if (!suggestLast.contains(e.target) && e.target !== last)   suggestLast.classList.add('d-none');
-    });
-
-    /* ======================
-       Address (PSGC-powered)
-       ====================== */
-    const addrProvince  = document.getElementById('addr_province');
-    const addrCity      = document.getElementById('addr_city');
-    const addrBarangay  = document.getElementById('addr_barangay');
-    const addrDetails   = document.getElementById('addr_details');
-    const sAddressHidden= document.getElementById('s_address');
-
-    // PSGC helper (inline; cached via localStorage)
+    // ---------- PSGC GitLab-based cascade (Province ▸ City/Town ▸ Barangay)
     const PSGC_API = 'https://psgc.gitlab.io/api';
     const LS_PREFIX = 'psgc_cache_v1_';
+
     async function psgcCached(key, url) {
         const k = LS_PREFIX + key;
         try {
             const raw = localStorage.getItem(k);
             if (raw) {
                 const { ts, data } = JSON.parse(raw);
-                if (Date.now() - ts < 14*24*60*60*1000) return data;
+                if (Date.now() - ts < 14*24*60*60*1000) {
+                    return data;
+                }
             }
         } catch {}
-        const res = await fetch(url, { headers: { 'Accept':'application/json' }});
-        if (!res.ok) throw new Error('HTTP '+res.status);
+        const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         try { localStorage.setItem(k, JSON.stringify({ ts: Date.now(), data })); } catch {}
         return data;
     }
+
     const listProvinces = () => psgcCached('provinces', `${PSGC_API}/provinces/`);
-    const listCitiesMunsOfProvince = (provCode) => psgcCached(`prov_${provCode}_cm`, `${PSGC_API}/provinces/${provCode}/cities-municipalities/`);
-    const listBarangaysOf = (code, isCity) => psgcCached(`${isCity?'city':'mun'}_${code}_brgys`, `${PSGC_API}/${isCity?'cities':'municipalities'}/${code}/barangays/`);
+    const listCitiesMunsOfProvince = (provCode) =>
+        psgcCached(`prov_${provCode}_cm`, `${PSGC_API}/provinces/${provCode}/cities-municipalities/`);
+    const listBarangaysOf = (code, isCity) =>
+        psgcCached(`${isCity ? 'city' : 'mun'}_${code}_brgys`, `${PSGC_API}/${isCity ? 'cities' : 'municipalities'}/${code}/barangays/`);
     const byName = (a,b) => a.name.localeCompare(b.name);
 
-    function composeFullAddress() {
-        const p = addrProvince.options[addrProvince.selectedIndex]?.text || '';
-        const c = addrCity.options[addrCity.selectedIndex]?.text || '';
-        const b = addrBarangay.options[addrBarangay.selectedIndex]?.text || '';
-        const d = addrDetails.value || '';
-        const parts = [];
-        if (d) parts.push(d);
-        if (b) parts.push(b);
-        if (c) parts.push(c);
-        if (p) parts.push(p);
-        sAddressHidden.value = parts.join(', ');
-    }
-
-    // wire selects + controller for preselect
     const Address = {
         ready: (async function init() {
-            // Provinces
+            if (!addrProvince) return;
             addrProvince.innerHTML = '<option value="">Province</option>';
             addrProvince.disabled = true;
             try {
                 const provs = (await listProvinces()).sort(byName);
                 provs.forEach(p => {
                     const o = document.createElement('option');
-                    o.value = p.code; o.textContent = p.name;
+                    o.value = p.code;
+                    o.textContent = p.name;
                     addrProvince.appendChild(o);
                 });
-            } catch (e) { /* silent */ }
+            } catch (e) {
+                // silent
+            }
             addrProvince.disabled = false;
         })(),
         async setByNames(provName, cityName, brgyName) {
+            if (!addrProvince) return;
             if (!provName) return;
             await this.ready;
 
-            // select province by label
+            // Province
             let provCode = '';
             Array.from(addrProvince.options).forEach(o => {
-                if ((o.textContent||'').trim().toLowerCase() === provName.trim().toLowerCase()) provCode = o.value;
+                if ((o.textContent || '').trim().toLowerCase() === provName.trim().toLowerCase()) {
+                    provCode = o.value;
+                }
             });
             if (!provCode) return;
 
             addrProvince.value = provCode;
             addrProvince.dispatchEvent(new Event('change'));
 
-            // cities/mun
+            // Cities/Municipalities
             addrCity.innerHTML = '<option value="">City / Town</option>';
             addrCity.disabled = true;
             const cms = (await listCitiesMunsOfProvince(provCode)).sort(byName);
             cms.forEach(cm => {
                 const isCity = /city/i.test(cm.classification);
                 const o = document.createElement('option');
-                o.value = `${cm.code}|${isCity?'city':'mun'}`;
+                o.value = `${cm.code}|${isCity ? 'city' : 'mun'}`;
                 o.textContent = cm.name;
                 addrCity.appendChild(o);
             });
             addrCity.disabled = false;
 
             if (!cityName) return;
-            let cmCode = '', isCity = false;
+            let cmCode = '';
+            let isCityFlag = false;
             Array.from(addrCity.options).forEach(o => {
-                if ((o.textContent||'').trim().toLowerCase() === cityName.trim().toLowerCase()) {
-                    const [code, kind] = o.value.split('|'); cmCode = code; isCity = (kind==='city'); addrCity.value = o.value;
+                if ((o.textContent || '').trim().toLowerCase() === cityName.trim().toLowerCase()) {
+                    const [code, kind] = o.value.split('|');
+                    cmCode = code;
+                    isCityFlag = (kind === 'city');
+                    addrCity.value = o.value;
                 }
             });
             addrCity.dispatchEvent(new Event('change'));
 
-            // barangays
             if (!cmCode) return;
             addrBarangay.innerHTML = '<option value="">Barangay</option>';
             addrBarangay.disabled = true;
-            const brgys = (await listBarangaysOf(cmCode, isCity)).sort(byName);
+            const brgys = (await listBarangaysOf(cmCode, isCityFlag)).sort(byName);
             brgys.forEach(b => {
                 const o = document.createElement('option');
-                o.value = b.code; o.textContent = b.name;
+                o.value = b.code;
+                o.textContent = b.name;
                 addrBarangay.appendChild(o);
             });
             addrBarangay.disabled = false;
 
             if (brgyName) {
                 Array.from(addrBarangay.options).forEach(o => {
-                    if ((o.textContent||'').trim().toLowerCase() === brgyName.trim().toLowerCase()) addrBarangay.value = o.value;
+                    if ((o.textContent || '').trim().toLowerCase() === brgyName.trim().toLowerCase()) {
+                        addrBarangay.value = o.value;
+                    }
                 });
             }
-            composeFullAddress();
+            assembleAddress();
         }
     };
 
-    addrProvince.addEventListener('change', async () => {
-        composeFullAddress();
-        const provCode = addrProvince.value;
-        addrCity.innerHTML = '<option value="">City / Town</option>';
-        addrBarangay.innerHTML = '<option value="">Barangay</option>';
-        addrCity.disabled = true; addrBarangay.disabled = true;
-        if (!provCode) return;
-
-        try {
-            const cms = (await listCitiesMunsOfProvince(provCode)).sort(byName);
-            cms.forEach(cm => {
-                const isCity = /city/i.test(cm.classification);
-                const o = document.createElement('option');
-                o.value = `${cm.code}|${isCity?'city':'mun'}`;
-                o.textContent = cm.name;
-                addrCity.appendChild(o);
-            });
-            addrCity.disabled = false;
-        } catch (e) {
-            // leave disabled
-        }
-    });
-
-    addrCity.addEventListener('change', async () => {
-        composeFullAddress();
-        addrBarangay.innerHTML = '<option value="">Barangay</option>';
-        addrBarangay.disabled = true;
-        if (!addrCity.value) return;
-
-        const [code, kind] = addrCity.value.split('|');
-        const isCity = (kind === 'city');
-        try {
-            const brgys = (await listBarangaysOf(code, isCity)).sort(byName);
-            brgys.forEach(b => {
-                const o = document.createElement('option');
-                o.value = b.code; o.textContent = b.name;
-                addrBarangay.appendChild(o);
-            });
-            addrBarangay.disabled = false;
-        } catch (e) {}
-    });
-
-    addrBarangay.addEventListener('change', composeFullAddress);
-    addrDetails.addEventListener('input', composeFullAddress);
-
     function tryPrefillAddressFromFull(full) {
-        if (!full) { composeFullAddress(); return; }
+        if (!full) { assembleAddress(); return; }
         const parts = full.split(',').map(s => s.trim()).filter(Boolean);
-        // heuristics: [details?, barangay?, city?, province?]
-        const provinceName = parts.find(p => true) ? parts[parts.length-1] : '';
-        const cityName     = parts.length >= 2 ? parts[parts.length-2] : '';
-        const brgyName     = parts.length >= 3 ? parts[parts.length-3] : '';
-        const detail       = parts.slice(0, Math.max(0, parts.length-3)).join(', ');
+        const provinceName = parts.length ? parts[parts.length - 1] : '';
+        const cityName     = parts.length >= 2 ? parts[parts.length - 2] : '';
+        const brgyName     = parts.length >= 3 ? parts[parts.length - 3] : '';
+        const detail       = parts.slice(0, Math.max(0, parts.length - 3)).join(', ');
 
-        addrDetails.value = detail || '';
+        if (addrDetails) addrDetails.value = detail || '';
         Address.setByNames(provinceName || '', cityName || '', brgyName || '');
     }
 
-    // Load provinces initially
-    Address.ready.then(() => {
-        // If there was an old s_address (validation fail), prefill widgets
-        const oldFull = document.getElementById('s_address').value || '';
-        if (oldFull) tryPrefillAddressFromFull(oldFull);
-    });
+    // ---------- Reset button
+    function resetForm() {
+        form.reset();
+        pickedStudentId.value = '';
+        clearSuggestLists();
+        showErrors({});
+        sAge.value = '';
+        updateSped();
+        updateGuardianUI();
+        updateEnrollTypeUI();
 
-    /* ======================
-       Reset button
-       ====================== */
-    const resetBtn = document.getElementById('resetFormBtn');
-    resetBtn?.addEventListener('click', function() {
-        form.classList.remove('was-validated');
+        if (addrDetails) addrDetails.value = '';
+        if (sAddressHidden) sAddressHidden.value = '';
 
-        form.querySelectorAll('input, textarea, select').forEach(el => {
-            if (el.tagName === 'INPUT' && el.type === 'hidden' && el.id !== 'picked_student_id' && el.id !== 's_address') return;
-
-            if (el.tagName === 'SELECT') {
-                el.selectedIndex = 0;
-            } else if (el.type === 'checkbox' || el.type === 'radio') {
-                el.checked = false;
-            } else {
-                el.value = '';
+        Address.ready.then(() => {
+            if (addrProvince) {
+                addrProvince.selectedIndex = 0;
             }
-            el.setCustomValidity('');
+            if (addrCity) {
+                addrCity.innerHTML = '<option value="">City / Town</option>';
+                addrCity.disabled = true;
+            }
+            if (addrBarangay) {
+                addrBarangay.innerHTML = '<option value="">Barangay</option>';
+                addrBarangay.disabled = true;
+            }
+            assembleAddress();
         });
 
-        // default citizenship back to Filipino
-        const citizen = document.getElementById('s_citizenship');
-        if (citizen) citizen.value = 'Filipino';
+        if (loadingOverlay) loadingOverlay.classList.remove('active');
+    }
 
-        // optional fees unchecked
-        form.querySelectorAll('input[name="student_optional_fee_ids[]"]').forEach(cb => cb.checked = false);
+    const resetBtn = document.getElementById('resetFormBtn');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', resetForm);
+    }
 
-        // guardian block
-        guardianSelect.value = '';
-        guardianSelect.dispatchEvent(new Event('change'));
+    // ---------- Wire events
 
-        // suggestions hidden
-        suggestFirst?.classList.add('d-none');
-        suggestLast?.classList.add('d-none');
+    // Type toggle
+    enrollTypeSel.addEventListener('change', updateEnrollTypeUI);
+    if (oldRetainChk) {
+        oldRetainChk.addEventListener('change', () => {
+            oldEligibility.textContent = oldRetainChk.checked
+                ? 'Retain same grade checked: student will repeat the same grade level.'
+                : 'Unchecked: set the next appropriate grade level in the selector.';
+        });
+    }
 
-        // clear picked id & age
-        pickHidden.value = '';
-        calcAge();
+    // Transferee fields
+    prevGradeSel.addEventListener('change', computeTransfereeTarget);
+    prevGwaInput.addEventListener('input', computeTransfereeTarget);
+    prevSchoolProxy.addEventListener('input', () => { previousSchool.value = prevSchoolProxy.value; });
 
-        // SPED desc disabled
-        spedDesc.disabled = true;
+    // SPED
+    spedHas.addEventListener('change', updateSped);
 
-        // Address reset: reload provinces
-        addrDetails.value = '';
-        sAddressHidden.value = '';
-        Address.ready.then(() => {
-            addrProvince.selectedIndex = 0;
+    // Age compute
+    sBirth.addEventListener('change', () => calcAge(sBirth.value));
+
+    // Guardian toggle
+    guardianSel.addEventListener('change', updateGuardianUI);
+    if (sameAddrChk) {
+        sameAddrChk.addEventListener('change', syncGuardianCheckboxChange);
+    }
+
+    // Address cascade + assembly
+    if (addrProvince) {
+        addrProvince.addEventListener('change', async () => {
+            assembleAddress();
+            const provCode = addrProvince.value;
             addrCity.innerHTML = '<option value="">City / Town</option>';
             addrBarangay.innerHTML = '<option value="">Barangay</option>';
-            addrCity.disabled = true; addrBarangay.disabled = true;
+            addrCity.disabled = true;
+            addrBarangay.disabled = true;
+            if (!provCode) return;
+
+            try {
+                const cms = (await listCitiesMunsOfProvince(provCode)).sort(byName);
+                cms.forEach(cm => {
+                    const isCity = /city/i.test(cm.classification);
+                    const o = document.createElement('option');
+                    o.value = `${cm.code}|${isCity ? 'city' : 'mun'}`;
+                    o.textContent = cm.name;
+                    addrCity.appendChild(o);
+                });
+                addrCity.disabled = false;
+            } catch (e) {}
         });
+    }
+
+    if (addrCity) {
+        addrCity.addEventListener('change', async () => {
+            assembleAddress();
+            addrBarangay.innerHTML = '<option value="">Barangay</option>';
+            addrBarangay.disabled = true;
+            if (!addrCity.value) return;
+
+            const [code, kind] = addrCity.value.split('|');
+            const isCityFlag = (kind === 'city');
+            try {
+                const brgys = (await listBarangaysOf(code, isCityFlag)).sort(byName);
+                brgys.forEach(b => {
+                    const o = document.createElement('option');
+                    o.value = b.code;
+                    o.textContent = b.name;
+                    addrBarangay.appendChild(o);
+                });
+                addrBarangay.disabled = false;
+            } catch (e) {}
+        });
+    }
+
+    if (addrBarangay) {
+        addrBarangay.addEventListener('change', assembleAddress);
+    }
+    if (addrDetails) {
+        addrDetails.addEventListener('input', assembleAddress);
+    }
+
+    // ------- OLD student suggestions: FIRST / LAST / LRN inputs
+    let tFirst = 0, tLast = 0, tLrn = 0;
+
+    async function handleSuggest(inputEl, boxEl) {
+        const mode = enrollTypeSel.value;
+        if (mode !== 'old') { clearSuggestLists(); return; }
+        const term = (inputEl.value || '').trim();
+        const list = await searchStudents(term);
+        buildSearchList(boxEl, list);
+    }
+
+    sFirst.addEventListener('input', () => {
+        clearTimeout(tFirst); pickedStudentId.value = '';
+        tFirst = setTimeout(() => handleSuggest(sFirst, suggestFirstBox), 180);
+    });
+    sLast.addEventListener('input', () => {
+        clearTimeout(tLast); pickedStudentId.value = '';
+        tLast = setTimeout(() => handleSuggest(sLast, suggestLastBox), 180);
+    });
+    lrnInput.addEventListener('input', () => {
+        clearTimeout(tLrn); pickedStudentId.value = '';
+        tLrn = setTimeout(() => handleSuggest(lrnInput, suggestLrnBox), 180);
+    });
+
+    [sFirst, sLast, lrnInput].forEach(el => {
+        el.addEventListener('blur', () => setTimeout(clearSuggestLists, 150));
+    });
+
+    wireSuggestBox(suggestFirstBox);
+    wireSuggestBox(suggestLastBox);
+    wireSuggestBox(suggestLrnBox);
+
+    // Initial loads
+    updateSped();
+    updateGuardianUI();
+    updateEnrollTypeUI();
+    if (sBirth.value) calcAge(sBirth.value);
+
+    Address.ready.then(() => {
+        const oldFull = sAddressHidden.value || '';
+        if (oldFull) {
+            tryPrefillAddressFromFull(oldFull);
+        } else {
+            assembleAddress();
+        }
     });
 
     /* ======================
-       Submit validation
+       Submit: AJAX then redirect to Students page
        ====================== */
     form.addEventListener('submit', function (e) {
-        setRequiredForNewGuardian(guardianSelect.value === 'new');
-        composeFullAddress();
-
         if (!form.checkValidity()) {
             e.preventDefault(); e.stopPropagation();
             form.classList.add('was-validated');
@@ -877,15 +1220,57 @@ document.addEventListener('DOMContentLoaded', function () {
                 firstInvalid.focus({ preventScroll: true });
                 firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
+            return;
         }
+
+        e.preventDefault();
+        if (form.dataset.submitting === '1') return; // prevent double-clicks
+        form.dataset.submitting = '1';
+        errorBox?.classList.add('d-none');
+        if (errorList) errorList.innerHTML = '';
+
+        assembleAddress(); // ensure latest address
+        if (loadingOverlay) loadingOverlay.classList.add('active');
+
+        const fd = new FormData(form);
+        const enrolledLrn = (fd.get('lrn') || '').toString().trim();
+        const redirectBase = form.dataset.redirect || '/';
+        const redirectUrl = new URL(redirectBase, window.location.origin);
+        if (enrolledLrn) redirectUrl.searchParams.set('enrolled', enrolledLrn);
+
+        fetch(form.action, {
+            method: 'POST',
+            body: fd,
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin'
+        })
+        .then(async (r) => {
+            if (r.ok) {
+                // Let overlay remain while page redirects
+                window.location.href = redirectUrl.toString();
+                return;
+            }
+            if (r.status === 422) {
+                const data = await r.json().catch(() => ({}));
+                showErrors(data.errors || { error: ['Please correct the highlighted fields.'] });
+                form.dataset.submitting = '';
+                if (loadingOverlay) loadingOverlay.classList.remove('active');
+                return;
+            }
+            // Any other status: fall back to normal submit (server-driven redirect)
+            form.dataset.submitting = '';
+            // keep overlay on while full page submit happens
+            form.submit();
+        })
+        .catch(() => {
+            form.dataset.submitting = '';
+            // keep overlay on while full page submit happens
+            form.submit();
+        });
     }, false);
-
-    document.body.dataset.initialized = 'true';
-    toggleGuardianUI();
-
-    // Ensure default citizenship if empty on load
-    const citizen = document.getElementById('s_citizenship');
-    if (citizen && (!citizen.value || citizen.value.trim() === '')) citizen.value = 'Filipino';
 });
 </script>
 @endpush

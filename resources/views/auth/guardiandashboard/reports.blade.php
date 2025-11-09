@@ -332,7 +332,7 @@
                         <option value="">All</option>
                         <option>Paid</option>
                         <option>Partial</option>
-                        <option>Not Paid</option>
+                        <option>Unpaid</option>
                     </select>
                 </div>
             </form>
@@ -382,7 +382,7 @@
                                 $paid     = $moneyCache[$s->id]['paid'] ?? 0;
                                 $balance  = $moneyCache[$s->id]['balance'] ?? 0;
 
-                                $derivedPay = $balance <= 0.01 ? 'Paid' : ($paid > 0 ? 'Partial' : 'Not Paid');
+                                $derivedPay = $balance <= 0.01 ? 'Paid' : ($paid > 0 ? 'Partial' : 'Unpaid');
                                 $enrollStatus = $s->enrollment_status ?? ($balance < $total ? 'Enrolled' : 'Not Enrolled');
                             @endphp
 
@@ -548,7 +548,7 @@
 
                     <div class="col-md-4">
                         <label class="form-label">Student</label>
-                        <select name="student_id" id="studentSelectGrades" class="form-select">
+                        <select name="student_lrn" id="studentSelectGrades" class="form-select">
                             <option value="">Select student</option>
                             {{-- Populated by JS from the guardian’s children --}}
                         </select>

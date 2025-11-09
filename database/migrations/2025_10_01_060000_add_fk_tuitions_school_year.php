@@ -35,16 +35,6 @@ return new class extends Migration {
         });
     }
 
-    public function down(): void
-    {
-        // Drop FK only if it exists, then the index; keep column to avoid data loss
-        $this->dropFkIfExists('tuitions', 'tuitions_school_year_fk');
-
-        Schema::table('tuitions', function (Blueprint $table) {
-            try { $table->dropIndex('tuitions_school_year_idx'); } catch (\Throwable $e) {}
-            // We leave the column in place intentionally.
-        });
-    }
 
     /** ---------- Helpers ---------- */
 

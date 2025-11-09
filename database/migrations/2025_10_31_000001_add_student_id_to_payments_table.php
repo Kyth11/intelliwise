@@ -44,7 +44,7 @@ return new class extends Migration
         // 1) Add column if missing
         if (!$this->hasColumn('payments', 'student_id')) {
             Schema::table('payments', function (Blueprint $table) {
-                $table->unsignedBigInteger('student_id')->nullable()->after('id');
+                $table->char('student_id', 12)->nullable()->after('id');
             });
         }
 
@@ -63,42 +63,11 @@ return new class extends Migration
                 Schema::table('payments', function (Blueprint $table) {
                     // Pick ONE behavior you want; keeping SET NULL is common for payments
                     $table->foreign('student_id', $this->fkName)
-                        ->references('id')->on('students')
+                        ->references('lrn')->on('students')
                         ->onDelete('set null')->onUpdate('cascade');
                 });
             }
         }
     }
 
-    public function down(): void
-    {
-        // Drop our custom FK if present
-        if ($this->hasForeignKey('payments', $this->fkName)) {
-            Schema::table('payments', function (Blueprint $table) {
-                $table->dropForeign($this->fkName);
-            });
-        }
-
-        // (If you want to drop Laravel's default FK too, uncomment below)
-        // if ($this->hasForeignKey('payments', 'payments_student_id_foreign')) {
-        //     Schema::table('payments', function (Blueprint $table) {
-        //         $table->dropForeign('payments_student_id_foreign');
-        //     });
-        // }
-
-        // Drop our custom index if present
-        if ($this->hasIndex('payments', $this->idxName)) {
-            Schema::table('payments', function (Blueprint $table) use (&$indexName) {
-                $table->dropIndex($this->idxName);
-            });
-        }
-
-        // Do NOT drop the column here if other migrations depend on it.
-        // If you absolutely need to, guard it:
-        // if ($this->hasColumn('payments', 'student_id')) {
-        //     Schema::table('payments', function (Blueprint $table) {
-        //         $table->dropColumn('student_id');
-        //     });
-        // }
-    }
 };

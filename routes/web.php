@@ -75,9 +75,8 @@ Route::middleware(['auth', 'role:admin'])
             Route::get('/', [StudentController::class, 'index'])->name('index');
             Route::get('/enroll', [StudentController::class, 'create'])->name('create');
             Route::post('/store', [StudentController::class, 'store'])->name('store');
-            Route::put('/{id}', [StudentController::class, 'update'])->name('update');
-            Route::delete('/{id}', [StudentController::class, 'destroy'])->name('destroy');
-
+            Route::put('/{lrn}', [StudentController::class, 'update'])->name('update');
+            Route::delete('/{lrn}', [StudentController::class, 'destroy'])->name('destroy');
             // Clean endpoints used by JS
             Route::get('/search', [StudentController::class, 'search'])->name('search');         // admin.students.search
             Route::get('/prefill/{id}', [StudentController::class, 'prefill'])->name('prefill'); // admin.students.prefill
@@ -206,24 +205,24 @@ Route::middleware(['auth', 'role:guardian'])
             Route::post('/', [GuardianPaymentReceiptController::class, 'store'])->name('store');
         });
 
-if (app()->environment('local')) {
-    Route::get('/_test-mail', function () {
-        try {
-            Mail::to('occ.davidkieth@gmail.com')->send(
-                new ParentAccountCredentials(
-                    guardianName: 'Test Parent',
-                    studentName:  'Test Student',
-                    username:     'testparent',
-                    password:     'test12345',
-                    appUrl:       config('app.url')
-                )
-            );
-            return response('Mail dispatched OK.', 200);
-        } catch (\Throwable $e) {
-            // Show the error right in the browser so you don't have to dig through logs
-            return response('MAIL ERROR: '.$e->getMessage(), 500);
+        if (app()->environment('local')) {
+            Route::get('/_test-mail', function () {
+                try {
+                    Mail::to('occ.davidkieth@gmail.com')->send(
+                        new ParentAccountCredentials(
+                            guardianName: 'Test Parent',
+                            studentName: 'Test Student',
+                            username: 'testparent',
+                            password: 'test12345',
+                            appUrl: config('app.url')
+                        )
+                    );
+                    return response('Mail dispatched OK.', 200);
+                } catch (\Throwable $e) {
+                    // Show the error right in the browser so you don't have to dig through logs
+                    return response('MAIL ERROR: ' . $e->getMessage(), 500);
+                }
+            })->name('_test-mail');
         }
-    })->name('_test-mail');
-}
-});
+    });
 

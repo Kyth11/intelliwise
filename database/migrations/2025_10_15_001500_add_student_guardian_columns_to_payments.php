@@ -17,9 +17,9 @@ return new class extends Migration
             }
 
             if (!Schema::hasColumn('payments', 'student_id')) {
-                $table->unsignedBigInteger('student_id')->nullable()->after('guardian_id');
+                $table->char('student_id', 12)->nullable()->after('guardian_id');
                 $table->foreign('student_id')
-                    ->references('id')->on('students')
+                    ->references('lrn')->on('students')
                     ->onDelete('set null')->onUpdate('cascade');
             }
 
@@ -38,22 +38,4 @@ return new class extends Migration
         });
     }
 
-    public function down(): void
-    {
-        Schema::table('payments', function (Blueprint $table) {
-            if (Schema::hasColumn('payments', 'payer_name'))   $table->dropColumn('payer_name');
-            if (Schema::hasColumn('payments', 'father_name'))  $table->dropColumn('father_name');
-            if (Schema::hasColumn('payments', 'mother_name'))  $table->dropColumn('mother_name');
-            if (Schema::hasColumn('payments', 'guardian_name'))$table->dropColumn('guardian_name');
-
-            if (Schema::hasColumn('payments', 'student_id')) {
-                $table->dropForeign(['student_id']);
-                $table->dropColumn('student_id');
-            }
-            if (Schema::hasColumn('payments', 'guardian_id')) {
-                $table->dropForeign(['guardian_id']);
-                $table->dropColumn('guardian_id');
-            }
-        });
-    }
 };

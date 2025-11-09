@@ -12,7 +12,7 @@
         <div class="modal-body">
           {{-- Hidden identifiers --}}
           <input type="hidden" name="guardian_id" id="pm_guardian_id">
-          <input type="hidden" name="student_id"  id="pm_student_id">
+          <input type="hidden" name="student_lrn"  id="pm_student_id">
           <input type="hidden" name="current_balance" id="pm_current_balance">
           <input type="hidden" name="payment_source"  id="pm_payment_source">
 

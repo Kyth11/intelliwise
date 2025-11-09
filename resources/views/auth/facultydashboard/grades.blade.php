@@ -189,7 +189,7 @@
 
             <div class="col-md-4">
                 <label class="form-label">Student</label>
-                <select name="student_id" id="studentSelect" class="form-select" required>
+                <select name="student_lrn" id="studentSelect" class="form-select" required>
                     <option value="">Select student</option>
                     {{-- populated by JS --}}
                 </select>
@@ -226,7 +226,7 @@
         {{-- keep filters with the post --}}
         <input type="hidden" name="schoolyr_id"  id="hf_sy"    value="{{ $selectedSchoolYr }}">
         <input type="hidden" name="grade_level"  id="hf_grade" value="{{ $selectedGrade }}">
-        <input type="hidden" name="student_id"   id="hf_stu"   value="{{ $selectedStudent }}">
+        <input type="hidden" name="student_lrn"   id="hf_stu"   value="{{ $selectedStudent }}">
 
         <div class="table-responsive">
             <table class="table table-bordered align-middle table-report">

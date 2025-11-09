@@ -1,322 +1,202 @@
-<!-- ================== Student Modals ================== -->
-
-<!-- Edit Student Modal -->
-<div class="modal fade" id="editStudentModal" tabindex="-1" aria-labelledby="editStudentModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <form id="editStudentForm" method="POST" action="">
-                @csrf
-                @method('PUT')
-
-                <div class="modal-header">
-                    <h5 class="modal-title" id="editStudentModalLabel">Edit Student</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-
-                <div class="modal-body row g-3">
-                    <input type="hidden" name="id" id="edit-id">
-                    <input type="hidden" name="tuition_id" id="edit-tuition-id">
-
-                    <!-- Personal Information -->
-                    <div class="col-md-4">
-                        <div class="form-floating">
-                            <input type="text" name="s_firstname" id="edit-firstname" class="form-control"
-                                placeholder="First Name" required>
-                            <label for="edit-firstname">First Name</label>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="form-floating">
-                            <input type="text" name="s_middlename" id="edit-middlename" class="form-control"
-                                placeholder="Middle Name">
-                            <label for="edit-middlename">Middle Name</label>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="form-floating">
-                            <input type="text" name="s_lastname" id="edit-lastname" class="form-control"
-                                placeholder="Last Name" required>
-                            <label for="edit-lastname">Last Name</label>
-                        </div>
-                    </div>
-
-                    <!-- Grade Level (select) + Birthdate -->
-                    <div class="col-md-6">
-                        <div class="form-floating">
-                            <select name="s_gradelvl" id="edit-gradelvl" class="form-select">
-                                @foreach(($gradelvls ?? []) as $g)
-                                    <option value="{{ $g->grade_level }}">{{ $g->grade_level }}</option>
-                                @endforeach
-                            </select>
-                            <label for="edit-gradelvl">Grade Level</label>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-floating">
-                            <input type="date" name="s_birthdate" id="edit-birthdate" class="form-control"
-                                placeholder="Birthdate">
-                            <label for="edit-birthdate">Birthdate</label>
-                        </div>
-                    </div>
-
-                    <!-- Contact -->
-                    <div class="col-md-12">
-                        <div class="form-floating">
-                            <input type="text" name="s_address" id="edit-address" class="form-control"
-                                placeholder="Address">
-                            <label for="edit-address">Address</label>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-floating">
-                            <input type="text" name="s_contact" id="edit-contact" class="form-control"
-                                placeholder="Contact">
-                            <label for="edit-contact">Contact</label>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-floating">
-                            <input type="email" name="s_email" id="edit-email" class="form-control" placeholder="Email">
-                            <label for="edit-email">Email</label>
-                        </div>
-                    </div>
-
-                    <!-- Guardian (readonly) -->
-                    <div class="col-md-6">
-                        <div class="form-floating">
-                            <input type="text" id="edit-guardian" class="form-control" placeholder="Guardian" disabled>
-                            <label for="edit-guardian">Guardian</label>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-floating">
-                            <input type="email" id="edit-guardianemail" class="form-control"
-                                placeholder="Guardian Email" disabled>
-                            <label for="edit-guardianemail">Guardian Email</label>
-                        </div>
-                    </div>
-
-                    <!-- Tuition + Status -->
-                    <div class="col-md-6">
-                        <div class="form-floating">
-                            <input type="text" name="s_tuition_sum" id="edit-tuition" class="form-control"
-                                placeholder="Tuition" readonly>
-                            <label for="edit-tuition">Base Tuition (auto from grade level)</label>
-                        </div>
-                        <small class="text-muted">Pulled from the latest Tuition for the chosen grade level.</small>
-                    </div>
-
-                    <div class="col-md-6">
-                        <div class="form-floating">
-                            <select name="payment_status" id="edit-payment" class="form-select">
-                                <option value="Unpaid">Unpaid</option>
-                                <option value="Partial">Partial</option>
-                                <option value="Paid">Paid</option>
-                            </select>
-                            <label for="edit-payment">Payment Status</label>
-                        </div>
-                    </div>
-
-                    <div class="col-md-6">
-                        <div class="form-floating">
-                            <select name="enrollment_status" id="edit-status" class="form-select">
-                                <option value="Enrolled">Enrolled</option>
-                                <option value="Not Enrolled">Not Enrolled</option>
-                            </select>
-                            <label for="edit-status">Enrollment Status</label>
-                        </div>
-                    </div>
-
-                    <!-- STUDENT OPTIONAL FEES (multi-select) -->
-                    <div class="col-12">
-                        <label class="form-label mt-2">Student Optional Fees</label>
-                        <div class="border rounded p-2" style="max-height: 220px; overflow:auto;">
-                            @php
-                                $__fees = ($optionalFees ?? collect())->filter(function($f){
-                                    $scopeOk = !isset($f->scope) || in_array($f->scope, ['student','both']);
-                                    return $scopeOk && (property_exists($f, 'active') ? $f->active : true);
-                                });
-                            @endphp
-
-                            @forelse($__fees as $fee)
-                                <div class="form-check">
-                                    <input class="form-check-input edit-opt-fee" type="checkbox"
-                                           id="stu_fee_{{ $fee->id }}"
-                                           name="student_optional_fee_ids[]"
-                                           value="{{ $fee->id }}"
-                                           data-amount="{{ number_format($fee->amount, 2, '.', '') }}">
-                                    <label class="form-check-label" for="stu_fee_{{ $fee->id }}">
-                                        {{ $fee->name }} — ₱{{ number_format($fee->amount, 2) }}
-                                    </label>
-                                </div>
-                            @empty
-                                <div class="text-muted">No student-level optional fees available.</div>
-                            @endforelse
-                        </div>
-
-                        <div class="row g-2 mt-2">
-                            <div class="col-md-6">
-                                <div class="form-floating">
-                                    <input type="text" id="edit-optional-total" class="form-control" placeholder="Optional Total" readonly>
-                                    <label for="edit-optional-total">Selected Optional Total (₱)</label>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-floating">
-                                    <input type="text" id="edit-total-due-preview" class="form-control" placeholder="Total (before payments)" readonly>
-                                    <label for="edit-total-due-preview">New Total (before payments) (₱)</label>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Info fields -->
-                        <div class="row g-2 mt-1">
-                            <div class="col-md-6">
-                                <div class="form-floating">
-                                    <input type="text" id="edit-paid-so-far" class="form-control" placeholder="Paid So Far" readonly>
-                                    <label for="edit-paid-so-far">Paid So Far (₱)</label>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-floating">
-                                    <input type="text" id="edit-current-balance" class="form-control" placeholder="Current Balance" readonly>
-                                    <label for="edit-current-balance">Current Balance (₱)</label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div><!-- /modal-body -->
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Update Student</button>
-                </div>
-            </form>
+{{-- resources/views/auth/admindashboard/partials/edit-student-modal.blade.php --}}
+<div class="modal fade" id="editStudentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <form id="editStudentForm"
+            method="POST"
+            action="{{ route('admin.students.update', ['lrn' => 'LRN_PLACEHOLDER']) }}">
+        @csrf
+        @method('PUT')
+        <div class="modal-header">
+          <h5 class="modal-title">Edit Student</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
+
+        <div class="modal-body">
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label">LRN</label>
+              <input class="form-control" id="edit_lrn" name="lrn_display" readonly>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">First name</label>
+              <input class="form-control" id="edit_firstname" name="s_firstname" required>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Middle name</label>
+              <input class="form-control" id="edit_middlename" name="s_middlename">
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Last name</label>
+              <input class="form-control" id="edit_lastname" name="s_lastname" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Birthdate</label>
+              <input type="date" class="form-control" id="edit_birthdate" name="s_birthdate" required>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Address</label>
+              <input class="form-control" id="edit_address" name="s_address" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Grade Level</label>
+              <select class="form-select" id="edit_gradelvl" name="s_gradelvl">
+                <option value="">—</option>
+                <option value="Nursery">Nursery</option>
+                <option value="Kindergarten 1">Kindergarten 1</option>
+                <option value="Kindergarten 2">Kindergarten 2</option>
+                @for ($i = 1; $i <= 6; $i++)
+                    <option value="Grade {{ $i }}">Grade {{ $i }}</option>
+                @endfor
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Gender</label>
+              <select class="form-select" id="edit_gender" name="s_gender">
+                <option value="">—</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Prefer not to say">Prefer not to say</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Contact</label>
+              <input class="form-control" id="edit_contact" name="s_contact">
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Email</label>
+              <input class="form-control" id="edit_email" name="s_email" type="email">
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Enrollment Status</label>
+              <select class="form-select" id="edit_status" name="enrollment_status">
+                <option value="Enrolled">Enrolled</option>
+                <option value="Pending">Pending</option>
+                <option value="Dropped">Dropped</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Payment Status</label>
+              <select class="form-select" id="edit_payment" name="payment_status">
+                <option value="Unpaid">Unpaid</option>
+                <option value="Partial">Partial</option>
+                <option value="Paid">Paid</option>
+              </select>
+            </div>
+
+            @if (!empty($optionalFees) && $optionalFees->count())
+            <div class="col-12">
+              <label class="form-label">Optional Fees</label>
+              <div class="row g-2">
+                @foreach ($optionalFees as $fee)
+                  <div class="col-md-6">
+                    <div class="form-check">
+                      <input class="form-check-input opt-fee-checkbox"
+                             type="checkbox"
+                             id="edit_opt_fee_{{ $fee->id }}"
+                             name="student_optional_fee_ids[]"
+                             value="{{ $fee->id }}">
+                      <label class="form-check-label" for="edit_opt_fee_{{ $fee->id }}">
+                        {{ $fee->name }} — ₱{{ number_format($fee->amount, 2) }}
+                      </label>
+                    </div>
+                  </div>
+                @endforeach
+              </div>
+            </div>
+            @endif
+
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save"></i> Save changes
+          </button>
+        </div>
+      </form>
     </div>
+  </div>
 </div>
 
-@php
-    // Build a map: grade_level => latest tuition row (id + total_yearly)
-    $__tuitionMap = [];
-    if (isset($tuitions)) {
-        foreach ($tuitions as $row) {
-            $gl = $row->grade_level;
-            $ts = $row->updated_at ?? $row->created_at;
-            if (!isset($__tuitionMap[$gl]) || strtotime($ts) > strtotime($__tuitionMap[$gl]['_ts'])) {
-                $__tuitionMap[$gl] = [
-                    'id' => $row->id,
-                    'total_yearly' => (float) $row->total_yearly,
-                    '_ts' => $ts,
-                ];
-            }
-        }
-        foreach ($__tuitionMap as &$v) { unset($v['_ts']); }
-        unset($v);
-    }
-@endphp
-
+@push('scripts')
 <script>
-    const editStudentModal = document.getElementById('editStudentModal');
+(function() {
+    const modalEl = document.getElementById('editStudentModal');
+    if (!modalEl) return;
 
-    // Tuition map from server
-    const TUITION_MAP = {!! json_encode($__tuitionMap ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!};
+    modalEl.addEventListener('show.bs.modal', function (ev) {
+        const btn = ev.relatedTarget;
+        if (!btn) return;
 
-    // ✅ Use named route template (avoids hardcoding /admin)
-    const UPDATE_URL_TEMPLATE = @json(route('admin.students.update', ['id' => '___ID___']));
+        // Read data-* from the clicked "edit" button
+        const lrn        = btn.getAttribute('data-lrn') || '';
+        const firstname  = btn.getAttribute('data-firstname') || '';
+        const middlename = btn.getAttribute('data-middlename') || '';
+        const lastname   = btn.getAttribute('data-lastname') || '';
+        const birthdate  = (btn.getAttribute('data-birthdate') || '').substring(0,10);
+        const address    = btn.getAttribute('data-address') || '';
+        const contact    = btn.getAttribute('data-contact') || '';
+        const email      = btn.getAttribute('data-email') || '';
+        const gradelvl   = btn.getAttribute('data-gradelvl') || '';
+        const gender     = btn.getAttribute('data-gender') || '';
+        const status     = btn.getAttribute('data-status') || 'Enrolled';
+        const payment    = btn.getAttribute('data-payment') || 'Unpaid';
+        const feeIdsCsv  = btn.getAttribute('data-feeids') || '';
 
-    function applyTuitionFromGrade(gradeLevel) {
-        const t = TUITION_MAP[gradeLevel];
-        const tuitionInput = document.getElementById('edit-tuition');
-        const tuitionIdInput = document.getElementById('edit-tuition-id');
-        if (t) {
-            tuitionInput.value = Number(t.total_yearly).toFixed(2);
-            tuitionIdInput.value = t.id;
-        } else {
-            tuitionInput.value = '';
-            tuitionIdInput.value = '';
-        }
-        recalcTotals();
-    }
+        // Fill fields
+        document.getElementById('edit_lrn').value = lrn;
+        document.getElementById('edit_firstname').value = firstname;
+        document.getElementById('edit_middlename').value = middlename;
+        document.getElementById('edit_lastname').value = lastname;
+        document.getElementById('edit_birthdate').value = birthdate;
+        document.getElementById('edit_address').value = address;
+        document.getElementById('edit_contact').value = contact;
+        document.getElementById('edit_email').value = email;
 
-    function recalcTotals() {
-        const base = parseFloat(document.getElementById('edit-tuition').value || '0') || 0;
-        const opt = Array.from(editStudentModal.querySelectorAll('.edit-opt-fee:checked'))
-            .reduce((sum, cb) => sum + (parseFloat(cb.dataset.amount || '0') || 0), 0);
-        const optField = document.getElementById('edit-optional-total');
-        const dueField = document.getElementById('edit-total-due-preview');
-        if (optField) optField.value = opt.toFixed(2);
-        if (dueField) dueField.value = (base + opt).toFixed(2);
-    }
+        const glSel = document.getElementById('edit_gradelvl');
+        if (glSel) glSel.value = gradelvl;
 
-    editStudentModal.addEventListener('show.bs.modal', function (event) {
-        const button = event.relatedTarget;
+        const genderSel = document.getElementById('edit_gender');
+        if (genderSel) genderSel.value = gender;
 
-        const id            = button.getAttribute('data-id');
-        const firstname     = button.getAttribute('data-firstname');
-        const middlename    = button.getAttribute('data-middlename');
-        const lastname      = button.getAttribute('data-lastname');
-        const gradelvl      = button.getAttribute('data-gradelvl');
-        const birthdate     = button.getAttribute('data-birthdate');
-        const address       = button.getAttribute('data-address');
-        const contact       = button.getAttribute('data-contact');
-        const email         = button.getAttribute('data-email');
-        const guardian      = button.getAttribute('data-guardian');
-        const guardianEmail = button.getAttribute('data-guardianemail');
-        const status        = button.getAttribute('data-status');
-        const payment       = button.getAttribute('data-payment');
+        const statusSel = document.getElementById('edit_status');
+        if (statusSel) statusSel.value = status;
 
-        // Selected fee IDs (comma-separated): "1,3,5"
-        const feeIdsRaw = button.getAttribute('data-feeids') || '';
-        const feeIds = feeIdsRaw.split(',').map(s => s.trim()).filter(Boolean);
+        const paySel = document.getElementById('edit_payment');
+        if (paySel) paySel.value = payment;
 
-        // Populate fields
-        editStudentModal.querySelector('#edit-id').value = id;
-        editStudentModal.querySelector('#edit-firstname').value = firstname ?? '';
-        editStudentModal.querySelector('#edit-middlename').value = middlename ?? '';
-        editStudentModal.querySelector('#edit-lastname').value = lastname ?? '';
-        editStudentModal.querySelector('#edit-gradelvl').value = gradelvl ?? '';
-        editStudentModal.querySelector('#edit-birthdate').value = birthdate ?? '';
-        editStudentModal.querySelector('#edit-address').value = address ?? '';
-        editStudentModal.querySelector('#edit-contact').value = contact ?? '';
-        editStudentModal.querySelector('#edit-email').value = email ?? '';
-        editStudentModal.querySelector('#edit-guardian').value = guardian ?? '';
-        editStudentModal.querySelector('#edit-guardianemail').value = guardianEmail ?? '';
-        editStudentModal.querySelector('#edit-status').value = status ?? 'Enrolled';
-
-        // Ensure enum values are used
-        const paySel = editStudentModal.querySelector('#edit-payment');
-        paySel.value = ['Paid','Unpaid','Partial'].includes(payment) ? payment : 'Unpaid';
-
-        // Tick optional-fee checkboxes
-        editStudentModal.querySelectorAll('.edit-opt-fee').forEach(cb => {
-            cb.checked = feeIds.includes(cb.value);
+        // Precheck optional fee checkboxes
+        const picked = new Set(feeIdsCsv.split(',').map(s => s.trim()).filter(Boolean));
+        document.querySelectorAll('#editStudentModal .opt-fee-checkbox').forEach(chk => {
+            chk.checked = picked.has(String(chk.value));
         });
 
-        // Tuition (auto from grade level)
-        applyTuitionFromGrade(gradelvl);
-
-        // Reassign handlers each open
-        editStudentModal.querySelector('#edit-gradelvl').onchange = function () {
-            applyTuitionFromGrade(this.value);
-        };
-        editStudentModal.querySelectorAll('.edit-opt-fee').forEach(cb => cb.onchange = recalcTotals);
-
-        // Pre-fill "Paid so far" and "Current balance" from the table cells
-        const row = document.querySelector(`tr[data-id="${id}"]`);
-        if (row) {
-            const paidCell    = row.querySelector('.text-success');
-            const balanceCell = row.querySelector('.text-danger');
-            const paidVal     = paidCell ? parseFloat((paidCell.textContent||'0').replace(/,/g,'')) : 0;
-            const balVal      = balanceCell ? parseFloat((balanceCell.textContent||'0').replace(/,/g,'')) : 0;
-            const paidField   = document.getElementById('edit-paid-so-far');
-            const balField    = document.getElementById('edit-current-balance');
-            if (paidField) paidField.value = (isFinite(paidVal) ? paidVal : 0).toFixed(2);
-            if (balField) balField.value  = (isFinite(balVal) ? balVal : 0).toFixed(2);
-        }
-
-        // ✅ Correct form action via named route template
-        const form = editStudentModal.querySelector('#editStudentForm');
-        form.action = UPDATE_URL_TEMPLATE.replace('___ID___', id);
+        // Fix the form action to include the {lrn} parameter
+        const form = document.getElementById('editStudentForm');
+        const template = form.getAttribute('action'); // contains .../LRN_PLACEHOLDER
+        const newAction = template.replace('LRN_PLACEHOLDER', encodeURIComponent(lrn));
+        form.setAttribute('action', newAction);
     });
+
+    // When modal hides, restore the action to the template (so next open can replace again)
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        const form = document.getElementById('editStudentForm');
+        const raw = "{{ route('admin.students.update', ['lrn' => 'LRN_PLACEHOLDER']) }}";
+        form.setAttribute('action', raw);
+    });
+})();
 </script>
+@endpush

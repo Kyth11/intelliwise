@@ -1,3 +1,4 @@
+{{-- resources/views/auth/admindashboard/students.blade.php --}}
 @extends('layouts.admin')
 
 @section('title', 'Students by Grade Level')
@@ -22,11 +23,16 @@
 
 @section('content')
 <div class="card section p-4 students-page">
-    <!-- Header (kept consistent with your design language, no Quick Actions here) -->
+    <!-- Header -->
     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-2">
         <div class="section-title">
             <h4 class="mb-0">Students (Grouped by Grade Level)</h4>
             <span class="text-muted ms-2">Browse, filter, edit, or archive students.</span>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ route('admin.students.create') }}" class="btn btn-success">
+                <i class="bi bi-person-plus"></i> Enroll Student
+            </a>
         </div>
     </div>
 
@@ -90,7 +96,7 @@
             ->values();
     @endphp
 
-    {{-- ===== Filters (kept) ===== --}}
+    {{-- ===== Filters ===== --}}
     <form class="filters row g-2 align-items-end mt-1 mb-2">
         <div class="col-auto">
             <label class="form-label mb-0 small">Grade Level</label>
@@ -108,7 +114,7 @@
                 <option value="">All</option>
                 <option>Paid</option>
                 <option>Partial</option>
-                <option>Not Paid</option>
+                <option>Unpaid</option>
             </select>
         </div>
 
@@ -189,7 +195,7 @@
 
                                 $originalTotal = $base + $opt;
 
-                                // If s_total_due is stored, treat it as current balance; otherwise derive from payments
+                                // Paid / balance
                                 $paidRecords = (float) ($s->payments()->sum('amount') ?? 0);
                                 if ($s->s_total_due !== null && $s->s_total_due !== '') {
                                     $currentBalance = max(0.0, (float) $s->s_total_due);
@@ -199,7 +205,7 @@
                                     $currentBalance = max(0.0, round($originalTotal - $paid, 2));
                                 }
 
-                                $derivedPay = $currentBalance <= 0.01 ? 'Paid' : ($paid > 0 ? 'Partial' : 'Not Paid');
+                                $derivedPay = $currentBalance <= 0.01 ? 'Paid' : ($paid > 0 ? 'Partial' : 'Unpaid');
 
                                 // Household label
                                 $g = $s->guardian;
@@ -243,7 +249,7 @@
                                 $guardianId = $s->guardian->id ?? '';
                             @endphp
 
-                            <tr data-id="{{ $s->id }}" data-paystatus="{{ $derivedPay }}" data-guardianid="{{ $guardianId }}">
+                            <tr data-lrn="{{ $s->lrn }}" data-paystatus="{{ $derivedPay }}" data-guardianid="{{ $guardianId }}">
                                 <td>{{ $s->s_firstname }} {{ $s->s_middlename }} {{ $s->s_lastname }}</td>
                                 <td>{{ \Illuminate\Support\Carbon::parse($s->s_birthdate)->format('Y-m-d') }}</td>
                                 <td>{{ $household }}</td>
@@ -263,7 +269,7 @@
                                     <button class="btn btn-sm btn-warning"
                                             data-bs-toggle="modal"
                                             data-bs-target="#editStudentModal"
-                                            data-id="{{ $s->id }}"
+                                            data-lrn="{{ $s->lrn }}"
                                             data-firstname="{{ $s->s_firstname }}"
                                             data-middlename="{{ $s->s_middlename }}"
                                             data-lastname="{{ $s->s_lastname }}"
@@ -280,7 +286,7 @@
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
 
-                                    <form action="{{ route('admin.students.destroy', $s->id) }}" method="POST" class="d-inline delete-form">
+                                    <form action="{{ route('admin.students.destroy', $s->lrn) }}" method="POST" class="d-inline delete-form">
                                         @csrf
                                         @method('DELETE')
                                         <button type="button" class="btn btn-sm btn-danger delete-btn" title="Archive">
@@ -305,38 +311,13 @@
     'tuitions'      => $tuitions  ?? collect(),
     'optionalFees'  => $optionalFees ?? collect(),
 ])
-
-{{-- SweetAlert2 (delete confirm) --}}
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-document.addEventListener('click', function (e) {
-    const btn = e.target.closest('.delete-btn');
-    if (!btn) return;
-    const form = btn.closest('form');
-    Swal.fire({
-        title: 'Are you sure to delete this student record?',
-        text: "You can't undo this action.",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Yes, proceed',
-        reverseButtons: true,
-        background: '#fff',
-        backdrop: false,
-        allowOutsideClick: true,
-        allowEscapeKey: true
-    }).then((result) => {
-        if (result.isConfirmed) form.submit();
-    });
-});
-</script>
 @endsection
 
 @push('scripts')
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" crossorigin="anonymous"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
         let studentTables = [];
@@ -398,6 +379,29 @@ document.addEventListener('click', function (e) {
             });
             updateCardVisibility();
         }
+
+        // Delete confirm
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('.delete-btn');
+            if (!btn) return;
+            const form = btn.closest('form');
+            Swal.fire({
+                title: 'Are you sure to delete this student record?',
+                text: "You can't undo this action.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, proceed',
+                reverseButtons: true,
+                background: '#fff',
+                backdrop: false,
+                allowOutsideClick: true,
+                allowEscapeKey: true
+            }).then((result) => {
+                if (result.isConfirmed) form.submit();
+            });
+        });
 
         $(function () {
             $('.student-table').each(function () {

@@ -14,8 +14,8 @@ return new class extends Migration {
             $table->enum('status', ['Enrolled', 'Not Enrolled'])->default('Not Enrolled');
             $table->enum('payment_status', ['Paid', 'Partial', 'Not Paid'])->default('Not Paid');
 
-            // FKs
-            $table->unsignedBigInteger('student_id');
+            // FKs (match Student PK = CHAR(12))
+            $table->char('student_id', 12);                  // <— was unsignedBigInteger
             $table->unsignedBigInteger('guardian_id')->nullable();
             $table->unsignedBigInteger('tuition_id')->nullable();
             $table->unsignedBigInteger('schoolyr_id');
@@ -24,31 +24,33 @@ return new class extends Migration {
 
             // Dates
             $table->date('date_enrolled')->nullable();
-            $table->date('date_dropped')->nullable(); // when enrollment was dropped
+            $table->date('date_dropped')->nullable();
 
             // Meta
             $table->string('enrollment_type')->nullable(); // New/Transferee/Returnee
             $table->string('remarks')->nullable();
             $table->boolean('is_active')->default(true);
 
-            // ---- Finance snapshot (cached at time of last calc) ----
-            // You still can compute live from relations, but these keep the
-            // reports fast and allow historical snapshotting by school year.
-            $table->decimal('base_tuition',    12, 2)->default(0); // tuition->total_yearly
-            $table->decimal('optional_total',  12, 2)->default(0); // selected optional fees
-            $table->decimal('total_due',       12, 2)->default(0); // base + optional
-            $table->decimal('paid_to_date',    12, 2)->default(0); // sum(payments.amount) by tuition_id
-            $table->decimal('balance_cached',  12, 2)->default(0); // total_due - paid_to_date
+            // Finance snapshot
+            $table->decimal('base_tuition',   12, 2)->default(0);
+            $table->decimal('optional_total', 12, 2)->default(0);
+            $table->decimal('total_due',      12, 2)->default(0);
+            $table->decimal('paid_to_date',   12, 2)->default(0);
+            $table->decimal('balance_cached', 12, 2)->default(0);
 
             // Indexes / Constraints
             $table->unique(['student_id', 'schoolyr_id'], 'uq_student_per_sy');
 
-            $table->foreign('student_id')->references('id')->on('students')->onDelete('cascade')->onUpdate('cascade');
-            $table->foreign('guardian_id')->references('id')->on('guardians')->onDelete('set null')->onUpdate('cascade');
-            $table->foreign('tuition_id')->references('id')->on('tuitions')->onDelete('set null')->onUpdate('cascade');
-            $table->foreign('schoolyr_id')->references('id')->on('schoolyrs')->onDelete('cascade')->onUpdate('cascade');
-            $table->foreign('gradelvl_id')->references('id')->on('gradelvls')->onDelete('cascade')->onUpdate('cascade');
-            $table->foreign('faculty_id')->references('id')->on('faculties')->onDelete('set null')->onUpdate('cascade');
+            // Foreign keys
+            $table->foreign('student_id')
+                  ->references('lrn')->on('students')
+                  ->cascadeOnDelete()->cascadeOnUpdate();
+
+            $table->foreign('guardian_id')->references('id')->on('guardians')->nullOnDelete()->cascadeOnUpdate();
+            $table->foreign('tuition_id')->references('id')->on('tuitions')->nullOnDelete()->cascadeOnUpdate();
+            $table->foreign('schoolyr_id')->references('id')->on('schoolyrs')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreign('gradelvl_id')->references('id')->on('gradelvls')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreign('faculty_id')->references('id')->on('faculties')->nullOnDelete()->cascadeOnUpdate();
 
             $table->timestamps();
         });

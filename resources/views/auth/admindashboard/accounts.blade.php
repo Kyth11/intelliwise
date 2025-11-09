@@ -89,14 +89,14 @@
                 </tr>
                 </thead>
                 <tbody>
-                @forelse($faculties as $f)
+                @foreach($faculties as $f)
                     <tr>
                         <td>{{ $f->f_firstname }} {{ $f->f_middlename }} {{ $f->f_lastname }}</td>
-                        <td>{{ $f->f_contact }}</td>
-                        <td>{{ $f->f_address }}</td>
-                        <td>{{ $f->f_email ?? '-' }}</td>
-                        <td>{{ $f->user->username ?? '-' }}</td>
-                        <td>{{ $f->created_at->format('Y-m-d') }}</td>
+                        <td>{{ $f->f_contact ?? '—' }}</td>
+                        <td>{{ $f->f_address ?? '—' }}</td>
+                        <td>{{ $f->f_email ?? '—' }}</td>
+                        <td>{{ optional($f->user)->username ?? '—' }}</td>
+                        <td>{{ $f->created_at?->format('Y-m-d') }}</td>
                         <td class="text-nowrap">
                             <button class="btn btn-sm btn-warning"
                                     data-bs-toggle="modal"
@@ -108,7 +108,7 @@
                                     data-contact="{{ $f->f_contact }}"
                                     data-address="{{ $f->f_address }}"
                                     data-email="{{ $f->f_email }}"
-                                    data-username="{{ $f->user->username ?? '' }}">
+                                    data-username="{{ optional($f->user)->username ?? '' }}">
                                 <i class="bi bi-pencil-square"></i>
                             </button>
                             <form action="{{ route('admin.faculties.destroy', $f->id) }}" method="POST" class="d-inline delete-form">
@@ -119,9 +119,7 @@
                             </form>
                         </td>
                     </tr>
-                @empty
-                    <tr><td colspan="7" class="text-center">No faculty accounts found.</td></tr>
-                @endforelse
+                @endforeach
                 </tbody>
             </table>
         </div>
@@ -144,7 +142,7 @@
                 </tr>
                 </thead>
                 <tbody>
-                @forelse($guardians as $g)
+                @foreach($guardians as $g)
                     @php
                         $motherFull = trim(collect([$g->m_firstname, $g->m_middlename, $g->m_lastname])->filter()->implode(' '));
                         $fatherFull = trim(collect([$g->f_firstname, $g->f_middlename, $g->f_lastname])->filter()->implode(' '));
@@ -209,9 +207,7 @@
                             </form>
                         </td>
                     </tr>
-                @empty
-                    <tr><td colspan="7" class="text-center">No guardian accounts found.</td></tr>
-                @endforelse
+                @endforeach
                 </tbody>
             </table>
         </div>
@@ -381,12 +377,7 @@ document.querySelectorAll('.delete-btn').forEach(btn=>{
 const v    = (x) => (x ?? '');
 const pick = (...vals) => vals.find(s => !!(s && s.trim && s.trim().length)) || '';
 // dataset helper: read camelCase, underscore, or any variant safely
-const ds = (d, ...keys) => {
-    for (const k of keys) {
-        if (d[k] !== undefined) return d[k];
-    }
-    return '';
-};
+const ds = (d, ...keys) => { for (const k of keys) { if (d[k] !== undefined) return d[k]; } return ''; };
 
 // Toggle password buttons
 document.addEventListener('click', e=>{
@@ -451,23 +442,31 @@ document.getElementById('editGuardianModal')
 
 // DataTables
 $(function () {
-    const dtOpts = {
+    $('#facultyTable').DataTable({
         dom: 'lrtip',
         pageLength: 5,
         lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, 'All']],
         order: [],
-        columnDefs: [{ targets: -1, orderable: false }]
-    };
-    const facultyDT  = $('#facultyTable').DataTable(dtOpts);
-    const guardianDT = $('#guardianTable').DataTable(dtOpts);
+        columnDefs: [{ targets: -1, orderable: false }],
+        language: { emptyTable: 'No faculty accounts found.' }
+    });
+
+    $('#guardianTable').DataTable({
+        dom: 'lrtip',
+        pageLength: 5,
+        lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, 'All']],
+        order: [],
+        columnDefs: [{ targets: -1, orderable: false }],
+        language: { emptyTable: 'No guardian accounts found.' }
+    });
 
     // Quick Actions search bar filters both tables
     const qa = document.getElementById('qaAccountsSearch');
     qa?.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter') return;
         const q = qa.value || '';
-        facultyDT.search(q).draw();
-        guardianDT.search(q).draw();
+        $('#facultyTable').DataTable().search(q).draw();
+        $('#guardianTable').DataTable().search(q).draw();
     });
 });
 </script>

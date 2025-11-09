@@ -118,7 +118,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        // No-op (we keep the new split columns).
-        // If you must rollback, add logic to recombine into old columns here.
+        // no-op: tables will be dropped by base 'create' migrations during refresh
     }
 };

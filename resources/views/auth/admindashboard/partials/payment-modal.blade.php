@@ -35,7 +35,7 @@
           {{-- Student Selection --}}
           <div class="mb-3" id="studentSelectWrapper" style="display:none;">
             <label class="form-label">Select Student</label>
-            <select name="student_id" id="paymentStudentSelect" class="form-select" required>
+            <select name="student_lrn" id="paymentStudentSelect" class="form-select" required>
               <option value="">— Select Student —</option>
             </select>
           </div>
@@ -43,7 +43,7 @@
           {{-- Single Student Display --}}
           <div class="mb-3" id="singleStudentName" style="display:none;">
             <label class="form-label">Student</label>
-            <input type="hidden" name="student_id" id="singleStudentId">
+            <input type="hidden" name="student_lrn" id="singleStudentId">
             <input type="text" id="singleStudentDisplay" class="form-control" readonly>
           </div>
 
@@ -168,12 +168,12 @@ document.addEventListener('DOMContentLoaded', function () {
   payForm.addEventListener('submit', function(e) {
     e.preventDefault();
 
-    const studentId = singleStudentId.value || studentSelect.value;
+    const studentLrn = singleStudentId.value || studentSelect.value;
     const amount    = parseFloat(paymentAmount.value);
     const method    = paymentMethod.value;
     const balance   = parseFloat(currentBalance.value);
 
-    if (!studentId || !amount || amount <= 0 || isNaN(balance) || amount > balance) {
+    if (!studentLrn || !amount || amount <= 0 || isNaN(balance) || amount > balance) {
       Swal.fire('Invalid Payment', 'Please check student and balance', 'error');
       return;
     }
@@ -197,7 +197,7 @@ document.addEventListener('DOMContentLoaded', function () {
           'Accept': 'application/json'
         },
         body: JSON.stringify({
-          student_id: studentId,
+          student_lrn: studentLrn,
           amount: amount,
           payment_method: method,
           current_balance: balance
@@ -227,7 +227,7 @@ document.addEventListener('DOMContentLoaded', function () {
         Swal.fire('Payment Saved', 'Student balance updated', 'success');
 
         // Optional UI patch-up (if you have a row for this student)
-        const row = document.querySelector(`tr[data-id="${studentId}"]`);
+        const row = document.querySelector(`tr[data-id="${studentLrn}"]`);
         if (row) {
           const paidCell    = row.querySelector('.text-success');
           const balanceCell = row.querySelector('.text-danger');

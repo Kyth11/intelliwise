@@ -21,7 +21,8 @@ return new class extends Migration {
             $table->string('remark', 32)->nullable(); // PASSED / FAILED
 
             // Conventional FK names
-            $table->foreignId('student_id')->constrained('students')->cascadeOnDelete()->cascadeOnUpdate();
+            $table->char('student_id', 12);
+            $table->foreign('student_id')->references('lrn')->on('students')->cascadeOnDelete()->cascadeOnUpdate()->cascadeOnDelete()->cascadeOnUpdate();
             $table->foreignId('subject_id')->constrained('subjects')->cascadeOnDelete()->cascadeOnUpdate();
             $table->foreignId('schoolyr_id')->constrained('schoolyrs')->cascadeOnDelete()->cascadeOnUpdate();
             $table->foreignId('gradelvl_id')->nullable()->constrained('gradelvls')->nullOnDelete()->cascadeOnUpdate();

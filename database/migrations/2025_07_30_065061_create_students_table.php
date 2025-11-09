@@ -8,14 +8,16 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('students', function (Blueprint $table) {
-            $table->id();
+            // LRN as PRIMARY KEY (string/char PK; no auto-increment id)
+            $table->char('lrn', 12)->primary();
+
             $table->string('s_firstname');
             $table->string('s_middlename')->nullable();
             $table->string('s_lastname');
             $table->date('s_birthdate');
             $table->string('s_address');
-            $table->string('s_citizenship')->nullable(); // NEW
-            $table->string('s_religion')->nullable();    // NEW
+            $table->string('s_citizenship')->nullable();
+            $table->string('s_religion')->nullable();
             $table->string('s_contact')->nullable();
             $table->string('s_email')->nullable();
 
@@ -36,6 +38,9 @@ return new class extends Migration {
             // Status
             $table->enum('enrollment_status', ['Enrolled', 'Not Enrolled'])->default('Not Enrolled');
             $table->enum('payment_status', ['Paid', 'Not Paid'])->default('Not Paid')->nullable();
+
+            // Soft deletes because the model uses SoftDeletes
+            $table->softDeletes();
 
             $table->timestamps();
         });

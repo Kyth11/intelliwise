@@ -85,20 +85,18 @@
         // Selected values (server remembers last selections)
         $selectedSchoolYr = $schoolyrId ?? request('schoolyr_id');
         $selectedGrade    = $gradeLevel ?? request('grade_level');
-        $selectedStudent  = $studentId ?? request('student_id');
+        $selectedStudent  = $studentLrn ?? request('student_lrn'); // ✅ use LRN
 
         // Build full-name list (for Student selector)
         $allStudentsList = collect($students)->map(function ($s) {
             $mid  = trim((string) ($s->s_middlename ?? ''));
             $name = trim(implode(' ', array_filter([$s->s_firstname ?? '', $mid, $s->s_lastname ?? ''])));
-            return ['id' => $s->id, 'name' => $name !== '' ? $name : ('Student #' . $s->id), 'grade' => $s->s_gradelvl ?? ''];
+            // Keep key as "id" for the JS below, but store the LRN value
+            return ['id' => $s->lrn, 'name' => $name !== '' ? $name : ('Student ' . $s->lrn), 'grade' => $s->s_gradelvl ?? ''];
         })->values();
 
         $studentsByGrade = $allStudentsList->groupBy('grade')->map->values();
         $gradeLevels     = collect($gradelvls ?? [])->pluck('grade_level')->values();
-
-        // Global quarter flags (true=open, false=closed)
-        $quartersOpen = \App\Models\QuarterLock::flags();
 
         // KPI numbers for the header strip
         $kpiStudents     = $allStudentsList->count();
@@ -107,12 +105,13 @@
         $kpiOpenQuarters = collect($quartersOpen)->filter(fn($v) => $v === true)->count();
 
         // ----- Student details for the report header -----
-        $currentStudent = collect($students)->firstWhere('id', (int) $selectedStudent);
+        $currentStudent = collect($students)->firstWhere('lrn', (string) $selectedStudent);
         $studentName    = $currentStudent
             ? trim(implode(' ', array_filter([$currentStudent->s_firstname ?? '', $currentStudent->s_middlename ?? '', $currentStudent->s_lastname ?? ''])))
             : null;
 
-        $gradeForReport = ($selectedGrade ?: null) ?? ($currentStudent->s_gradelv) ?? '—';
+        // ✅ correct field: s_gradelvl
+        $gradeForReport = ($selectedGrade ?: null) ?? ($currentStudent->s_gradelvl ?? null) ?? '—';
 
         $schoolYrModel  = collect($schoolyrs)->firstWhere('id', (int) $selectedSchoolYr);
         $schoolYrText   = $schoolYrModel->display_year
@@ -202,14 +201,14 @@
 
                 <div class="col-md-4">
                     <label class="form-label">Student</label>
-                    <select name="student_id" id="studentSelect" class="form-select">
+                    <select name="student_lrn" id="studentSelect" class="form-select">
                         <option value="">Select student</option>
                         {{-- Populated by JS --}}
                     </select>
                 </div>
 
                 <div class="col-md-2">
-                    <button class="btn btn-primary w-100 no-print">
+                    <button type="submit" class="btn btn-primary w-100 no-print">
                         <i class="bi bi-search"></i> View
                     </button>
                 </div>
@@ -337,6 +336,11 @@
                         Toggle which quarters are <strong>open for Faculty editing</strong>. This applies to
                         <strong>ALL grade levels and ALL students</strong> across the system.
                     </p>
+
+                    {{-- ✅ ensure current filters are posted --}}
+                    <input type="hidden" name="schoolyr_id" value="{{ $selectedSchoolYr }}">
+                    <input type="hidden" name="grade_level" value="{{ $selectedGrade }}">
+
                     <div class="d-flex flex-column gap-2">
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="mq1" name="q1" {{ $quartersOpen['q1'] ? 'checked' : '' }}>
@@ -410,33 +414,15 @@
         }
 
         document.addEventListener('DOMContentLoaded', function () {
-            const form     = document.getElementById('filtersForm');
-            const sySel    = document.getElementById('schoolyrSelect');
             const gradeSel = document.getElementById('gradeLevelFilter');
-            const stuSel   = document.getElementById('studentSelect');
 
             // Initial student list (respect preselects)
             populateStudents(gradeSel?.value || PRESELECT_GRADE, PRESELECT_STUDENT);
 
-            // Auto-submit helper
-            function submitIfReady() {
-                if (!form) return;
-                if (stuSel && stuSel.value) {
-                    if (form.requestSubmit) form.requestSubmit();
-                    else form.submit();
-                }
-            }
-
-            // When School Year changes: submit if a student is already chosen
-            sySel?.addEventListener('change', submitIfReady);
-
-            // When Grade changes: rebuild students and wait for a student pick
+            // Rebuild students when Grade changes (NO auto-submit)
             gradeSel?.addEventListener('change', function () {
                 populateStudents(this.value, null);
             });
-
-            // When Student changes: submit immediately
-            stuSel?.addEventListener('change', submitIfReady);
         });
     </script>
 @endpush
