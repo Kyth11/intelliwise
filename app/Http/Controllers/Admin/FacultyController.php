@@ -10,24 +10,35 @@ use App\Models\Gradelvl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use PDO;
 
 class FacultyController extends Controller
 {
     public function index()
     {
-        $faculties = Faculty::with([
-            'user',
-            'schedules.subject',
-            'schedules.gradelvl',
-        ])->get();
+        $faculties = Faculty::with(['user'])->get();
 
         $subjects  = Subjects::all();
         $gradelvls = Gradelvl::all();
 
+        
+        $result = DB::select(
+            "select c.*,
+            g.grade_level,
+            sy.school_year,
+            f.`name` as faculty_name,
+            CONCAT(sy.school_year, ' - ', g.grade_level) as `name`
+            from curriculum c 
+            left join gradelvls g ON g.id = c.grade_id 
+            left join schoolyrs sy ON sy.id = c.schoolyr_id
+            left join users f ON f.faculty_id = c.adviser_id where c.deleted = ?",
+            [0]
+        );
         return view('auth.admindashboard.faculties', compact(
             'faculties',
             'subjects',
-            'gradelvls'
+            'gradelvls',
+            'result'
         ));
     }
 
@@ -130,5 +141,99 @@ class FacultyController extends Controller
         });
 
         return back()->with('success', 'Faculty account deleted successfully!');
+    }
+
+    public function afterSubmit(Request $request){
+        DB::beginTransaction();
+
+
+
+        try {
+            
+            if(isset($request->curriculum_id)) {
+                $items = $request->itemlist['data'];
+                
+                foreach ($items as $row) {
+                    if(isset($row["id"])) {
+                        $day_schedule = implode("|", $row["day_schedule"]);
+                        DB::update(
+                            "UPDATE curriculum_child SET day_schedule = ? , class_start = ? , class_end = ? , adviser_id =?  WHERE id = ?",
+                            [$day_schedule, $row["class_start"], $row["class_end"] , $row["adviser_id"], $row["id"]]
+                        );
+                    } 
+                    
+                }
+
+            }  else {
+                return back()->with('error', 'Unabled to save the transaction!.');
+            }
+
+            DB::commit();
+            return back()->with('success', 'Successfully Saved.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function sourceModal(Request $request){
+          $result = DB::select(
+            "select c.*,
+            g.grade_level,
+            sy.school_year,
+            f.`name` as faculty_name,
+            CONCAT(sy.school_year, ' - ', g.grade_level) as `name`
+            from curriculum c 
+            left join gradelvls g ON g.id = c.grade_id 
+            left join schoolyrs sy ON sy.id = c.schoolyr_id
+            left join users f ON f.faculty_id = c.adviser_id where c.deleted = ?",
+            [0]
+        );
+       return response()->json([
+            'html' => view('auth.admindashboard.partials.scheduledModal', compact('result'))->render(),
+            'status' => 'success'
+        ]);
+
+    }
+
+    public function getCurriculumSubjects(Request $request){
+
+        if(isset($request->faculty_id)) {
+            $child = DB::select(
+                "select c.*,
+                s.subject_name,
+                s.subject_code
+                from curriculum_child c 
+                left join subjects s ON s.id = c.subject_id
+                where c.deleted = ? and c.adviser_id = ?",
+                [0, $request->faculty_id]
+            );
+        } else {
+            $request->validate([
+                'id' => 'required|int',
+            ]);
+            
+            $child = DB::select(
+                "select c.*,
+                s.subject_name,
+                s.subject_code
+                from curriculum_child c 
+                left join subjects s ON s.id = c.subject_id
+                where c.deleted = ? and c.curriculum_id = ?",
+                [0, $request->id]
+            );
+        }
+      
+       
+
+
+        $faculties = Faculty::with('user')->get();
+
+        return response()->json([
+            'html' => view('auth.admindashboard.views.faculty.getScheduledDetails', compact('child','faculties'))->render(),
+            'status' => 'success'
+        ]);
+
     }
 }

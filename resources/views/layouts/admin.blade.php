@@ -32,9 +32,12 @@
     <!-- Local Bootstrap JS -->
     <script src="{{ asset('vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     <link rel="stylesheet" href="{{ asset('css/dash.css') }}">
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
 </head>
 
-<body class="{{ (session('theme') === 'dark') ? 'theme-dark' : '' }}">
+<body class="{{ (session('theme') === 'dark') ? 'theme-dark' : '' }}  URL_HOST" data-url="{{ config('app.url') }}">
     <div class="dashboard-wrapper">
         <!-- Sidebar -->
         <div class="sidebar" id="sidebar">
@@ -83,6 +86,12 @@
                 <i class="bi bi-gear"></i><span> Settings</span>
             </a>
 
+            
+            <a href="{{ route('admin.curriculum.index') }}"
+                class="sidebar-link {{ request()->routeIs('admin.curriculum') ? 'active' : '' }}">
+                <i class="bi bi-gear"></i><span> Curriculum</span>
+            </a>
+
             {{-- Logout (SweetAlert confirm) --}}
             <a href="{{ route('login') }}" class="sidebar-link js-logout" role="button">
                 <i class="bi bi-box-arrow-right"></i><span> Logout</span>
@@ -112,14 +121,45 @@
             </div>
 
             @yield('content')
+        
+        
+        
+
+             <!-- Modal start -->
+            <div class="modal fade modalOpenCustom" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+                <div class="modal-dialog " role="document">
+                    <div class="modal-content">
+                        <form action="" method="POST" id="general-form"  enctype="multipart/form-data" novalidate>
+                            @csrf
+                            @method('POST')
+                            <div class="modal-header">
+                                
+                                <h5 class="modal-title"><i class="bi bi-pencil-square me-2" id="myModalLabel"></i>Manage Curriculum</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+                            </div>
+                            <div class="modal-body">
+                                
+                            </div>
+                            <div class="modal-footer">
+
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        
         </div>
     </div>
 
     <!-- Bootstrap JS (CDN duplicate kept as-is in your layout) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="{{ asset('js/main.js') }}"></script>
+
 
     <!-- Sidebar Collapse Toggle -->
     <script>

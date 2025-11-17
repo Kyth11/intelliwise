@@ -20,6 +20,8 @@ use App\Http\Controllers\Auth\FacultyDashboardController;
 use App\Http\Controllers\Auth\GuardianDashboardController;
 use App\Http\Controllers\Admin\FacultyController as AdminFacultyController;
 use App\Http\Controllers\Admin\SettingController as AdminSettingController;
+use App\Http\Controllers\Admin\CurriculumController as CurriculumController;
+
 
 // ---------- Shared / other controllers ----------
 use App\Http\Controllers\Admin\SubjectController as AdminSubjectController;
@@ -59,6 +61,7 @@ Route::middleware(['auth', 'role:admin'])
 
         // Settings (view-only)
         Route::get('/settings', [AdminDashboardController::class, 'settings'])->name('settings.index');
+        Route::get('/curriculum', [AdminDashboardController::class, 'curriculum'])->name('curriculum.index');
 
         // Settings actions
         Route::prefix('settings')->name('settings.')->group(function () {
@@ -69,6 +72,15 @@ Route::middleware(['auth', 'role:admin'])
             Route::post('/gcash-qr', [AdminSettingController::class, 'uploadGcashQr'])->name('gcashqr.upload');
             Route::post('/school-year/{id}/proceed', [SchoolYearController::class, 'proceed'])->name('schoolyear.proceed');
         });
+
+
+         // Settings actions
+        Route::prefix('curriculum')->name('curriculum.')->group(function () {
+            Route::post('/store', [CurriculumController::class, 'store'])->name('store');
+            Route::get('/curriculum_edit/{id}', [AdminDashboardController::class, 'curriculum_edit'])->name('curriculum_edit');
+
+        });
+
 
         // Students
         Route::prefix('students')->name('students.')->group(function () {
@@ -88,6 +100,13 @@ Route::middleware(['auth', 'role:admin'])
             Route::post('/store', [AdminFacultyController::class, 'store'])->name('store');
             Route::put('/{id}', [AdminFacultyController::class, 'update'])->name('update');
             Route::delete('/{id}', [AdminFacultyController::class, 'destroy'])->name('destroy');
+            Route::post('/afterSubmit', [AdminFacultyController::class, 'afterSubmit'])->name('afterSubmit');
+
+            Route::post('/sourceModal', [AdminFacultyController::class, 'sourceModal'])->name('sourceModal');
+            Route::post('/getCurriculumSubjects', [AdminFacultyController::class, 'getCurriculumSubjects'])->name('getCurriculumSubjects');
+            
+            
+
         });
 
         // Guardians (admin account management)
@@ -204,6 +223,9 @@ Route::middleware(['auth', 'role:guardian'])
         Route::prefix('payment-receipts')->name('payment-receipts.')->group(function () {
             Route::post('/', [GuardianPaymentReceiptController::class, 'store'])->name('store');
         });
+
+        Route::post('/getCurriculumSubjects', [AdminFacultyController::class, 'getCurriculumSubjects'])->name('getCurriculumSubjects');
+            
 
         if (app()->environment('local')) {
             Route::get('/_test-mail', function () {

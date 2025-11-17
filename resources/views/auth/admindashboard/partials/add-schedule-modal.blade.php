@@ -11,7 +11,23 @@
 
         <div class="modal-body">
           <div class="row g-3">
-            <div class="col-sm-4">
+
+
+            <div class="col-sm-12">
+              <label class="form-label">Curriculum: Sy - Grade Level <span class="text-danger">*</span></label>
+              
+                <select name="curriculum_id" class="form-select" id="curriculum_id" required>
+                   @foreach(($result ?? collect()) as $s)
+                    <option value="{{ $s->id }}" >
+                      {{ $s->name }}
+                    </option>
+                  @endforeach
+                </select>
+            </div>
+
+
+
+            <!-- <div class="col-sm-4">
               <label class="form-label">Day <span class="text-danger">*</span></label>
               @php $days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']; @endphp
               <select name="day" class="form-select" required>
@@ -19,9 +35,9 @@
                   <option value="{{ $d }}" {{ old('day')===$d ? 'selected' : '' }}>{{ $d }}</option>
                 @endforeach
               </select>
-            </div>
+            </div> -->
 
-            <div class="col-sm-4">
+            <!-- <div class="col-sm-4">
               <label class="form-label">Class Start <span class="text-danger">*</span></label>
               <input type="time" name="class_start" class="form-control" value="{{ old('class_start') }}" required>
             </div>
@@ -76,7 +92,7 @@
                   </option>
                 @endforeach
               </select>
-            </div>
+            </div> -->
           </div>
 
           @if ($errors->any())

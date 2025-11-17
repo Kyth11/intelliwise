@@ -16,6 +16,7 @@ use App\Models\Student;
 use App\Models\Subjects;
 use App\Models\Tuition;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class AdminDashboardController extends Controller
 {
@@ -150,6 +151,91 @@ class AdminDashboardController extends Controller
             'schoolyrs',
             'students',
             'guardians'
+        ));
+    }
+
+
+    /**
+     * Settings page (view only).
+     * CRUD actions are handled by Admin\SettingController.
+     */
+    public function curriculum()
+    {
+        $admins    = User::where('role', 'admin')->orderBy('created_at', 'desc')->get();
+        $schoolyrs = Schoolyr::orderBy('school_year', 'desc')->get(['id', 'school_year']);
+
+        $subjects  = Subjects::orderBy('subject_name')->get();
+        $gradelvls = Gradelvl::get(['id', 'grade_level']);
+
+        $child = false;
+        $faculties = Faculty::with('user')->get();
+
+
+        $result = DB::select(
+            "select c.*,
+            g.grade_level,
+            sy.school_year,
+            f.`name`
+            from curriculum c 
+            left join gradelvls g ON g.id = c.grade_id 
+            left join schoolyrs sy ON sy.id = c.schoolyr_id
+            left join users f ON f.faculty_id = c.adviser_id where c.deleted = ?",
+            [0]
+        );
+
+
+
+        return view('auth.admindashboard.curriculum', compact(
+            'admins',
+            'schoolyrs',
+            'subjects',
+            'gradelvls',
+            'child',
+            'faculties',
+            'result'
+        ));
+    }
+
+    public function curriculum_edit($id){
+         $admins    = User::where('role', 'admin')->orderBy('created_at', 'desc')->get();
+        $schoolyrs = Schoolyr::orderBy('school_year', 'desc')->get(['id', 'school_year']);
+
+        $subjects  = Subjects::orderBy('subject_name')->get();
+        $gradelvls = Gradelvl::get(['id', 'grade_level']);
+
+        $child = DB::select(
+            "select c.*,
+            s.subject_name,
+            s.subject_code
+            from curriculum_child c 
+            left join subjects s ON s.id = c.subject_id
+            where c.deleted = ? and c.curriculum_id = ?",
+            [0, $id]
+        );
+        $faculties = Faculty::with('user')->get();
+
+
+        $result = DB::select(
+            "select c.*,
+            g.grade_level,
+            sy.school_year,
+            f.`name`
+            from curriculum c 
+            left join gradelvls g ON g.id = c.grade_id 
+            left join schoolyrs sy ON sy.id = c.schoolyr_id
+            left join users f ON f.faculty_id = c.adviser_id where c.deleted = ? and c.id = ?",
+            [0, $id]
+        )[0];
+
+
+        return view('auth.admindashboard.partials.edit-curriculum', compact(
+            'admins',
+            'schoolyrs',
+            'subjects',
+            'gradelvls',
+            'child',
+            'faculties',
+            'result'
         ));
     }
 }

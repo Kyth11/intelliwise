@@ -135,6 +135,7 @@ class StudentController extends Controller
 
     public function store(Request $request)
     {
+
         // LRN rule: new/transferee -> unique; old -> exists
         $type = (string) $request->input('enroll_type', 'new');
         $lrnRules = ['required','digits_between:10,12'];
@@ -157,7 +158,6 @@ class StudentController extends Controller
             'student_optional_fee_ids.*' => ['integer', 'exists:optional_fees,id'],
             'guardian_id'  => 'required'
         ]);
-
         DB::beginTransaction();
         try {
             // ----- Guardian upsert
@@ -191,13 +191,13 @@ class StudentController extends Controller
                 $guardian = Guardian::lockForUpdate()->findOrFail((int)$request->guardian_id);
             }
 
-            // ----- Tuition & optional fees
-            [$tuitionId, $baseTotal] = $this->resolveTuition($request->s_gradelvl);
-            $studentOptIds = collect($request->input('student_optional_fee_ids', []))->filter()->unique()->values();
-            $studentOptSum = $studentOptIds->isNotEmpty()
-                ? (float) OptionalFee::whereIn('id', $studentOptIds)->sum('amount')
-                : 0.0;
-            $total = round($baseTotal + $studentOptSum, 2);
+            // // ----- Tuition & optional fees
+            // [$tuitionId, $baseTotal] = $this->resolveTuition($request->s_gradelvl);
+            // $studentOptIds = collect($request->input('student_optional_fee_ids', []))->filter()->unique()->values();
+            // $studentOptSum = $studentOptIds->isNotEmpty()
+            //     ? (float) OptionalFee::whereIn('id', $studentOptIds)->sum('amount')
+            //     : 0.0;
+            // $total = round($baseTotal + $studentOptSum, 2);
 
             // ----- Shared student fields
             $studentData = [
@@ -213,11 +213,11 @@ class StudentController extends Controller
                 's_email'           => $request->s_email,
                 's_gradelvl'        => $request->s_gradelvl,
                 'enrollment_status' => $request->enrollment_status ?? 'Enrolled',
-                'payment_status'    => $request->payment_status ?? 'Unpaid',
-                's_tuition_sum'     => $baseTotal,
-                's_optional_total'  => round($studentOptSum, 2),
-                's_total_due'       => $total,
-                'tuition_id'        => $tuitionId,
+                // 'payment_status'    => $request->payment_status ?? 'Unpaid',
+                // 's_tuition_sum'     => $baseTotal,
+                // 's_optional_total'  => round($studentOptSum, 2),
+                // 's_total_due'       => $total,
+                // 'tuition_id'        => $tuitionId,
                 'guardian_id'       => $guardian->id,
                 's_gender'          => $request->s_gender,
                 'previous_school'   => $request->previous_school,
@@ -232,22 +232,22 @@ class StudentController extends Controller
                 $student->save();
 
                 // Sync optional fees
-                $sync = [];
-                foreach ($studentOptIds as $fid) { $sync[$fid] = []; }
-                if (method_exists($student, 'optionalFees')) {
-                    $student->optionalFees()->sync($sync);
-                }
+                // $sync = [];
+                // foreach ($studentOptIds as $fid) { $sync[$fid] = []; }
+                // if (method_exists($student, 'optionalFees')) {
+                //     $student->optionalFees()->sync($sync);
+                // }
             } else {
                 // Create new record for new/transferee
                 $student = Student::create($this->filterColumns('students', $studentData));
 
-                if ($studentOptIds->isNotEmpty() && method_exists($student, 'optionalFees')) {
-                    $attach = [];
-                    foreach ($studentOptIds as $fid) { $attach[$fid] = []; }
-                    try { $student->optionalFees()->attach($attach); } catch (\Throwable $e) {
-                        Log::warning('Optional fee attach failed', ['err' => $e->getMessage()]);
-                    }
-                }
+                // if ($studentOptIds->isNotEmpty() && method_exists($student, 'optionalFees')) {
+                //     $attach = [];
+                //     foreach ($studentOptIds as $fid) { $attach[$fid] = []; }
+                //     try { $student->optionalFees()->attach($attach); } catch (\Throwable $e) {
+                //         Log::warning('Optional fee attach failed', ['err' => $e->getMessage()]);
+                //     }
+                // }
             }
 
             // ----- Create/Reset guardian user credentials + send email
@@ -278,6 +278,37 @@ class StudentController extends Controller
                 if ($this->hasColumn('users','guardian_id')) $user->guardian_id = $guardian->id;
                 $user->save();
             }
+
+
+            // process enrollement
+            $curriculum_id = DB::select('select c.id from curriculum c 
+                        left join gradelvls g ON g.id = c.grade_id
+                        inner join schoolyrs sy ON sy.id = c.schoolyr_id and sy.`active` = 1
+                        where g.grade_level =  ? ', [$request->s_gradelvl]);
+            
+
+            if(count($curriculum_id) > 0 ){
+                // process enrollement
+                $exisitRegistrar = DB::select('select * from registrar_student  where curriculum_id =  ? and student_id = ? and deleted = 0 ', [$curriculum_id[0]->id, $request->lrn]);
+                    
+                if(count($exisitRegistrar) > 0) {
+                    DB::rollBack();
+                    $role  = Auth::user()?->role;
+                    return back()->with('error', 'Failed to enroll student. Student Already Enrolled for this school year!.')->withInput();
+                }
+                DB::insert(
+                    "INSERT INTO registrar_student (curriculum_id, student_id,`type`)
+                    VALUES (?,?,?)",
+                    [$curriculum_id[0]->id, $request->lrn,$type]
+                );
+
+            } else {
+                DB::rollBack();
+                $role  = Auth::user()?->role;
+                $route = $role === 'faculty' ? 'faculty.students' : 'admin.students.index';
+                return back()->with('error', 'Failed to enroll student. No Curriculum Setup!.')->withInput();
+            }
+
 
             if ($emailTarget !== '') {
                 try {

@@ -32,7 +32,7 @@
     <link rel="stylesheet" href="{{ asset('css/dash.css') }}">
 </head>
 
-<body class="{{ (session('theme') === 'dark') ? 'theme-dark' : '' }}">
+<body class="{{ (session('theme') === 'dark') ? 'theme-dark' : '' }} URL_HOST" data-url="{{ config('app.url') }}">
 <div class="dashboard-wrapper">
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
@@ -85,6 +85,33 @@
         </div>
 
         @yield('content')
+
+
+
+            <!-- Modal start -->
+            <div class="modal fade modalOpenCustom" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+                <div class="modal-dialog " role="document">
+                    <div class="modal-content">
+                        <form action="" method="POST" id="general-form"  enctype="multipart/form-data" novalidate>
+                            @csrf
+                            @method('POST')
+                            <div class="modal-header">
+                                
+                                <h5 class="modal-title"><i class="bi bi-pencil-square me-2" id="myModalLabel"></i>Manage Curriculum</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+                            </div>
+                            <div class="modal-body">
+                                
+                            </div>
+                            <div class="modal-footer">
+
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        
     </div>
 </div>
 
@@ -93,6 +120,10 @@
 <!-- SweetAlert2 -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
+<script src="https://code.jquery.com/jquery-3.7.1.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="{{ asset('js/main.js') }}"></script>
 <!-- Sidebar Collapse Toggle + Theme -->
 <script>
     const sidebar = document.getElementById('sidebar');

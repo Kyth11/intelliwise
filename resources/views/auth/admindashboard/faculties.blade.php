@@ -40,14 +40,7 @@
                         <div class="kpi-number fs-4 fw-bold">{{ $facCount }}</div>
                         <div class="kpi-label text-muted small">Faculty</div>
                     </div>
-                    <div class="kpi-card border rounded p-3 text-center">
-                        <div class="kpi-number fs-4 fw-bold">{{ $schedCount }}</div>
-                        <div class="kpi-label text-muted small">Total Schedules</div>
-                    </div>
-                    <div class="kpi-card border rounded p-3 text-center">
-                        <div class="kpi-number fs-4 fw-bold">{{ $subjectCount }}</div>
-                        <div class="kpi-label text-muted small">Subjects</div>
-                    </div>
+                   
                 </div>
             </div>
 
@@ -66,7 +59,7 @@
                             placeholder="Filter faculty… (press Enter)">
                     </div>
                     <div class="d-grid gap-2">
-                        <button class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addScheduleModal">
+                        <button class="btn btn-outline-dark btn-sm" id="addScheduleModal">
                             <i class="bi bi-calendar-plus me-1"></i> Add Schedule
                         </button>
                     </div>
@@ -80,7 +73,7 @@
                 <table id="facultySchedTable" class="table table-bordered table-striped align-middle">
                     <thead class="table-primary text-center">
                         <tr>
-                            <th style="width: 90px;">Faculty ID</th>
+                            <th>Faculty ID</th>
                             <th>Name</th>
                             <th>Email</th>
                             <th>Contact</th>
@@ -90,71 +83,12 @@
                     <tbody>
                         @foreach ($faculties as $faculty)
                             <tr>
-                                <td class="text-center">{{ $faculty->id }}</td>
-                                <td>{{ $faculty->first_name }} {{ $faculty->last_name }}</td>
-                                <td>{{ $faculty->email ?? '-' }}</td>
-                                <td>{{ $faculty->contact ?? '-' }}</td>
+                                <td>{{ $faculty->id }}</td>
+                                <td>{{ $faculty->f_firstname }} {{ $faculty->f_lastname }}</td>
+                                <td>{{ $faculty->f_email ?? '-' }}</td>
+                                <td>{{ $faculty->f_contact ?? '-' }}</td>
                                 <td>
-                                    @if($faculty->schedules && $faculty->schedules->isNotEmpty())
-                                        <div class="table-responsive">
-                                            <table class="table table-sm table-bordered mb-0">
-                                                <thead class="table-light text-center">
-                                                    <tr>
-                                                        <th>Subject</th>
-                                                        <th>Grade Level</th>
-                                                        <th>Day / Time</th>
-                                                        <th style="width: 140px;">Actions</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    @foreach($faculty->schedules as $schedule)
-                                                        <tr>
-                                                            <td>{{ optional($schedule->subject)->name ?? '-' }}</td>
-                                                            <td>{{ optional($schedule->gradelvl)->name ?? '-' }}</td>
-                                                            <td>
-                                                                {{ $schedule->day_of_week ?? '-' }}
-                                                                @php
-                                                                    $st = $schedule->start_time ? substr($schedule->start_time, 0, 5) : '';
-                                                                    $et = $schedule->end_time ? substr($schedule->end_time, 0, 5) : '';
-                                                                @endphp
-                                                                {{ $st && $et ? " $st-$et" : '' }}
-                                                            </td>
-                                                            <td class="text-center text-nowrap">
-                                                                <div class="d-flex gap-2 justify-content-center">
-                                                                    <!-- EDIT -->
-                                                                    <button
-                                                                        class="btn btn-sm btn-warning"
-                                                                        title="Edit Schedule"
-                                                                        data-bs-toggle="modal"
-                                                                        data-bs-target="#editFacultyScheduleModal{{ $schedule->id }}">
-                                                                        <i class="bi bi-pencil-square"></i>
-                                                                    </button>
-
-                                                                    <!-- DELETE -->
-                                                                    <form
-                                                                        action="{{ route('admin.schedules.destroy', $schedule->id) }}"
-                                                                        method="POST"
-                                                                        class="d-inline delete-form">
-                                                                        @csrf
-                                                                        @method('DELETE')
-                                                                        <button
-                                                                            type="button"
-                                                                            class="btn btn-sm btn-danger delete-btn"
-                                                                            title="Delete Schedule"
-                                                                            data-confirm="Delete this schedule?">
-                                                                            <i class="bi bi-archive"></i>
-                                                                        </button>
-                                                                    </form>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    @endforeach
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    @else
-                                        <span class="text-muted">No schedules assigned</span>
-                                    @endif
+                                    <button class="btn btn-sm btn-success openModalSchedule" data-id="{{ $faculty->id }}"> <i class="bi bi-eye"></i> </button>
                                 </td>
                             </tr>
                         @endforeach
@@ -232,5 +166,103 @@
                 table.search(qa.value || '').draw();
             });
         });
+
+
+
+       
+
+         $(document).on('click', '#addScheduleModal', function() {
+            
+            var action = "{{ route('admin.faculties.sourceModal') }}";
+
+            var dataObj  = {};
+
+            // Convert the data object into FormData
+            var formData = new FormData();
+            formData.append('_token', '{{ csrf_token() }}'); // ← REQUIRED
+            for (const key in dataObj) {
+                if (dataObj.hasOwnProperty(key)) {
+                    formData.append(key, dataObj[key]);
+                }   
+            }
+
+            var request = main.send_ajax(formData, action, 'POST', true);
+            request.done(function (data) {
+
+                // action = component +  data.action;
+
+                // main.modalOpen(data.header, data.html,  data.button, action, data.size );
+
+                var button = ' <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button> <button type="submit" class="btn btn-primary">Add</button>';
+                main.modalOpen('Add Scheduled', data.html, button,"{{ route('admin.faculties.afterSubmit') }}",'modal-xl')
+
+            });
+
+          
+        });
+
+
+          $(document).on('change', '#curriculum_id', function() {
+           
+
+            var action = "{{ route('admin.faculties.getCurriculumSubjects') }}";
+
+            var dataObj  = {
+                'id' : $(this).val()
+            };
+
+            // Convert the data object into FormData
+            var formData = new FormData();
+            formData.append('_token', '{{ csrf_token() }}'); // ← REQUIRED
+            for (const key in dataObj) {
+                if (dataObj.hasOwnProperty(key)) {
+                    formData.append(key, dataObj[key]);
+                }   
+            }
+
+            var request = main.send_ajax(formData, action, 'POST', true);
+            request.done(function (data) {
+
+                $('#tableHere').html('');
+                $('#tableHere').html(data.html);
+
+
+            });
+
+
+        });
+
+        $(document).on('click', '.openModalSchedule', function() {
+            
+            var action = "{{ route('admin.faculties.getCurriculumSubjects') }}";
+
+            var dataObj  = {
+                faculty_id : $(this).data('id'),
+                id : ''
+            };
+
+            // Convert the data object into FormData
+            var formData = new FormData();
+            formData.append('_token', '{{ csrf_token() }}'); // ← REQUIRED
+            for (const key in dataObj) {
+                if (dataObj.hasOwnProperty(key)) {
+                    formData.append(key, dataObj[key]);
+                }   
+            }
+
+            var request = main.send_ajax(formData, action, 'POST', true);
+            request.done(function (data) {
+                var button = '';
+                main.modalOpen('View Scheduled', data.html, button,'','modal-xl')
+
+            });
+
+          
+        });
+        
+        
     </script>
+
+
+
 @endpush
