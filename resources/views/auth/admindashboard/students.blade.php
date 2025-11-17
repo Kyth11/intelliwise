@@ -25,10 +25,16 @@
 <div class="card section p-4 students-page">
     <!-- Header -->
     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-2">
-        <div class="section-title">
-            <h4 class="mb-0">Students (Grouped by Grade Level)</h4>
-            <span class="text-muted ms-2">Browse, filter, edit, or archive students.</span>
-        </div>
+<div class="section-title d-flex flex-wrap gap-2 align-items-baseline">
+    <h4 class="mb-0">
+        Students
+        @if($current)
+            from S.Y. {{ $current->school_year }}
+        @endif
+        (Grouped by Grade Level)
+    </h4>
+    <span class="text-muted ms-2">Browse, filter, edit, or archive students.</span>
+</div>
         <div class="d-flex gap-2">
             <a href="{{ route('admin.students.create') }}" class="btn btn-success">
                 <i class="bi bi-person-plus"></i> Enroll Student
@@ -98,6 +104,18 @@
 
     {{-- ===== Filters ===== --}}
     <form class="filters row g-2 align-items-end mt-1 mb-2">
+
+        <div class="col-auto">
+    <label class="form-label mb-0 small">School Year</label>
+    <select id="filterSchoolYear" class="form-select form-select-sm">
+        <option value="">All</option>
+        @foreach($schoolyrs as $sy)
+            <option value="{{ $sy->id }}" {{ ($current && $current->id == $sy->id) ? 'selected' : '' }}>
+                {{ $sy->school_year }}
+            </option>
+        @endforeach
+    </select>
+</div>
         <div class="col-auto">
             <label class="form-label mb-0 small">Grade Level</label>
             <select id="filterGrade" class="form-select form-select-sm">
@@ -146,25 +164,26 @@
 
             <div class="table-responsive">
                 <table class="table table-bordered table-striped table-sm align-middle student-table">
-                    <thead class="table-primary">
-                        <tr>
-                            <th>Name</th>
-                            <th>Birthdate</th>
-                            <th>Parents / Guardian</th>
-                            <th>Contact</th>
-                            <th>Email</th>
-                            <th>Tuition (₱)</th>
-                            <th class="opt-fees-cell">Optional Fees</th>
-                            <th>Optional (₱)</th>
-                            <th>Total Due (₱)</th>
-                            <th>Paid (₱)</th>
-                            <th>Balance (₱)</th>
-                            {{-- hidden helper columns for filtering --}}
-                            <th class="d-none">PayStatus</th>
-                            <th class="d-none">GuardianId</th>
-                            <th class="text-nowrap">Tools</th>
-                        </tr>
-                    </thead>
+<thead class="table-primary">
+    <tr>
+        <th>LRN</th> <!-- New column -->
+        <th>Name</th>
+        <th>Birthdate</th>
+        <th>Parents / Guardian</th>
+        <th>Contact</th>
+        <th>Email</th>
+        <th>Tuition (₱)</th>
+        <th class="opt-fees-cell">Optional Fees</th>
+        <th>Optional (₱)</th>
+        <th>Total Due (₱)</th>
+        <th>Paid (₱)</th>
+        <th>Balance (₱)</th>
+        <th class="d-none">PayStatus</th>
+        <th class="d-none">GuardianId</th>
+        <th class="text-nowrap">Tools</th>
+    </tr>
+</thead>
+
                     <tbody>
                         @foreach($group as $s)
                             @php
@@ -248,24 +267,22 @@
                                 $feeIdsCsv  = $filtered->pluck('id')->implode(',');
                                 $guardianId = $s->guardian->id ?? '';
                             @endphp
-
-                            <tr data-lrn="{{ $s->lrn }}" data-paystatus="{{ $derivedPay }}" data-guardianid="{{ $guardianId }}">
-                                <td>{{ $s->s_firstname }} {{ $s->s_middlename }} {{ $s->s_lastname }}</td>
-                                <td>{{ \Illuminate\Support\Carbon::parse($s->s_birthdate)->format('Y-m-d') }}</td>
-                                <td>{{ $household }}</td>
-                                <td>{{ $s->s_contact ?? '—' }}</td>
-                                <td>{{ $s->s_email ?? '—' }}</td>
-                                <td>{{ number_format($base, 2) }}</td>
-                                <td class="opt-fees-cell">{!! $optListHtml !!}</td>
-                                <td>{{ number_format($opt, 2) }}</td>
-                                <td class="fw-semibold">{{ number_format($originalTotal, 2) }}</td>
-                                <td class="text-success fw-semibold">{{ number_format($paid, 2) }}</td>
-                                <td class="text-danger fw-semibold">{{ number_format($currentBalance, 2) }}</td>
-                                {{-- hidden helper columns so DataTables can filter easily --}}
-                                <td class="d-none">{{ $derivedPay }}</td>
-                                <td class="d-none">{{ $guardianId }}</td>
-
-                                <td class="text-nowrap">
+        <tr data-lrn="{{ $s->lrn }}" data-paystatus="{{ $derivedPay }}" data-guardianid="{{ $guardianId }}">
+            <td>{{ $s->lrn }}</td> <!-- LRN value -->
+            <td>{{ $s->s_firstname }} {{ $s->s_middlename }} {{ $s->s_lastname }}</td>
+            <td>{{ \Illuminate\Support\Carbon::parse($s->s_birthdate)->format('Y-m-d') }}</td>
+            <td>{{ $household }}</td>
+            <td>{{ $s->s_contact ?? '—' }}</td>
+            <td>{{ $s->s_email ?? '—' }}</td>
+            <td>{{ number_format($base, 2) }}</td>
+            <td class="opt-fees-cell">{!! $optListHtml !!}</td>
+            <td>{{ number_format($opt, 2) }}</td>
+            <td class="fw-semibold">{{ number_format($originalTotal, 2) }}</td>
+            <td class="text-success fw-semibold">{{ number_format($paid, 2) }}</td>
+            <td class="text-danger fw-semibold">{{ number_format($currentBalance, 2) }}</td>
+            <td class="d-none">{{ $derivedPay }}</td>
+            <td class="d-none">{{ $guardianId }}</td>
+            <td class="text-nowrap">
                                     <button class="btn btn-sm btn-warning"
                                             data-bs-toggle="modal"
                                             data-bs-target="#editStudentModal"

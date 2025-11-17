@@ -800,7 +800,7 @@
                     allowEscapeKey: true
                 }).then(res => {
                     if (res.isConfirmed) {
-                        if (submitBtn) submitBtn.disabled = true;
+                        if (submitBtn) submitBtn.disabled = true;a
                         form.submit();
                     }
                 });
