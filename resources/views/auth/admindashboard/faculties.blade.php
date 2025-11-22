@@ -14,9 +14,17 @@
 @section('content')
     <div class="card section p-4">
         @php
-            // $activeSchoolYear should be passed from controller
-            // e.g. string "2025-2026", or null to show all.
-            $activeSy = $activeSchoolYear ?? null;
+            // Normalize active school year to the *string* value (e.g. "2025-2026")
+            if (isset($activeSchoolYear)) {
+                if (is_object($activeSchoolYear)) {
+                    $activeSy = $activeSchoolYear->school_year ?? null;
+                } else {
+                    $activeSy = $activeSchoolYear ?: null;
+                }
+            } else {
+                // Fallback: read from DB if not explicitly passed
+                $activeSy = \App\Models\Schoolyr::where('active', 1)->value('school_year');
+            }
 
             $facCount = $faculties->count();
 
@@ -24,9 +32,14 @@
             $gradeLevelCount = $faculties
                 ->flatMap(function ($f) use ($activeSy) {
                     $scheds = $f->schedules ?? collect();
-                    return $activeSy ? $scheds->where('school_year', $activeSy) : $scheds;
+
+                    if ($activeSy) {
+                        return $scheds->where('school_year', $activeSy);
+                    }
+
+                    // If no active SY, show all schedules (or use collect() if you want none)
+                    return $scheds;
                 })
-                ->filter()
                 ->map(fn($s) => optional($s->gradelvl)->grade_level)
                 ->filter()
                 ->unique()
@@ -42,7 +55,12 @@
                 <div class="intro mb-3">
                     <h5 class="mb-1">Faculty Schedule Management</h5>
                     <div class="text-muted small">
-                        View, edit, and manage faculty schedules. Only schedules for the currently active School Year are shown.
+                        View, edit, and manage faculty schedules.
+                        @if($activeSy)
+                            Only schedules for the currently active School Year are shown.
+                        @else
+                            No active School Year detected, all schedules are shown.
+                        @endif
                     </div>
                     @if($activeSy)
                         <div class="small mt-1">
@@ -108,12 +126,11 @@
                     <tbody>
                         @foreach ($faculties as $faculty)
                             @php
-                                // Filter this faculty's schedules by active school year
-                                $facultySchedules = $faculty->schedules
-                                    ? ($activeSy
-                                        ? $faculty->schedules->where('school_year', $activeSy)
-                                        : $faculty->schedules)
-                                    : collect();
+                                $scheds = $faculty->schedules ?? collect();
+                                // Filter this faculty's schedules by active school year if present
+                                $facultySchedules = $activeSy
+                                    ? $scheds->where('school_year', $activeSy)
+                                    : $scheds;
 
                                 $gradeLabels = $facultySchedules
                                     ->map(fn ($s) => optional($s->gradelvl)->grade_level)
@@ -142,7 +159,13 @@
                                             View Schedule
                                         </button>
                                     @else
-                                        <span class="text-muted">No schedules in active SY</span>
+                                        <span class="text-muted">
+                                            @if($activeSy)
+                                                No schedules in active SY
+                                            @else
+                                                No schedules
+                                            @endif
+                                        </span>
                                     @endif
                                 </td>
                             </tr>
@@ -163,11 +186,10 @@
                     $fname = 'Faculty #'.$faculty->id;
                 }
 
-                $facultySchedules = $faculty->schedules
-                    ? ($activeSy
-                        ? $faculty->schedules->where('school_year', $activeSy)
-                        : $faculty->schedules)
-                    : collect();
+                $scheds = $faculty->schedules ?? collect();
+                $facultySchedules = $activeSy
+                    ? $scheds->where('school_year', $activeSy)
+                    : $scheds;
 
                 // Distinct grade levels for this faculty (for header)
                 $gradeLabelsForHeader = $facultySchedules
@@ -217,8 +239,12 @@
                                                     <td>
                                                         @foreach($subjectSchedules as $schedule)
                                                             @php
-                                                                $st = $schedule->class_start ? substr($schedule->class_start, 0, 5) : '';
-                                                                $et = $schedule->class_end ? substr($schedule->class_end, 0, 5) : '';
+                                                                $st = $schedule->class_start
+                                                                    ? date('g:i A', strtotime($schedule->class_start))
+                                                                    : '';
+                                                                $et = $schedule->class_end
+                                                                    ? date('g:i A', strtotime($schedule->class_end))
+                                                                    : '';
                                                             @endphp
                                                             <div class="d-flex align-items-center gap-2 mb-1">
                                                                 <span class="badge bg-primary">
@@ -238,7 +264,8 @@
                                                                         class="btn btn-sm btn-warning"
                                                                         title="Edit Schedule"
                                                                         data-bs-toggle="modal"
-                                                                        data-bs-target="#editScheduleModal{{ $schedule->id }}">
+                                                                        data-bs-target="#editScheduleModal{{ $schedule->id }}"
+                                                                        data-parent-modal="#viewFacultySchedule{{ $faculty->id }}">
                                                                         <i class="bi bi-pencil-square"></i>
                                                                     </button>
 
@@ -268,9 +295,9 @@
                                 </div>
                             @else
                                 <p class="text-muted mb-0">
-                                    No schedules for this faculty in the active School Year
+                                    No schedules for this faculty
                                     @if($activeSy)
-                                        ({{ $activeSy }})
+                                        in active School Year ({{ $activeSy }})
                                     @endif
                                     .
                                 </p>
@@ -413,7 +440,7 @@
             }
 
             function buildDayButtonsAndContainerHtml() {
-                const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+                const days = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
                 const buttons = days.map(d => `
                     <button type="button"
                             class="btn btn-outline-primary btn-sm day-toggle-btn"
@@ -449,9 +476,6 @@
                                 ${buildDayButtonsAndContainerHtml()}
                             </div>
                         </div>
-                    </td>
-                    <td class="text-center">
-                        <span class="text-muted small">Use day buttons</span>
                     </td>
                 `;
 
@@ -583,6 +607,96 @@
 
                 btn.classList.add('active');
                 hidden.value = btn.dataset.day;
+            });
+        })();
+
+        // ==========================
+        // EDIT SCHEDULE: RETURN TO VIEW MODAL
+        // ==========================
+        (function () {
+            // When an edit modal is shown, remember which view modal it came from
+            document.addEventListener('show.bs.modal', function (event) {
+                const modal = event.target;
+                if (!modal.id || !modal.id.startsWith('editScheduleModal')) return;
+
+                const trigger = event.relatedTarget;
+                if (!trigger) return;
+
+                const parentSelector = trigger.getAttribute('data-parent-modal');
+                if (!parentSelector) return;
+
+                modal.dataset.parentModalSelector = parentSelector;
+
+                const parentModalEl = document.querySelector(parentSelector);
+                if (parentModalEl && window.bootstrap && window.bootstrap.Modal) {
+                    const parentInstance =
+                        bootstrap.Modal.getInstance(parentModalEl) ||
+                        new bootstrap.Modal(parentModalEl);
+                    parentInstance.hide();
+                }
+            });
+
+            // When edit modal is hidden (X, Cancel, backdrop), re-open its parent view modal
+            document.addEventListener('hidden.bs.modal', function (event) {
+                const modal = event.target;
+                if (!modal.id || !modal.id.startsWith('editScheduleModal')) return;
+
+                const parentSelector = modal.dataset.parentModalSelector;
+                if (!parentSelector) return;
+
+                const parentModalEl = document.querySelector(parentSelector);
+                if (!parentModalEl || !window.bootstrap || !window.bootstrap.Modal) return;
+
+                const parentInstance =
+                    bootstrap.Modal.getInstance(parentModalEl) ||
+                    new bootstrap.Modal(parentModalEl);
+                parentInstance.show();
+            });
+
+            // Before submitting an edit form, mark which view modal must be re-opened after reload
+            document.addEventListener('submit', function (event) {
+                const form = event.target;
+                if (!form.id || !form.id.startsWith('updateSchedule')) return;
+
+                const modal = form.closest('.modal');
+                if (!modal) return;
+
+                const parentSelector = modal.dataset.parentModalSelector;
+                if (!parentSelector) return;
+
+                try {
+                    localStorage.setItem('facultyViewToOpenOnLoad', parentSelector);
+                } catch (e) {
+                    // Storage errors ignored
+                }
+            });
+
+            // On page load (after a redirect), reopen any pending view modal
+            document.addEventListener('DOMContentLoaded', function () {
+                let selector = null;
+                try {
+                    selector = localStorage.getItem('facultyViewToOpenOnLoad');
+                } catch (e) {
+                    selector = null;
+                }
+                if (!selector) return;
+
+                const el = document.querySelector(selector);
+                if (!el || !window.bootstrap || !window.bootstrap.Modal) {
+                    try {
+                        localStorage.removeItem('facultyViewToOpenOnLoad');
+                    } catch (e) {}
+                    return;
+                }
+
+                const instance =
+                    bootstrap.Modal.getInstance(el) ||
+                    new bootstrap.Modal(el);
+                instance.show();
+
+                try {
+                    localStorage.removeItem('facultyViewToOpenOnLoad');
+                } catch (e) {}
             });
         })();
     </script>

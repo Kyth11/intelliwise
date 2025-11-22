@@ -107,7 +107,7 @@
 
             $dayVal = old('day', $schedule->day);
             // Sunday removed
-            $days   = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+            $days   = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
         @endphp
 
         <div class="modal fade" id="editScheduleModal{{ $schedule->id }}" tabindex="-1" aria-hidden="true">

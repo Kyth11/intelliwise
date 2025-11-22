@@ -74,7 +74,7 @@ class FacultyDashboardController extends Controller
             $query->where('faculty_id', $user->faculty_id);
         }
 
-        $query->orderByRaw("FIELD(day, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')")
+        $query->orderByRaw("FIELD(day, 'Monday','Tuesday','Wednesday','Thursday','Friday')")
               ->orderBy('class_start');
 
         $schedules = $query->get();

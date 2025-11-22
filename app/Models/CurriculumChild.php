@@ -26,6 +26,7 @@ class CurriculumChild extends Model
 
     public function subject()
     {
+        // model class is plural in your codebase
         return $this->belongsTo(Subjects::class, 'subject_id');
     }
 }

@@ -33,8 +33,23 @@ class Curriculum extends Model
         return $this->belongsTo(Faculty::class, 'adviser_id');
     }
 
+    // direct access to pivot rows
     public function children()
     {
         return $this->hasMany(CurriculumChild::class, 'curriculum_id');
+    }
+
+    // main relationship: curriculum → many subjects via curriculum_child
+    public function subjects()
+    {
+        return $this->belongsToMany(Subjects::class, 'curriculum_child', 'curriculum_id', 'subject_id')
+            ->withPivot([
+                'deleted',
+                'status',
+                'day_schedule',
+                'class_start',
+                'class_end',
+            ])
+            ->withTimestamps();
     }
 }

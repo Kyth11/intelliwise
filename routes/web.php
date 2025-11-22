@@ -20,7 +20,7 @@ use App\Http\Controllers\Auth\FacultyDashboardController;
 use App\Http\Controllers\Auth\GuardianDashboardController;
 use App\Http\Controllers\Admin\FacultyController as AdminFacultyController;
 use App\Http\Controllers\Admin\SettingController as AdminSettingController;
-use App\Http\Controllers\Admin\CurriculumController as AdminCurriculumController;
+use App\Http\Controllers\Admin\CurriculumController;
 
 
 // ---------- Shared / other controllers ----------
@@ -157,23 +157,20 @@ Route::middleware(['auth', 'role:admin'])
 
         // Curriculum
         Route::prefix('curriculum')->name('curriculum.')->group(function () {
-            // /admin/curriculum  → admin.curriculum.index
-            Route::get('/', [AdminCurriculumController::class, 'index'])->name('index');
+        Route::get('/curriculum', [CurriculumController::class, 'index'])
+            ->name('index');
 
-            // /admin/curriculum  → admin.curriculum.store (create)
-            Route::post('/', [AdminCurriculumController::class, 'store'])->name('store');
+        Route::post('/curriculum', [CurriculumController::class, 'store'])
+            ->name('store');
 
-            // /admin/curriculum/{id}/edit → admin.curriculum.curriculum_edit (for your Blade link)
-            Route::get('/{id}/edit', [AdminCurriculumController::class, 'edit'])->name('curriculum_edit');
+        Route::patch('/curriculum/{curriculum}/status', [CurriculumController::class, 'updateStatus'])
+            ->name('updateStatus');
 
-            // /admin/curriculum/{id} → admin.curriculum.update
-            Route::put('/{id}', [AdminCurriculumController::class, 'update'])->name('update');
+        Route::get('/curriculum/{curriculum}/edit', [CurriculumController::class, 'edit'])
+            ->name('curriculum_edit');
 
-            // /admin/curriculum/{id} → admin.curriculum.destroy
-            Route::delete('/{id}', [AdminCurriculumController::class, 'destroy'])->name('destroy');
-
-                Route::patch('/{id}/status', [AdminCurriculumController::class, 'updateStatus'])
-        ->name('updateStatus');
+        Route::delete('/curriculum/{curriculum}', [CurriculumController::class, 'destroy'])
+            ->name('destroy');
         });
 
 

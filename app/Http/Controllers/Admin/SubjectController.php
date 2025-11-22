@@ -9,31 +9,94 @@ use Illuminate\Validation\Rule;
 
 class SubjectController extends Controller
 {
-public function store(Request $request)
-{
-    $data = $request->validate([
-        'subject_name' => ['required','string','max:255'],
-        'gradelvl_id'  => ['required','exists:gradelvls,id'],
-    ]);
+    public function store(Request $request)
+    {
+        // Allow both single string and array input for subject_name
+        $baseRules = [
+            'gradelvl_id' => ['required', 'exists:gradelvls,id'],
+        ];
 
-    Subjects::create($data);
+        if (is_array($request->input('subject_name'))) {
+            $rules = $baseRules + [
+                'subject_name'   => ['required', 'array'],
+                'subject_name.*' => ['required', 'string', 'max:255'],
+            ];
+        } else {
+            $rules = $baseRules + [
+                'subject_name' => ['required', 'string', 'max:255'],
+            ];
+        }
 
-    return back()->with('success', 'Subject added.');
-}
+        $validated = $request->validate($rules);
 
-public function update(Request $request, $id)
-{
-    $subject = Subjects::findOrFail($id);
+        $gradeId = $validated['gradelvl_id'];
 
-    $data = $request->validate([
-        'subject_name' => ['required','string','max:255'],
-        'gradelvl_id'  => ['required','exists:gradelvls,id'],
-    ]);
+        // Normalize to array
+        $subjectInput = $validated['subject_name'];
+        $names = is_array($subjectInput) ? $subjectInput : [$subjectInput];
 
-    $subject->update($data);
+        foreach ($names as $name) {
+            if (!trim($name)) {
+                continue;
+            }
 
-    return back()->with('success', 'Subject updated.');
-}
+            Subjects::create([
+                'subject_name' => $name,
+                'gradelvl_id'  => $gradeId,
+            ]);
+        }
+
+        return back()->with('success', 'Subject(s) added.');
+    }
+
+    public function update(Request $request, $id)
+    {
+        $subject = Subjects::findOrFail($id);
+
+        // Allow both single string and array input for subject_name
+        $baseRules = [
+            'gradelvl_id' => ['required', 'exists:gradelvls,id'],
+        ];
+
+        if (is_array($request->input('subject_name'))) {
+            $rules = $baseRules + [
+                'subject_name'   => ['required', 'array'],
+                'subject_name.*' => ['required', 'string', 'max:255'],
+            ];
+        } else {
+            $rules = $baseRules + [
+                'subject_name' => ['required', 'string', 'max:255'],
+            ];
+        }
+
+        $validated = $request->validate($rules);
+
+        $gradeId      = $validated['gradelvl_id'];
+        $subjectInput = $validated['subject_name'];
+        $names        = is_array($subjectInput) ? $subjectInput : [$subjectInput];
+
+        // First entry updates the existing subject
+        $firstName = array_shift($names);
+
+        $subject->update([
+            'subject_name' => $firstName,
+            'gradelvl_id'  => $gradeId,
+        ]);
+
+        // Any remaining names will be created as new subjects under the same grade
+        foreach ($names as $name) {
+            if (!trim($name)) {
+                continue;
+            }
+
+            Subjects::create([
+                'subject_name' => $name,
+                'gradelvl_id'  => $gradeId,
+            ]);
+        }
+
+        return back()->with('success', 'Subject(s) updated.');
+    }
 
     public function destroy($id)
     {

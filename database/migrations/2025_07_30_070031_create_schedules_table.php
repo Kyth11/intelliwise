@@ -10,9 +10,9 @@ return new class extends Migration {
         Schema::create('schedules', function (Blueprint $table) {
             $table->id();
 
-            // UI uses Monday–Saturday only
+            // UI uses Monday–Friday only
             $table->enum('day', [
-                'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
+                'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'
             ]);
 
             // Stored as TIME (HH:MM[:SS]) in MySQL; form uses HH:MM

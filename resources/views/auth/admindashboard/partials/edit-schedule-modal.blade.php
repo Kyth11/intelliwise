@@ -11,7 +11,7 @@
     if ($endVal   && strlen($endVal)   > 5) $endVal   = substr($endVal,   0, 5);
 
     $dayVal = old('day', $schedule->day);
-    $days   = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    $days   = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 @endphp
 
 <div class="modal fade" id="editScheduleModal{{ $schedule->id }}" tabindex="-1" aria-hidden="true">
