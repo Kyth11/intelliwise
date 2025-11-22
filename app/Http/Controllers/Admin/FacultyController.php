@@ -7,8 +7,10 @@ use App\Models\User;
 use App\Models\Faculty;
 use App\Models\Subjects;
 use App\Models\Gradelvl;
+use App\Mail\FacultyCredentialsMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 
 class FacultyController extends Controller
@@ -33,37 +35,77 @@ class FacultyController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
+        // Basic validation for faculty data only
+        $validated = $request->validate([
             'f_firstname' => 'required|string|max:255',
+            'f_middlename'=> 'nullable|string|max:255',
             'f_lastname'  => 'required|string|max:255',
             'f_email'     => 'nullable|email|max:255|unique:faculties,f_email',
             'f_address'   => 'nullable|string|max:255',
             'f_contact'   => 'nullable|string|max:255',
-
-            'username'    => 'required|string|max:255|unique:users,username',
-            'password'    => 'required|string|min:6',
         ]);
 
-        DB::transaction(function () use ($request) {
+        $faculty       = null;
+        $username      = null;
+        $plainPassword = null;
+
+        DB::transaction(function () use ($validated, &$faculty, &$username, &$plainPassword) {
+            // Base username from firstname + lastname
+            $base = preg_replace(
+                '/\s+/',
+                '',
+                ($validated['f_firstname'] ?? '') . ($validated['f_lastname'] ?? '')
+            );
+
+            $base = strtolower($base);
+
+            // Fallback if somehow empty
+            if ($base === '') {
+                $base = 'faculty';
+            }
+
+            // Ensure username is unique among users
+            $username = $base;
+            $suffix   = 1;
+            while (User::where('username', $username)->exists()) {
+                $username = $base . $suffix;
+                $suffix++;
+            }
+
+            // Plain password is username base + 123 (not the suffixed one)
+            $plainPassword = $base . '123';
+
+            // Create Faculty record
             $faculty = Faculty::create([
-                'f_firstname'  => $request->f_firstname,
-                'f_middlename' => $request->f_middlename,
-                'f_lastname'   => $request->f_lastname,
-                'f_address'    => $request->f_address,
-                'f_contact'    => $request->f_contact,
-                'f_email'      => $request->f_email,
+                'f_firstname'  => $validated['f_firstname'],
+                'f_middlename' => $validated['f_middlename'] ?? null,
+                'f_lastname'   => $validated['f_lastname'],
+                'f_address'    => $validated['f_address'] ?? null,
+                'f_contact'    => $validated['f_contact'] ?? null,
+                'f_email'      => $validated['f_email'] ?? null,
             ]);
 
+            // Name field for User
+            $name = $faculty->full_name ?: ($faculty->f_firstname . ' ' . $faculty->f_lastname);
+
+            // Create linked User record
             User::create([
-                'name'       => $faculty->full_name ?: ($faculty->f_firstname.' '.$faculty->f_lastname),
-                'username'   => $request->username,
-                'password'   => bcrypt($request->password),
+                'name'       => $name,
+                'username'   => $username,
+                'password'   => bcrypt($plainPassword),
                 'role'       => 'faculty',
                 'faculty_id' => $faculty->id,
             ]);
         });
 
-        return back()->with('success', 'Faculty account created successfully!');
+        // Send credentials email only if email is provided
+        if ($faculty && !empty($faculty->f_email)) {
+            Mail::to($faculty->f_email)->send(
+                new FacultyCredentialsMail($faculty, $username, $plainPassword)
+            );
+        }
+
+        return back()->with('success', 'Faculty account created successfully and credentials emailed!');
     }
 
     public function update(Request $request, $id)
@@ -73,6 +115,7 @@ class FacultyController extends Controller
 
         $request->validate([
             'f_firstname' => 'required|string|max:255',
+            'f_middlename'=> 'nullable|string|max:255',
             'f_lastname'  => 'required|string|max:255',
             'f_email'     => 'nullable|email|max:255|unique:faculties,f_email,' . $faculty->id,
             'f_address'   => 'nullable|string|max:255',

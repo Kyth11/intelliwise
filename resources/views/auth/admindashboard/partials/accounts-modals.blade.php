@@ -17,15 +17,31 @@
                     <div class="row g-3">
                         <div class="col-md-4">
                             <label class="form-label small">First Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="f_firstname" value="{{ old('f_firstname') }}" required>
+                            <input
+                                type="text"
+                                class="form-control"
+                                name="f_firstname"
+                                id="af_firstname"
+                                value="{{ old('f_firstname') }}"
+                                required>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label small">Middle Name</label>
-                            <input type="text" class="form-control" name="f_middlename" value="{{ old('f_middlename') }}">
+                            <input
+                                type="text"
+                                class="form-control"
+                                name="f_middlename"
+                                value="{{ old('f_middlename') }}">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label small">Last Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="f_lastname" value="{{ old('f_lastname') }}" required>
+                            <input
+                                type="text"
+                                class="form-control"
+                                name="f_lastname"
+                                id="af_lastname"
+                                value="{{ old('f_lastname') }}"
+                                required>
                         </div>
 
                         <div class="col-md-6">
@@ -39,22 +55,46 @@
 
                         <div class="col-12">
                             <label class="form-label small">Email</label>
-                            <input type="email" class="form-control" name="f_email" value="{{ old('f_email') }}">
+                            <input
+                                type="email"
+                                class="form-control"
+                                name="f_email"
+                                value="{{ old('f_email') }}">
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label small">Username <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="username" value="{{ old('username') }}" required>
+                            <input
+                                type="text"
+                                class="form-control"
+                                name="username"
+                                id="af_username"
+                                value="{{ old('username') }}"
+                                required
+                                readonly>
+                            <div class="form-text">
+                                Auto-generated as <code>firstname+lastname</code>.
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small">Password <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <input type="password" class="form-control" name="password" id="af_password" autocomplete="new-password" minlength="6" required>
+                                <input
+                                    type="password"
+                                    class="form-control"
+                                    name="password"
+                                    id="af_password"
+                                    autocomplete="new-password"
+                                    minlength="6"
+                                    required
+                                    readonly>
                                 <button class="btn btn-outline-secondary" type="button" id="af_toggle_pwd" tabindex="-1">
                                     <i class="bi bi-eye"></i>
                                 </button>
                             </div>
-                            <div class="form-text">Minimum 6 characters.</div>
+                            <div class="form-text">
+                                Auto-generated as <code>firstname+lastname+123</code>.
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -194,7 +234,14 @@
                             <div class="col-md-6">
                                 <label class="form-label small">Password <span class="text-danger">*</span></label>
                                 <div class="input-group">
-                                    <input type="password" class="form-control" name="password" id="ag_password" autocomplete="new-password" minlength="6" required>
+                                    <input
+                                        type="password"
+                                        class="form-control"
+                                        name="password"
+                                        id="ag_password"
+                                        autocomplete="new-password"
+                                        minlength="6"
+                                        required>
                                     <button class="btn btn-outline-secondary" type="button" id="ag_toggle_pwd" tabindex="-1">
                                         <i class="bi bi-eye"></i>
                                     </button>
@@ -224,6 +271,7 @@ document.addEventListener('click', (e) => {
     if (e.target.closest('#af_toggle_pwd')) {
         const btn  = e.target.closest('button');
         const inp  = document.getElementById('af_password');
+        if (!inp) return;
         const show = inp.type === 'password';
         inp.type = show ? 'text' : 'password';
         btn.innerHTML = show ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
@@ -231,6 +279,7 @@ document.addEventListener('click', (e) => {
     if (e.target.closest('#ag_toggle_pwd')) {
         const btn  = e.target.closest('button');
         const inp  = document.getElementById('ag_password');
+        if (!inp) return;
         const show = inp.type === 'password';
         inp.type = show ? 'text' : 'password';
         btn.innerHTML = show ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
@@ -250,5 +299,57 @@ const resetOnHide = (modalId, formId) => {
 };
 resetOnHide('addFacultyModal', 'addFacultyForm');
 resetOnHide('addGuardianModal', 'addGuardianForm');
+
+/**
+ * Auto-generate Faculty username and password:
+ *   username = firstname+lastname
+ *   password = firstname+lastname+123
+ * (spaces removed, lowercased)
+ */
+document.addEventListener('DOMContentLoaded', function () {
+    const form      = document.getElementById('addFacultyForm');
+    const firstName = document.getElementById('af_firstname');
+    const lastName  = document.getElementById('af_lastname');
+    const username  = document.getElementById('af_username');
+    const password  = document.getElementById('af_password');
+    const modalEl   = document.getElementById('addFacultyModal');
+
+    if (!form || !firstName || !lastName || !username || !password) {
+        return;
+    }
+
+    function buildCredentials() {
+        const f = (firstName.value || '').trim();
+        const l = (lastName.value || '').trim();
+        const base = (f + l).replace(/\s+/g, '');
+        if (!base) {
+            username.value = '';
+            password.value = '';
+            return;
+        }
+        const normalized = base.toLowerCase();
+        username.value = normalized;
+        password.value = normalized + '123';
+    }
+
+    firstName.addEventListener('input', buildCredentials);
+    lastName.addEventListener('input', buildCredentials);
+
+    // Ensure credentials are generated before submit
+    form.addEventListener('submit', function () {
+        buildCredentials();
+    });
+
+    if (modalEl) {
+        modalEl.addEventListener('shown.bs.modal', function () {
+            buildCredentials();
+        });
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            // After resetOnHide, regenerate defaults if needed on next open
+            username.value = '';
+            password.value = '';
+        });
+    }
+});
 </script>
 @endpush
