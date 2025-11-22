@@ -9,12 +9,9 @@ return new class extends Migration {
     {
         Schema::table('students', function (Blueprint $table) {
             if (!Schema::hasColumn('students', 'lrn')) {
-                $table->string('lrn', 12)->after('id');
+                // Create column and unique index in one go
+                $table->string('lrn', 12)->after('id')->unique('students_lrn_unique');
             }
-            // Make sure it's indexed/unique for fast lookups & FK refs
-            $sm = Schema::getConnection()->getDoctrineSchemaManager();
-            // Just add a unique index if it doesn't exist yet:
-            $table->unique('lrn', 'students_lrn_unique');
         });
     }
 
@@ -22,6 +19,7 @@ return new class extends Migration {
     {
         Schema::table('students', function (Blueprint $table) {
             if (Schema::hasColumn('students', 'lrn')) {
+                // Drop unique index then column
                 $table->dropUnique('students_lrn_unique');
                 $table->dropColumn('lrn');
             }

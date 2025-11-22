@@ -323,9 +323,6 @@
 
     {{-- PAYMENT MODAL --}}
     @include('auth.admindashboard.partials.payment-modal')
-
-    {{-- SHARED: ADD SCHEDULE MODAL (self-safe) --}}
-    @include('auth.admindashboard.partials.add-schedule-modal')
 </div>
 
 {{-- EDIT TUITION MODALS --}}

@@ -56,6 +56,11 @@
                 <i class="bi bi-person-workspace"></i></i><span> Schedule </span>
             </a>
 
+            <a href="{{ route('admin.curriculum.index') }}"
+                class="sidebar-link {{ request()->routeIs('admin.settings') ? 'active' : '' }}">
+                <i class="bi bi-book"></i><span> Curriculum</span>
+            </a>
+            
             {{-- Finances --}}
             <a href="{{ route('admin.finances') }}"
                 class="sidebar-link {{ request()->routeIs('admin.finances') ? 'active' : '' }}">
@@ -82,6 +87,7 @@
                 class="sidebar-link {{ request()->routeIs('admin.settings') ? 'active' : '' }}">
                 <i class="bi bi-gear"></i><span> Settings</span>
             </a>
+
 
             {{-- Logout (SweetAlert confirm) --}}
             <a href="{{ route('login') }}" class="sidebar-link js-logout" role="button">

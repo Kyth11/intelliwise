@@ -10,42 +10,48 @@ return new class extends Migration {
         Schema::create('schedules', function (Blueprint $table) {
             $table->id();
 
+            // UI uses Monday–Saturday only
             $table->enum('day', [
-                'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+                'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
             ]);
 
-            // Store as TIME in MySQL; we'll input/validate as HH:MM in the app.
+            // Stored as TIME (HH:MM[:SS]) in MySQL; form uses HH:MM
             $table->time('class_start');
             $table->time('class_end');
 
+            // Core relations
             $table->unsignedBigInteger('faculty_id');
-            $table->unsignedBigInteger('subject_id');
+            $table->unsignedBigInteger('subject_id');   // from entries[][subject_id]
+            $table->unsignedBigInteger('gradelvl_id');  // from top Grade Level select
 
-            // These are optional in your forms, so mark them nullable here:
-            $table->unsignedBigInteger('gradelvl_id')->nullable();
-
-            // String FK to schoolyrs.school_year (YYYY-YYYY), optional
+            // String FK to schoolyrs.school_year (YYYY-YYYY), set from active school year in controller
             $table->string('school_year', 9)->collation('utf8mb4_unicode_ci')->nullable();
 
-            // FKs
+            // Foreign keys
+            $table->foreign('faculty_id')
+                ->references('id')->on('faculties')
+                ->cascadeOnDelete();
+
+            $table->foreign('subject_id')
+                ->references('id')->on('subjects')
+                ->cascadeOnDelete();
+
+            $table->foreign('gradelvl_id')
+                ->references('id')->on('gradelvls')
+                ->cascadeOnDelete();
+
             $table->foreign('school_year')
                 ->references('school_year')->on('schoolyrs')
                 ->nullOnDelete()
                 ->cascadeOnUpdate();
 
-            $table->foreign('faculty_id')->references('id')->on('faculties')->cascadeOnDelete();
-            $table->foreign('subject_id')->references('id')->on('subjects')->cascadeOnDelete();
-            $table->foreign('gradelvl_id')->references('id')->on('gradelvls')->nullOnDelete();
-
             $table->timestamps();
 
-            // (Optional) indexes that help filters/sorts
+            // Helpful indexes
             $table->index(['day', 'class_start']);
             $table->index(['school_year']);
+            $table->index(['faculty_id', 'gradelvl_id']);
         });
-
-        // NOTE: Removed the extra Schema::table() from your original file.
-        // It tried to add school_year again and wasn't needed.
     }
 
     public function down(): void

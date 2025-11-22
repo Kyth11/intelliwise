@@ -8,7 +8,7 @@ use App\Models\Guardian;
 use App\Models\User;
 use App\Models\Tuition;
 use App\Models\Gradelvl;
-use App\Models\Schoolyr; // add at top
+use App\Models\Schoolyr;
 use App\Models\OptionalFee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -21,55 +21,63 @@ use Illuminate\Validation\Rule;
 
 class StudentController extends Controller
 {
-public function index()
-{
-    $students = Student::with(['guardian', 'optionalFees'])->get()->groupBy('s_gradelvl');
-    $gradelvls = Gradelvl::all();
-    $tuitions = Tuition::with('optionalFees')->orderBy('updated_at', 'desc')->get();
-    $optionalFees = OptionalFee::orderBy('name')->get();
+    public function index()
+    {
+        // Determine current school year (active, or fallback to first by school_year)
+        $current = $this->currentSchoolYear();
 
-    $guardians = Guardian::all()->map(function ($g) {
-        $mother = trim(collect([$g->m_firstname, $g->m_middlename, $g->m_lastname])->filter()->implode(' '));
-        $father = trim(collect([$g->f_firstname, $g->f_middlename, $g->f_lastname])->filter()->implode(' '));
-        $label = $mother && $father ? ($mother . ' & ' . $father) : ($mother ?: ($father ?: 'Guardian #' . $g->id));
-        $g->display_name = $label;
-        $g->display_contact = $g->g_contact ?: ($g->m_contact ?: ($g->f_contact ?: ''));
-        return $g;
-    });
+        // Base query
+        $studentsQuery = Student::with(['guardian', 'optionalFees']);
 
-    // Fetch all school years
-    $schoolyrs = Schoolyr::orderBy('school_year')->get();
+        // Limit to current school year if we have one and a matching column
+        if ($current) {
+            if ($this->hasColumn('students', 'schoolyr_id')) {
+                $studentsQuery->where('schoolyr_id', $current->id);
+            } elseif ($this->hasColumn('students', 'school_year')) {
+                $studentsQuery->where('school_year', $current->school_year);
+            }
+        }
 
-    // Set current SY explicitly
-    $current = Schoolyr::where('school_year', '2025-2026')->first();
+        $students = $studentsQuery->get()->groupBy('s_gradelvl');
 
-    return view('auth.admindashboard.students', compact(
-        'students',
-        'gradelvls',
-        'tuitions',
-        'guardians',
-        'optionalFees',
-        'schoolyrs',
-        'current' // now always 2025-2026
-    ));
-}
+        $gradelvls    = Gradelvl::all();
+        $tuitions     = Tuition::with('optionalFees')->orderBy('updated_at', 'desc')->get();
+        $optionalFees = OptionalFee::orderBy('name')->get();
 
+        $guardians = Guardian::all()->map(function ($g) {
+            $mother = trim(collect([$g->m_firstname, $g->m_middlename, $g->m_lastname])->filter()->implode(' '));
+            $father = trim(collect([$g->f_firstname, $g->f_middlename, $g->f_lastname])->filter()->implode(' '));
+            $label  = $mother && $father ? ($mother . ' & ' . $father) : ($mother ?: ($father ?: 'Guardian #' . $g->id));
+            $g->display_name    = $label;
+            $g->display_contact = $g->g_contact ?: ($g->m_contact ?: ($g->f_contact ?: ''));
+            return $g;
+        });
 
+        // All school years (for dropdown, etc.)
+        $schoolyrs = Schoolyr::orderBy('school_year')->get();
 
-
+        return view('auth.admindashboard.students', compact(
+            'students',
+            'gradelvls',
+            'tuitions',
+            'guardians',
+            'optionalFees',
+            'schoolyrs',
+            'current'
+        ));
+    }
 
     public function create()
     {
-        // Current school year
-        $current = \App\Models\Schoolyr::where('school_year', '2025-2026')->first()
-            ?? \App\Models\Schoolyr::orderBy('school_year')->first();
+        // Current school year (same logic as Settings blade snippet)
+        $current = $this->currentSchoolYear();
 
         // Guardians mapping
         $guardians = Guardian::all()->map(function ($g) {
             $mother = trim(collect([$g->m_firstname, $g->m_middlename, $g->m_lastname])->filter()->implode(' '));
             $father = trim(collect([$g->f_firstname, $g->f_middlename, $g->f_lastname])->filter()->implode(' '));
-            $label = $mother && $father ? ($mother . ' & ' . $father) : ($mother ?: ($father ?: 'Guardian #' . $g->id));
-            $g->display_name = $label;
+            $label  = $mother && $father ? ($mother . ' & ' . $father) : ($mother ?: ($father ?: 'Guardian #' . $g->id));
+            $g->display_name    = $label;
             $g->display_contact = $g->g_contact ?: ($g->m_contact ?: ($g->f_contact ?: ''));
             return $g;
         });
@@ -85,7 +93,6 @@ public function index()
 
         return view($view, compact('current', 'guardians', 'optionalFees'));
     }
-
 
     /** Live search (names or LRN) for suggest dropdowns */
     public function search(Request $request)
@@ -106,7 +113,7 @@ public function index()
             ->limit(20)->get();
 
         $items = $rows->map(function (Student $s) {
-            $mid = trim($s->s_middlename ?? '');
+            $mid  = trim($s->s_middlename ?? '');
             $name = trim($s->s_firstname . ' ' . ($mid ? $mid . ' ' : '') . $s->s_lastname);
             return ['id' => (string) $s->lrn, 'name' => $name]; // id = LRN for the UI
         });
@@ -122,36 +129,36 @@ public function index()
         $religion = $s->s_religion ?? $s->religion ?? '';
 
         $payload = [
-            'id' => $s->lrn,
-            's_firstname' => $s->s_firstname,
-            's_middlename' => $s->s_middlename,
-            's_lastname' => $s->s_lastname,
-            's_gender' => $s->s_gender,
-            's_birthdate' => $s->s_birthdate ? substr((string) $s->s_birthdate, 0, 10) : '',
-            's_citizenship' => $s->s_citizenship,
-            's_address' => $s->s_address,
-            's_religion' => $religion,
-            's_contact' => $s->s_contact,
-            's_email' => $s->s_email,
-            'sped_has' => $s->sped_has,
-            'sped_desc' => $s->sped_desc,
-            's_gradelvl' => $s->s_gradelvl,
-            'previous_school' => $s->previous_school,
+            'id'             => $s->lrn,
+            's_firstname'    => $s->s_firstname,
+            's_middlename'   => $s->s_middlename,
+            's_lastname'     => $s->s_lastname,
+            's_gender'       => $s->s_gender,
+            's_birthdate'    => $s->s_birthdate ? substr((string) $s->s_birthdate, 0, 10) : '',
+            's_citizenship'  => $s->s_citizenship,
+            's_address'      => $s->s_address,
+            's_religion'     => $religion,
+            's_contact'      => $s->s_contact,
+            's_email'        => $s->s_email,
+            'sped_has'       => $s->sped_has,
+            'sped_desc'      => $s->sped_desc,
+            's_gradelvl'     => $s->s_gradelvl,
+            'previous_school'=> $s->previous_school,
 
-            'guardian_id' => optional($s->guardian)->id,
-            'g_address' => optional($s->guardian)->g_address,
-            'm_firstname' => optional($s->guardian)->m_firstname,
-            'm_middlename' => optional($s->guardian)->m_middlename,
-            'm_lastname' => optional($s->guardian)->m_lastname,
-            'm_contact' => optional($s->guardian)->m_contact,
-            'm_email' => optional($s->guardian)->m_email,
-            'm_occupation' => optional($s->guardian)->m_occupation,
-            'f_firstname' => optional($s->guardian)->f_firstname,
-            'f_middlename' => optional($s->guardian)->f_middlename,
-            'f_lastname' => optional($s->guardian)->f_lastname,
-            'f_contact' => optional($s->guardian)->f_contact,
-            'f_email' => optional($s->guardian)->f_email,
-            'f_occupation' => optional($s->guardian)->f_occupation,
+            'guardian_id'          => optional($s->guardian)->id,
+            'g_address'            => optional($s->guardian)->g_address,
+            'm_firstname'          => optional($s->guardian)->m_firstname,
+            'm_middlename'         => optional($s->guardian)->m_middlename,
+            'm_lastname'           => optional($s->guardian)->m_lastname,
+            'm_contact'            => optional($s->guardian)->m_contact,
+            'm_email'              => optional($s->guardian)->m_email,
+            'm_occupation'         => optional($s->guardian)->m_occupation,
+            'f_firstname'          => optional($s->guardian)->f_firstname,
+            'f_middlename'         => optional($s->guardian)->f_middlename,
+            'f_lastname'           => optional($s->guardian)->f_lastname,
+            'f_contact'            => optional($s->guardian)->f_contact,
+            'f_email'              => optional($s->guardian)->f_email,
+            'f_occupation'         => optional($s->guardian)->f_occupation,
             'alt_guardian_details' => optional($s->guardian)->alt_guardian_details,
         ];
 
@@ -161,7 +168,7 @@ public function index()
     public function store(Request $request)
     {
         // LRN rule: new/transferee -> unique; old -> exists
-        $type = (string) $request->input('enroll_type', 'new');
+        $type     = (string) $request->input('enroll_type', 'new');
         $lrnRules = ['required', 'digits_between:10,12'];
         if ($type === 'old') {
             $lrnRules[] = Rule::exists('students', 'lrn');
@@ -170,21 +177,24 @@ public function index()
         }
 
         $request->validate([
-            'lrn' => $lrnRules,
-            's_firstname' => 'required|string',
-            's_lastname' => 'required|string',
-            's_address' => 'required|string',
-            's_birthdate' => 'required|date',
-            's_gradelvl' => 'required|string',
-            's_citizenship' => 'nullable|string',
-            's_religion' => 'nullable|string',
-            'student_optional_fee_ids' => ['array'],
-            'student_optional_fee_ids.*' => ['integer', 'exists:optional_fees,id'],
-            'guardian_id' => 'required'
+            'lrn'                       => $lrnRules,
+            's_firstname'               => 'required|string',
+            's_lastname'                => 'required|string',
+            's_address'                 => 'required|string',
+            's_birthdate'               => 'required|date',
+            's_gradelvl'                => 'required|string',
+            's_citizenship'             => 'nullable|string',
+            's_religion'                => 'nullable|string',
+            'student_optional_fee_ids'  => ['array'],
+            'student_optional_fee_ids.*'=> ['integer', 'exists:optional_fees,id'],
+            'guardian_id'               => 'required'
         ]);
 
         DB::beginTransaction();
         try {
+            // Current school year (for tagging enrollment)
+            $currentSy = $this->currentSchoolYear();
+
             // ----- Guardian upsert
             if ($request->guardian_id === 'new') {
                 $hasMother = $request->filled('m_firstname') || $request->filled('m_lastname');
@@ -194,22 +204,22 @@ public function index()
                 }
 
                 $guardianData = [
-                    'g_address' => $request->g_address,
-                    'g_contact' => $request->m_contact ?: ($request->f_contact ?: null),
-                    'g_email' => $request->g_email ?: ($request->m_email ?: ($request->f_email ?: null)),
-                    'm_firstname' => $request->m_firstname,
-                    'm_middlename' => $request->m_middlename,
-                    'm_lastname' => $request->m_lastname,
-                    'm_contact' => $request->m_contact,
-                    'm_email' => $request->m_email,
-                    'm_occupation' => $request->m_occupation,
-                    'f_firstname' => $request->f_firstname,
-                    'f_middlename' => $request->f_middlename,
-                    'f_lastname' => $request->f_lastname,
-                    'f_contact' => $request->f_contact,
-                    'f_email' => $request->f_email,
-                    'f_occupation' => $request->f_occupation,
-                    'alt_guardian_details' => $request->alt_guardian_details,
+                    'g_address'           => $request->g_address,
+                    'g_contact'           => $request->m_contact ?: ($request->f_contact ?: null),
+                    'g_email'             => $request->g_email ?: ($request->m_email ?: ($request->f_email ?: null)),
+                    'm_firstname'         => $request->m_firstname,
+                    'm_middlename'        => $request->m_middlename,
+                    'm_lastname'          => $request->m_lastname,
+                    'm_contact'           => $request->m_contact,
+                    'm_email'             => $request->m_email,
+                    'm_occupation'        => $request->m_occupation,
+                    'f_firstname'         => $request->f_firstname,
+                    'f_middlename'        => $request->f_middlename,
+                    'f_lastname'          => $request->f_lastname,
+                    'f_contact'           => $request->f_contact,
+                    'f_email'             => $request->f_email,
+                    'f_occupation'        => $request->f_occupation,
+                    'alt_guardian_details'=> $request->alt_guardian_details,
                 ];
                 $guardian = Guardian::create($this->filterColumns('guardians', $guardianData));
             } else {
@@ -226,29 +236,38 @@ public function index()
 
             // ----- Shared student fields
             $studentData = [
-                'lrn' => $request->lrn,
-                's_firstname' => $request->s_firstname,
-                's_middlename' => $request->s_middlename,
-                's_lastname' => $request->s_lastname,
-                's_birthdate' => $request->s_birthdate,
-                's_address' => $request->s_address,
-                's_citizenship' => $request->s_citizenship,
-                's_religion' => $request->s_religion,
-                's_contact' => $request->s_contact,
-                's_email' => $request->s_email,
-                's_gradelvl' => $request->s_gradelvl,
-                'enrollment_status' => $request->enrollment_status ?? 'Enrolled',
-                'payment_status' => $request->payment_status ?? 'Unpaid',
-                's_tuition_sum' => $baseTotal,
+                'lrn'              => $request->lrn,
+                's_firstname'      => $request->s_firstname,
+                's_middlename'     => $request->s_middlename,
+                's_lastname'       => $request->s_lastname,
+                's_birthdate'      => $request->s_birthdate,
+                's_address'        => $request->s_address,
+                's_citizenship'    => $request->s_citizenship,
+                's_religion'       => $request->s_religion,
+                's_contact'        => $request->s_contact,
+                's_email'          => $request->s_email,
+                's_gradelvl'       => $request->s_gradelvl,
+                'enrollment_status'=> $request->enrollment_status ?? 'Enrolled',
+                'payment_status'   => $request->payment_status ?? 'Unpaid',
+                's_tuition_sum'    => $baseTotal,
                 's_optional_total' => round($studentOptSum, 2),
-                's_total_due' => $total,
-                'tuition_id' => $tuitionId,
-                'guardian_id' => $guardian->id,
-                's_gender' => $request->s_gender,
-                'previous_school' => $request->previous_school,
-                'sped_has' => $request->sped_has,
-                'sped_desc' => $request->sped_desc,
+                's_total_due'      => $total,
+                'tuition_id'       => $tuitionId,
+                'guardian_id'      => $guardian->id,
+                's_gender'         => $request->s_gender,
+                'previous_school'  => $request->previous_school,
+                'sped_has'         => $request->sped_has,
+                'sped_desc'        => $request->sped_desc,
             ];
+
+            // Attach current school year to student (flexible: supports schoolyr_id OR school_year column)
+            if ($currentSy) {
+                if ($this->hasColumn('students', 'schoolyr_id')) {
+                    $studentData['schoolyr_id'] = $currentSy->id;
+                } elseif ($this->hasColumn('students', 'school_year')) {
+                    $studentData['school_year'] = $currentSy->school_year;
+                }
+            }
 
             if ($type === 'old') {
                 // Update existing by LRN (not PK)
@@ -283,16 +302,16 @@ public function index()
 
             // ----- Create/Reset guardian user credentials + send email
             $emailTarget = trim((string) ($guardian->g_email ?: $guardian->m_email ?: $guardian->f_email ?: ''));
-            $emailed = false;
+            $emailed      = false;
 
             // Use mother first, fallback to father
-            $parentLast = $guardian->m_lastname ?: $guardian->f_lastname;
+            $parentLast  = $guardian->m_lastname ?: $guardian->f_lastname;
             $parentFirst = $guardian->m_firstname ?: $guardian->f_firstname;
 
-            $username = $this->uniqueUsername($this->buildUsernameBaseFromParent($parentLast, $parentFirst));
+            $username      = $this->uniqueUsername($this->buildUsernameBaseFromParent($parentLast, $parentFirst));
             $passwordPlain = $this->buildPasswordFromParent($parentLast);
 
-            $displayName = $this->guardianDisplayName($guardian);
+            $displayName   = $this->guardianDisplayName($guardian);
 
             $existingUser = User::where('guardian_id', $guardian->id)->first();
             if ($existingUser) {
@@ -340,18 +359,17 @@ public function index()
             DB::commit();
 
             // Redirect to the proper list
-            $role = Auth::user()?->role;
+            $role  = Auth::user()?->role;
             $route = $role === 'faculty' ? 'faculty.students' : 'admin.students.index';
             return redirect()->route($route)->with(
                 'success',
                 ($type === 'old' ? 'Student updated. ' : 'Student saved. ')
                 . ($emailed ? 'Credentials emailed to parent/guardian.' : 'No email on file.')
             );
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Student store failed', ['error' => $e->getMessage()]);
-            $role = Auth::user()?->role;
+            $role  = Auth::user()?->role;
             $route = $role === 'faculty' ? 'faculty.students' : 'admin.students.index';
             return redirect()->route($route)->with('error', 'Failed to enroll student. Check inputs/logs.');
         }
@@ -361,23 +379,23 @@ public function index()
     public function update(Request $request, $lrn)
     {
         $request->validate([
-            's_firstname' => 'required|string',
-            's_lastname' => 'required|string',
-            's_address' => 'required|string',
-            's_birthdate' => 'required|date',
-            's_gradelvl' => 'nullable|string',
-            's_citizenship' => 'nullable|string',
-            's_religion' => 'nullable|string',
-            'student_optional_fee_ids' => ['array'],
-            'student_optional_fee_ids.*' => ['integer', 'exists:optional_fees,id'],
+            's_firstname'               => 'required|string',
+            's_lastname'                => 'required|string',
+            's_address'                 => 'required|string',
+            's_birthdate'               => 'required|date',
+            's_gradelvl'                => 'nullable|string',
+            's_citizenship'             => 'nullable|string',
+            's_religion'                => 'nullable|string',
+            'student_optional_fee_ids'  => ['array'],
+            'student_optional_fee_ids.*'=> ['integer', 'exists:optional_fees,id'],
         ]);
 
         try {
             $student = Student::where('lrn', $lrn)->firstOrFail();
 
-            $old_base = (float) ($student->s_tuition_sum ?? 0);
-            $old_opt = (float) ($student->s_optional_total ?? 0);
-            $old_total = $old_base + $old_opt;
+            $old_base    = (float) ($student->s_tuition_sum ?? 0);
+            $old_opt     = (float) ($student->s_optional_total ?? 0);
+            $old_total   = $old_base + $old_opt;
             $old_balance = (float) ($student->s_total_due ?? $old_total);
             $paid_so_far = max($old_total - $old_balance, 0);
 
@@ -389,31 +407,31 @@ public function index()
                 ? (float) OptionalFee::whereIn('id', $studentOptIds)->sum('amount')
                 : 0.0;
 
-            $new_total = round($baseTotal + $studentOptSum, 2);
+            $new_total   = round($baseTotal + $studentOptSum, 2);
             $new_balance = max($new_total - $paid_so_far, 0);
-            $new_status = $new_balance <= 0 ? 'Paid' : ($paid_so_far > 0 ? 'Partial' : 'Unpaid');
+            $new_status  = $new_balance <= 0 ? 'Paid' : ($paid_so_far > 0 ? 'Partial' : 'Unpaid');
 
             $updateData = [
-                's_firstname' => $request->s_firstname,
-                's_middlename' => $request->s_middlename,
-                's_lastname' => $request->s_lastname,
-                's_birthdate' => $request->s_birthdate,
-                's_address' => $request->s_address,
-                's_citizenship' => $request->s_citizenship,
-                's_religion' => $request->s_religion,
-                's_contact' => $request->s_contact,
-                's_email' => $request->s_email,
-                's_gradelvl' => $grade,
-                'enrollment_status' => $request->enrollment_status ?? $student->enrollment_status,
-                'payment_status' => $new_status,
-                's_tuition_sum' => $baseTotal,
+                's_firstname'      => $request->s_firstname,
+                's_middlename'     => $request->s_middlename,
+                's_lastname'       => $request->s_lastname,
+                's_birthdate'      => $request->s_birthdate,
+                's_address'        => $request->s_address,
+                's_citizenship'    => $request->s_citizenship,
+                's_religion'       => $request->s_religion,
+                's_contact'        => $request->s_contact,
+                's_email'          => $request->s_email,
+                's_gradelvl'       => $grade,
+                'enrollment_status'=> $request->enrollment_status ?? $student->enrollment_status,
+                'payment_status'   => $new_status,
+                's_tuition_sum'    => $baseTotal,
                 's_optional_total' => round($studentOptSum, 2),
-                's_total_due' => $new_balance,
-                'tuition_id' => $tuitionId,
-                's_gender' => $request->s_gender ?? $student->s_gender,
-                'previous_school' => $request->previous_school ?? $student->previous_school,
-                'sped_has' => $request->sped_has ?? $student->sped_has,
-                'sped_desc' => $request->sped_desc ?? $student->sped_desc,
+                's_total_due'      => $new_balance,
+                'tuition_id'       => $tuitionId,
+                's_gender'         => $request->s_gender ?? $student->s_gender,
+                'previous_school'  => $request->previous_school ?? $student->previous_school,
+                'sped_has'         => $request->sped_has ?? $student->sped_has,
+                'sped_desc'        => $request->sped_desc ?? $student->sped_desc,
             ];
 
             $student->update($this->filterColumns('students', $updateData));
@@ -426,12 +444,12 @@ public function index()
                 $student->optionalFees()->sync($sync);
             }
 
-            $role = Auth::user()?->role;
+            $role  = Auth::user()?->role;
             $route = $role === 'faculty' ? 'faculty.students' : 'admin.students.index';
             return redirect()->route($route)->with('success', 'Student updated successfully.');
         } catch (\Exception $e) {
             Log::error('Student update failed', ['error' => $e->getMessage(), 'lrn' => $lrn]);
-            $role = Auth::user()?->role;
+            $role  = Auth::user()?->role;
             $route = $role === 'faculty' ? 'faculty.students' : 'admin.students.index';
             return redirect()->route($route)->with('error', 'Failed to update student.');
         }
@@ -490,8 +508,8 @@ public function index()
 
     private function buildUsernameBaseFromParent(?string $last, ?string $first): string
     {
-        $last = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $last));
-        $first = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $first));
+        $last   = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $last));
+        $first  = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $first));
         $initial = $first !== '' ? substr($first, 0, 2) : 'xx'; // first 2 letters of first name, fallback 'xx'
         return ($last !== '' ? $last : 'parent') . $initial; // e.g., davisjo
     }
@@ -513,5 +531,15 @@ public function index()
     {
         $last = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $last));
         return ($last !== '' ? $last : 'parent') . '123'; // e.g., davis123
+    }
+
+    /**
+     * Helper: get the "current" Schoolyr, same logic as Settings blade:
+     * active=true first, fallback to first by school_year.
+     */
+    private function currentSchoolYear(): ?Schoolyr
+    {
+        return Schoolyr::where('active', true)->first()
+            ?? Schoolyr::orderBy('school_year')->first();
     }
 }

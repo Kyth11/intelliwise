@@ -383,10 +383,16 @@
                     </div>
                     {{-- /Enrollment Type + LRN --}}
 
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">School Year</label>
-                        <input type="text" class="form-control" value="{{ $current->school_year ?? '' }}" disabled>
-                    </div>
+<div class="mb-3">
+    <label class="form-label fw-semibold">School Year</label>
+    <input type="text" class="form-control" value="{{ $current->school_year ?? '' }}" disabled>
+
+    @if($current)
+        {{-- These are actually submitted with the form --}}
+        <input type="hidden" name="schoolyr_id" value="{{ $current->id }}">
+        <input type="hidden" name="school_year" value="{{ $current->school_year }}">
+    @endif
+</div>
                     {{-- Learner’s section --}}
                     <div class="row g-3">
                         <div class="col-12">

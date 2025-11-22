@@ -400,75 +400,6 @@
                     </div>
                 </div>
 
-                <!-- Schedule -->
-                <div class="card" id="schedule-section">
-                    <div class="card-header d-flex justify-content-between align-items-center p-3">
-                        <h6 class="mb-0">Schedule Notes</h6>
-                        <div class="d-flex align-items-center gap-2">
-                            <input type="text" id="scheduleSearch" class="form-control form-control-sm"
-                                placeholder="Search schedule...">
-                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal"
-                                data-bs-target="#addScheduleModal">
-                                <i class="bi bi-plus-circle me-1"></i> Add
-                            </button>
-                            <button class="btn btn-sm btn-outline-secondary collapse-toggle"
-                                data-bs-target="#scheduleCollapse" aria-expanded="false" aria-controls="scheduleCollapse">
-                                <i class="bi bi-chevron-down"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div id="scheduleCollapse" class="collapse">
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-bordered table-striped" id="scheduleTable">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Day</th>
-                                            <th>Time</th>
-                                            <th>Subject</th>
-                                            <th>Grade Level</th>
-                                            <th>School Year</th>
-                                            <th>Faculty</th>
-                                            <th>Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @if($schedules->isNotEmpty())
-                                            @foreach($schedules as $schedule)
-                                                <tr>
-                                                    <td><span class="badge bg-light text-dark border">{{ $schedule->day }}</span></td>
-                                                    <td>{{ $schedule->class_start }} - {{ $schedule->class_end }}</td>
-                                                    <td>{{ $schedule->subject->subject_name ?? '-' }}</td>
-                                                    <td>{{ $schedule->gradelvls->grade_level ?? $schedule->gradelvl->grade_level ?? '-' }}</td>
-                                                    <td>{{ $schedule->school_year ?? '—' }}</td>
-                                                    <td>{{ $schedule->faculty->user->name ?? '—' }}</td>
-                                                    <td class="text-nowrap">
-                                                        <button class="btn btn-sm btn-warning" data-bs-toggle="modal"
-                                                            data-bs-target="#editScheduleModal{{ $schedule->id }}">
-                                                            <i class="bi bi-pencil-square"></i>
-                                                        </button>
-                                                        <form action="{{ route('admin.schedules.destroy', $schedule->id) }}" method="POST"
-                                                            class="d-inline js-confirm-delete"
-                                                            data-confirm="Delete this schedule record?">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <button type="submit" class="btn btn-sm btn-danger js-delete-btn"
-                                                                aria-label="Delete schedule">
-                                                                <i class="bi bi-archive"></i>
-                                                            </button>
-                                                        </form>
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        @endif
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- RIGHT: recent payments -->
             <div class="right-stack">
                 <div class="card p-3 pay-card">
@@ -523,7 +454,6 @@
 
     {{-- Include Modals --}}
     @include('auth.admindashboard.partials.add-announcement-modal')
-    @include('auth.admindashboard.partials.add-schedule-modal')
     @include('auth.admindashboard.partials.pay-student-modal') {{-- NEW: separated modal --}}
 
     {{-- Receipt Viewer (shared) --}}

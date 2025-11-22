@@ -57,8 +57,14 @@
               <label class="form-label">Faculty <span class="text-danger">*</span></label>
               <select name="faculty_id" class="form-select" required>
                 @foreach(($faculties ?? collect()) as $f)
-                  @php $fname = optional($f->user)->name ?: ('Faculty #'.$f->id); @endphp
-                  <option value="{{ $f->id }}" {{ (string)old('faculty_id', $currentFacultyId) === (string)$f->id ? 'selected' : '' }}>
+                  @php
+                      $fname = trim(($f->f_firstname ?? '') . ' ' . ($f->f_lastname ?? ''));
+                      if ($fname === '') {
+                          $fname = 'Faculty #'.$f->id;
+                      }
+                  @endphp
+                  <option value="{{ $f->id }}"
+                    {{ (string)old('faculty_id', $currentFacultyId) === (string)$f->id ? 'selected' : '' }}>
                     {{ $fname }}
                   </option>
                 @endforeach
@@ -69,7 +75,8 @@
               <label class="form-label">Subject <span class="text-danger">*</span></label>
               <select name="subject_id" class="form-select" required>
                 @foreach(($subjects ?? collect()) as $s)
-                  <option value="{{ $s->id }}" {{ (string)old('subject_id', $currentSubjectId) === (string)$s->id ? 'selected' : '' }}>
+                  <option value="{{ $s->id }}"
+                    {{ (string)old('subject_id', $currentSubjectId) === (string)$s->id ? 'selected' : '' }}>
                     {{ $s->subject_name }}
                   </option>
                 @endforeach
@@ -81,7 +88,8 @@
               <select name="gradelvl_id" class="form-select">
                 <option value="">— None —</option>
                 @foreach(($gradelvls ?? collect()) as $gl)
-                  <option value="{{ $gl->id }}" {{ (string)old('gradelvl_id', $currentGradelvlId) === (string)$gl->id ? 'selected' : '' }}>
+                  <option value="{{ $gl->id }}"
+                    {{ (string)old('gradelvl_id', $currentGradelvlId) === (string)$gl->id ? 'selected' : '' }}>
                     {{ $gl->grade_level }}
                   </option>
                 @endforeach
@@ -93,7 +101,8 @@
               <select name="school_year" class="form-select">
                 <option value="">— None —</option>
                 @foreach(($schoolyrs ?? collect()) as $sy)
-                  <option value="{{ $sy->school_year }}" {{ (string)old('school_year', $schedule->school_year) === (string)$sy->school_year ? 'selected' : '' }}>
+                  <option value="{{ $sy->school_year }}"
+                    {{ (string)old('school_year', $schedule->school_year) === (string)$sy->school_year ? 'selected' : '' }}>
                     {{ $sy->school_year }}
                   </option>
                 @endforeach
@@ -101,7 +110,6 @@
             </div>
           </div>
 
-          {{-- errors --}}
           @if ($errors->any())
             <div class="alert alert-danger mt-3 mb-0">
               <ul class="mb-0">

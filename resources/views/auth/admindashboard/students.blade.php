@@ -23,24 +23,43 @@
 
 @section('content')
 <div class="card section p-4 students-page">
+    @php
+        /** @var \App\Models\Schoolyr|null $current */
+        $current = $current
+            ?? \App\Models\Schoolyr::where('active', true)->first()
+            ?? \App\Models\Schoolyr::orderBy('school_year')->first();
+
+        // Only keep students belonging to the current (active) school year
+        if ($current && isset($students)) {
+            $students = collect($students)
+                ->map(function ($group) use ($current) {
+                    return $group->where('schoolyr_id', $current->id);
+                })
+                ->filter(function ($group) {
+                    return $group->isNotEmpty();
+                });
+        }
+    @endphp
+
     <!-- Header -->
     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-2">
-<div class="section-title d-flex flex-wrap gap-2 align-items-baseline">
-    <h4 class="mb-0">
-        Students
-        @if($current)
-            from S.Y. {{ $current->school_year }}
-        @endif
-        (Grouped by Grade Level)
-    </h4>
-    <span class="text-muted ms-2">Browse, filter, edit, or archive students.</span>
-</div>
+        <div class="section-title d-flex flex-wrap gap-2 align-items-baseline">
+            <h4 class="mb-0">
+                Students
+                @if($current)
+                    from S.Y. {{ $current->school_year }}
+                @endif
+                (Grouped by Grade Level)
+            </h4>
+            <span class="text-muted ms-2">Browse, filter, edit, or archive students.</span>
+        </div>
         <div class="d-flex gap-2">
             <a href="{{ route('admin.students.create') }}" class="btn btn-success">
                 <i class="bi bi-person-plus"></i> Enroll Student
             </a>
         </div>
     </div>
+
 
     {{-- ===== Build guardian dropdown options (unique per guardian id) ===== --}}
     @php

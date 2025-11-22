@@ -154,13 +154,6 @@
                         <small class="text-muted">Must be unique.</small>
                     </div>
 
-                    {{-- Optional password in this form too --}}
-                    <div class="mt-3">
-                        <label class="form-label">New password (optional)</label>
-                        <input type="password" name="password" class="form-control" minlength="6" autocomplete="new-password">
-                        <small class="text-muted">Leave blank to keep your current password.</small>
-                    </div>
-
                     <div class="mt-3 d-flex gap-2">
                         <button class="btn btn-primary" type="submit">
                             <i class="bi bi-save me-1"></i> Save Changes
@@ -292,4 +285,3 @@
     })();
 </script>
 @endpush
-    

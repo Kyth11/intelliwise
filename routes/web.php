@@ -20,6 +20,8 @@ use App\Http\Controllers\Auth\FacultyDashboardController;
 use App\Http\Controllers\Auth\GuardianDashboardController;
 use App\Http\Controllers\Admin\FacultyController as AdminFacultyController;
 use App\Http\Controllers\Admin\SettingController as AdminSettingController;
+use App\Http\Controllers\Admin\CurriculumController as AdminCurriculumController;
+
 
 // ---------- Shared / other controllers ----------
 use App\Http\Controllers\Admin\SubjectController as AdminSubjectController;
@@ -68,6 +70,8 @@ Route::middleware(['auth', 'role:admin'])
             Route::post('/school-year', [AdminSettingController::class, 'storeSchoolYear'])->name('schoolyear.store');
             Route::post('/gcash-qr', [AdminSettingController::class, 'uploadGcashQr'])->name('gcashqr.upload');
             Route::post('/school-year/{id}/proceed', [SchoolYearController::class, 'proceed'])->name('schoolyear.proceed');
+            Route::post('/school-year/{id}/revert', [SchoolYearController::class, 'revert'])
+                ->name('schoolyear.revert');
         });
 
         // Students
@@ -150,6 +154,28 @@ Route::middleware(['auth', 'role:admin'])
             Route::put('/{id}', [AdminSubjectController::class, 'update'])->name('update');
             Route::delete('/{id}', [AdminSubjectController::class, 'destroy'])->name('destroy');
         });
+
+        // Curriculum
+        Route::prefix('curriculum')->name('curriculum.')->group(function () {
+            // /admin/curriculum  → admin.curriculum.index
+            Route::get('/', [AdminCurriculumController::class, 'index'])->name('index');
+
+            // /admin/curriculum  → admin.curriculum.store (create)
+            Route::post('/', [AdminCurriculumController::class, 'store'])->name('store');
+
+            // /admin/curriculum/{id}/edit → admin.curriculum.curriculum_edit (for your Blade link)
+            Route::get('/{id}/edit', [AdminCurriculumController::class, 'edit'])->name('curriculum_edit');
+
+            // /admin/curriculum/{id} → admin.curriculum.update
+            Route::put('/{id}', [AdminCurriculumController::class, 'update'])->name('update');
+
+            // /admin/curriculum/{id} → admin.curriculum.destroy
+            Route::delete('/{id}', [AdminCurriculumController::class, 'destroy'])->name('destroy');
+
+                Route::patch('/{id}/status', [AdminCurriculumController::class, 'updateStatus'])
+        ->name('updateStatus');
+        });
+
 
         // Optional AJAX
         Route::get('/grades/report', [GradesController::class, 'reportAjax'])->name('grades.report');

@@ -10,18 +10,18 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('schoolyrs', function (Blueprint $table) {
-            $table->id(); // ← primary key (auto-increment)
+            $table->id();                               // primary key
             $table->string('school_year', 9)->unique(); // e.g. '2025-2026'
+            $table->boolean('active')->default(false);  // current active school year
             $table->timestamps();
         });
 
         DB::table('schoolyrs')->insert([
-            ['school_year' => '2025-2026'],
-            ['school_year' => '2026-2027'],
-            ['school_year' => '2027-2028'],
-            ['school_year' => '2028-2029'],
-            ['school_year' => '2029-2030'],
-
+            ['school_year' => '2025-2026', 'active' => true],
+            ['school_year' => '2026-2027', 'active' => false],
+            ['school_year' => '2027-2028', 'active' => false],
+            ['school_year' => '2028-2029', 'active' => false],
+            ['school_year' => '2029-2030', 'active' => false],
         ]);
     }
 

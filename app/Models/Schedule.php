@@ -14,23 +14,13 @@ class Schedule extends Model
         'class_start',
         'class_end',
         'faculty_id',
-        'subject_id',
+        'subject_id',   // IMPORTANT: must be here
         'gradelvl_id',
-        'school_year', // references Schoolyr::school_year (string key)
+        'school_year',
     ];
 
     /**
-     * Optional: cast time strings if you want Carbon instances.
-     * (Uncomment if you store full datetime; keep as string if HH:MM)
-     */
-    // protected $casts = [
-    //     'class_start' => 'datetime:H:i',
-    //     'class_end'   => 'datetime:H:i',
-    // ];
-
-    /**
      * School year relation keyed by human-readable "school_year" (e.g., "2025-2026").
-     * Local key: schedules.school_year, Owner key: schoolyrs.school_year
      */
     public function schoolYear(): BelongsTo
     {
