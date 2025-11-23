@@ -187,7 +187,7 @@
 
     <h5 style="margin-top:12px; margin-bottom:4px;">SUBJECTS / CLASS SCHEDULE</h5>
 
-    <table class="subjects-table">
+        <table class="subjects-table">
         <thead>
         <tr>
             <th class="col-subject">Subjects</th>
@@ -199,16 +199,22 @@
         <tbody>
         @forelse($billing['subjects'] as $subj)
             @php
-                $daysRaw  = $subj['day']  ?? '';
-                $timeRaw  = $subj['time'] ?? '';
+                $daysRaw   = $subj['day']  ?? '';
+                $timeRaw   = $subj['time'] ?? '';
+                $teacher   = $subj['teacher'] ?? '';
 
                 $days  = array_values(array_filter(array_map('trim', explode('/', $daysRaw))));
                 $times = array_values(array_filter(array_map('trim', explode(',', $timeRaw))));
 
-                $rowsCount = max(count($days), count($times), 1);
+                $rowsCount       = max(count($days), count($times), 1);
+                $teacherDisplay  = trim($teacher) !== '' ? $teacher : 'TBA';
             @endphp
 
             @for($i = 0; $i < $rowsCount; $i++)
+                @php
+                    $dayVal  = $days[$i]  ?? '';
+                    $timeVal = $times[$i] ?? '';
+                @endphp
                 <tr>
                     @if($i === 0)
                         <td>{{ $subj['title'] }}</td>
@@ -217,15 +223,15 @@
                     @endif
 
                     <td class="text-center">
-                        {{ $days[$i] ?? '' }}
+                        {{ $dayVal !== '' ? $dayVal : 'TBA' }}
                     </td>
                     <td class="text-center">
-                        {{ $times[$i] ?? '' }}
+                        {{ $timeVal !== '' ? $timeVal : 'TBA' }}
                     </td>
 
                     @if($i === 0)
                         <td rowspan="{{ $rowsCount }}">
-                            {{ $subj['teacher'] }}
+                            {{ $teacherDisplay }}
                         </td>
                     @endif
                 </tr>
@@ -237,7 +243,7 @@
         @endforelse
         </tbody>
     </table>
-
+php
     <table class="fees-table" style="margin-top:12px;">
         <tr>
             <td style="width:60%;"><strong>ASSESSMENT:</strong></td>
