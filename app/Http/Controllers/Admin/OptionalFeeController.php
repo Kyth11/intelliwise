@@ -13,15 +13,23 @@ class OptionalFeeController extends Controller
         $data = $request->validate([
             'name'   => ['required', 'string', 'max:100'],
             'amount' => ['required', 'numeric', 'min:0'],
+            // You can keep this if you later add a `scope` column,
+            // but right now your DB table does NOT have `scope`.
             'scope'  => ['nullable', 'in:grade,student,both'],
             'active' => ['nullable', 'in:0,1'],
         ]);
 
+        // Default to active=true when the checkbox is not present
+        $active = $request->has('active')
+            ? $request->boolean('active')
+            : true;
+
         OptionalFee::create([
             'name'   => $data['name'],
             'amount' => $data['amount'],
+            // This will have effect only if you add a `scope` column in DB.
             'scope'  => $data['scope'] ?? 'both',
-            'active' => $request->boolean('active'),
+            'active' => $active,
         ]);
 
         return back()->with('success', 'Optional fee added.');
@@ -38,11 +46,16 @@ class OptionalFeeController extends Controller
             'active' => ['nullable', 'in:0,1'],
         ]);
 
+        // If the checkbox is absent, keep the previous active value
+        $active = $request->has('active')
+            ? $request->boolean('active')
+            : (bool) $fee->active;
+
         $fee->update([
             'name'   => $data['name'],
             'amount' => $data['amount'],
             'scope'  => $data['scope'] ?? $fee->scope,
-            'active' => $request->boolean('active'),
+            'active' => $active,
         ]);
 
         return back()->with('success', 'Optional fee updated.');

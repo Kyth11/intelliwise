@@ -198,8 +198,8 @@
                     ->unique()
                     ->values();
 
-                // Group schedules by subject for row-wise display (subject -> many days/times)
-                $groupedBySubject = $facultySchedules->groupBy('subject_id');
+                // Group schedules by grade level for separated tables
+                $groupedByGrade = $facultySchedules->groupBy('gradelvl_id');
             @endphp
 
             <div class="modal fade" id="viewFacultySchedule{{ $faculty->id }}" tabindex="-1" aria-hidden="true">
@@ -209,7 +209,7 @@
                             <h5 class="modal-title">
                                 Schedule for {{ $fname }}
                                 @if($gradeLabelsForHeader->isNotEmpty())
-                                    – Grade Level: {{ $gradeLabelsForHeader->join(', ') }}
+                                    – Grade Level(s): {{ $gradeLabelsForHeader->join(', ') }}
                                 @endif
                                 @if($activeSy)
                                     <span class="small text-muted ms-1">(SY {{ $activeSy }})</span>
@@ -221,77 +221,96 @@
                         <div class="modal-body">
                             @if($facultySchedules->isNotEmpty())
                                 <div class="table-responsive">
-                                    <table class="table table-sm table-bordered align-middle">
-                                        <thead class="table-light text-center">
-                                            <tr>
-                                                <th style="width: 35%;">Subject</th>
-                                                <th style="width: 65%;">Day / Time</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach($groupedBySubject as $subjectId => $subjectSchedules)
-                                                @php
-                                                    $first = $subjectSchedules->first();
-                                                    $subjectName = optional($first->subject)->subject_name ?? '-';
-                                                @endphp
-                                                <tr>
-                                                    <td>{{ $subjectName }}</td>
-                                                    <td>
-                                                        @foreach($subjectSchedules as $schedule)
-                                                            @php
-                                                                $st = $schedule->class_start
-                                                                    ? date('g:i A', strtotime($schedule->class_start))
-                                                                    : '';
-                                                                $et = $schedule->class_end
-                                                                    ? date('g:i A', strtotime($schedule->class_end))
-                                                                    : '';
-                                                            @endphp
-                                                            <div class="d-flex align-items-center gap-2 mb-1">
-                                                                <span class="badge bg-primary">
-                                                                    {{ $schedule->day ?? '-' }}
-                                                                </span>
-                                                                <span>
-                                                                    @if($st && $et)
-                                                                        {{ $st }}–{{ $et }}
-                                                                    @else
-                                                                        -
-                                                                    @endif
-                                                                </span>
-                                                                <span class="ms-auto d-flex gap-1">
-                                                                    {{-- EDIT: reuse existing edit modal from scheduleModal partial --}}
-                                                                    <button
-                                                                        type="button"
-                                                                        class="btn btn-sm btn-warning"
-                                                                        title="Edit Schedule"
-                                                                        data-bs-toggle="modal"
-                                                                        data-bs-target="#editScheduleModal{{ $schedule->id }}"
-                                                                        data-parent-modal="#viewFacultySchedule{{ $faculty->id }}">
-                                                                        <i class="bi bi-pencil-square"></i>
-                                                                    </button>
+                                    @forelse($groupedByGrade as $gradeId => $gradeSchedules)
+                                        @php
+                                            $gradeName = optional($gradeSchedules->first()->gradelvl)->grade_level ?? 'N/A';
+                                            $groupedBySubject = $gradeSchedules->groupBy('subject_id');
+                                        @endphp
 
-                                                                    {{-- DELETE: inline form, hooked by .delete-btn script --}}
-                                                                    <form
-                                                                        action="{{ route('admin.schedules.destroy', $schedule->id) }}"
-                                                                        method="POST"
-                                                                        class="d-inline delete-form">
-                                                                        @csrf
-                                                                        @method('DELETE')
+                                        <h6 class="fw-bold mt-2 mb-1">
+                                            Grade Level: {{ $gradeName }}
+                                        </h6>
+
+                                        <table class="table table-sm table-bordered align-middle mb-3">
+                                            <thead class="table-light text-center">
+                                                <tr>
+                                                    <th style="width: 35%;">Subject</th>
+                                                    <th style="width: 65%;">Day / Time</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($groupedBySubject as $subjectId => $subjectSchedules)
+                                                    @php
+                                                        $first = $subjectSchedules->first();
+                                                        $subjectName = optional($first->subject)->subject_name ?? '-';
+                                                    @endphp
+                                                    <tr>
+                                                        <td>{{ $subjectName }}</td>
+                                                        <td>
+                                                            @foreach($subjectSchedules as $schedule)
+                                                                @php
+                                                                    $st = $schedule->class_start
+                                                                        ? date('g:i A', strtotime($schedule->class_start))
+                                                                        : '';
+                                                                    $et = $schedule->class_end
+                                                                        ? date('g:i A', strtotime($schedule->class_end))
+                                                                        : '';
+                                                                @endphp
+                                                                <div class="d-flex align-items-center gap-2 mb-1">
+                                                                    <span class="badge bg-primary">
+                                                                        {{ $schedule->day ?? '-' }}
+                                                                    </span>
+                                                                    <span>
+                                                                        @if($st && $et)
+                                                                            {{ $st }}–{{ $et }}
+                                                                        @else
+                                                                            -
+                                                                        @endif
+                                                                    </span>
+                                                                    <span class="ms-auto d-flex gap-1">
+                                                                        {{-- EDIT: reuse existing edit modal from scheduleModal partial --}}
                                                                         <button
                                                                             type="button"
-                                                                            class="btn btn-sm btn-danger delete-btn"
-                                                                            title="Delete Schedule"
-                                                                            data-confirm="Delete this schedule?">
-                                                                            <i class="bi bi-archive"></i>
+                                                                            class="btn btn-sm btn-warning"
+                                                                            title="Edit Schedule"
+                                                                            data-bs-toggle="modal"
+                                                                            data-bs-target="#editScheduleModal{{ $schedule->id }}"
+                                                                            data-parent-modal="#viewFacultySchedule{{ $faculty->id }}">
+                                                                            <i class="bi bi-pencil-square"></i>
                                                                         </button>
-                                                                    </form>
-                                                                </span>
-                                                            </div>
-                                                        @endforeach
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
+
+                                                                        {{-- DELETE: inline form, hooked by .delete-btn script --}}
+                                                                        <form
+                                                                            action="{{ route('admin.schedules.destroy', $schedule->id) }}"
+                                                                            method="POST"
+                                                                            class="d-inline delete-form">
+                                                                            @csrf
+                                                                            @method('DELETE')
+                                                                            <button
+                                                                                type="button"
+                                                                                class="btn btn-sm btn-danger delete-btn"
+                                                                                title="Delete Schedule"
+                                                                                data-confirm="Delete this schedule?">
+                                                                                <i class="bi bi-archive"></i>
+                                                                            </button>
+                                                                        </form>
+                                                                    </span>
+                                                                </div>
+                                                            @endforeach
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    @empty
+                                        <p class="text-muted mb-0">
+                                            No schedules for this faculty
+                                            @if($activeSy)
+                                                in active School Year ({{ $activeSy }})
+                                            @endif
+                                            .
+                                        </p>
+                                    @endforelse
                                 </div>
                             @else
                                 <p class="text-muted mb-0">

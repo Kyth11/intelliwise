@@ -3,13 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Mail\ParentAccountCredentials;
+use App\Mail\StudentCorMail;
 use App\Models\Student;
 use App\Models\Guardian;
 use App\Models\User;
 use App\Models\Tuition;
+use App\Models\Schedule;
 use App\Models\Gradelvl;
 use App\Models\Schoolyr;
 use App\Models\OptionalFee;
+use App\Models\CorHeader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -18,18 +21,31 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 
 class StudentController extends Controller
 {
-    public function index()
+    // in App\Http\Controllers\StudentController.php
+
+    public function index(Request $request)
     {
-        // Determine current school year (active, or fallback to first by school_year)
-        $current = $this->currentSchoolYear();
+        // Selected school year from the query string, if any
+        $selectedId = $request->query('schoolyr_id');
+        $current = null;
+
+        if ($selectedId) {
+            $current = Schoolyr::find($selectedId);
+        }
+
+        // Fallback: active school year, or first by school_year
+        if (!$current) {
+            $current = $this->currentSchoolYear();
+        }
 
         // Base query
         $studentsQuery = Student::with(['guardian', 'optionalFees']);
 
-        // Limit to current school year if we have one and a matching column
+        // Limit to the chosen school year if we have one and a matching column
         if ($current) {
             if ($this->hasColumn('students', 'schoolyr_id')) {
                 $studentsQuery->where('schoolyr_id', $current->id);
@@ -38,8 +54,7 @@ class StudentController extends Controller
             }
         }
 
-        $students = $studentsQuery->get()->groupBy('s_gradelvl');
-
+        $students     = $studentsQuery->get()->groupBy('s_gradelvl');
         $gradelvls    = Gradelvl::all();
         $tuitions     = Tuition::with('optionalFees')->orderBy('updated_at', 'desc')->get();
         $optionalFees = OptionalFee::orderBy('name')->get();
@@ -82,8 +97,23 @@ class StudentController extends Controller
             return $g;
         });
 
-        // Optional fees
-        $optionalFees = OptionalFee::where('active', true)->orderBy('name')->get();
+        // Tuition rows for the fees summary modal in the enrollment form
+        // We load all, but the Blade will filter by $current->school_year.
+        $tuitionsQuery = Tuition::query();
+
+        if ($current && $current->school_year) {
+            $tuitionsQuery->where('school_year', $current->school_year);
+        }
+
+        $tuitions = $tuitionsQuery
+            ->orderBy('grade_level')
+            ->orderBy('school_year')
+            ->get();
+
+        // Optional fees – show all, Blade will filter:
+        //  - active is NULL or 1
+        //  - scope in ['student','both','any']
+        $optionalFees = OptionalFee::orderBy('name')->get();
 
         // Determine view based on role
         $role = Auth::user()?->role;
@@ -91,7 +121,7 @@ class StudentController extends Controller
             ? 'auth.facultydashboard.enroll-student'
             : 'auth.admindashboard.enroll-student';
 
-        return view($view, compact('current', 'guardians', 'optionalFees'));
+        return view($view, compact('current', 'guardians', 'optionalFees', 'tuitions'));
     }
 
     /** Live search (names or LRN) for suggest dropdowns */
@@ -124,7 +154,8 @@ class StudentController extends Controller
     /** Prefill payload for a picked suggestion (LRN-based) */
     public function prefill($id)
     {
-        $s = Student::with(['guardian'])->where('lrn', $id)->firstOrFail();
+        // Load guardian AND optional fees
+        $s = Student::with(['guardian', 'optionalFees'])->where('lrn', $id)->firstOrFail();
 
         $religion = $s->s_religion ?? $s->religion ?? '';
 
@@ -160,6 +191,9 @@ class StudentController extends Controller
             'f_email'              => optional($s->guardian)->f_email,
             'f_occupation'         => optional($s->guardian)->f_occupation,
             'alt_guardian_details' => optional($s->guardian)->alt_guardian_details,
+
+            // NEW: current optional fee IDs for this student
+            'student_optional_fee_ids' => $s->optionalFees->pluck('id')->values(),
         ];
 
         return response()->json($payload);
@@ -300,60 +334,156 @@ class StudentController extends Controller
                 }
             }
 
-            // ----- Create/Reset guardian user credentials + send email
-            $emailTarget = trim((string) ($guardian->g_email ?: $guardian->m_email ?: $guardian->f_email ?: ''));
-            $emailed      = false;
+            // Make temporary properties for COR rendering (not persisted)
+            $student->enroll_type   = $type;
+            $guardian->display_name = $this->guardianDisplayName($guardian);
+
+            // ----- COR generation (Certificate of Registration)
+            $schoolYearStr = $currentSy?->school_year ?? null;
+            $gradeLevel    = $student->s_gradelvl;
+
+            $tuitionFee      = (float) $baseTotal;
+            $miscFee         = 0.0;
+            $otherFees       = (float) $studentOptSum;
+            $totalSchoolFees = round($tuitionFee + $miscFee + $otherFees, 2);
+
+            // Build subjects for COR from schedules (grade level + SY)
+            $corSubjects = $this->buildCorSubjectsForStudent($student, $schoolYearStr);
+
+            $corBilling = [
+                'date_enrolled'      => now(),
+                'tuition_fee'        => $tuitionFee,
+                'misc_fee'           => $miscFee,
+                'other_fees'         => $otherFees,
+                'total_school_fees'  => $totalSchoolFees,
+                'subjects'           => $corSubjects,
+            ];
+
+            // Registration number — SY digits + LRN + random
+            $registrationNo = sprintf(
+                '%s-%s-%s',
+                preg_replace('/[^0-9]/', '', $schoolYearStr ?? ''),
+                $student->lrn,
+                strtoupper(Str::random(4))
+            );
+
+            $semester   = null;
+            $courseYear = $gradeLevel;
+            $signerName = Auth::user()?->name ?? 'School Registrar';
+
+            // Render COR HTML once
+            $corHtml = view('emails.cor', [
+                'student'        => $student,
+                'guardian'       => $guardian,
+                'billing'        => $corBilling,
+                'schoolYear'     => $schoolYearStr,
+                'semester'       => $semester,
+                'courseYear'     => $courseYear,
+                'registrationNo' => $registrationNo,
+                'signerName'     => $signerName,
+            ])->render();
+
+            // Save COR header record
+            CorHeader::create([
+                'student_id'        => $student->lrn,
+                'guardian_id'       => $guardian->id,
+                'school_year'       => $schoolYearStr,
+                'semester'          => $semester,
+                'course_year'       => $courseYear,
+                'registration_no'   => $registrationNo,
+                'cor_no'            => null,
+                'date_enrolled'     => $corBilling['date_enrolled'],
+                'tuition_fee'       => $tuitionFee,
+                'misc_fee'          => $miscFee,
+                'other_fees'        => $otherFees,
+                'total_school_fees' => $totalSchoolFees,
+                'signed_by_name'    => $signerName,
+                'signed_by_user_id' => Auth::id(),
+                'html_snapshot'     => $corHtml,
+            ]);
+
+            // ----- Guardian user credentials: create once, then only send COR on subsequent enrollments
+            $emailTarget     = trim((string) ($guardian->g_email ?: $guardian->m_email ?: $guardian->f_email ?: ''));
+            $emailed         = false;
+            $credentialsSent = false;
 
             // Use mother first, fallback to father
             $parentLast  = $guardian->m_lastname ?: $guardian->f_lastname;
             $parentFirst = $guardian->m_firstname ?: $guardian->f_firstname;
+            $displayName = $this->guardianDisplayName($guardian);
 
-            $username      = $this->uniqueUsername($this->buildUsernameBaseFromParent($parentLast, $parentFirst));
-            $passwordPlain = $this->buildPasswordFromParent($parentLast);
-
-            $displayName   = $this->guardianDisplayName($guardian);
+            $username      = null;
+            $passwordPlain = null;
 
             $existingUser = User::where('guardian_id', $guardian->id)->first();
+
             if ($existingUser) {
-                $username = $existingUser->username ?: $username;
-                if ($this->hasColumn('users', 'password')) {
-                    $existingUser->password = Hash::make($passwordPlain);
-                }
-                if ($this->hasColumn('users', 'email') && !$existingUser->email && $emailTarget) {
+                // Keep existing username/password; only ensure email is filled in
+                if ($this->hasColumn('users', 'email') && $emailTarget && !$existingUser->email) {
                     $existingUser->email = $emailTarget;
+                    $existingUser->save();
                 }
-                $existingUser->save();
             } else {
-                $user = new User();
+                // First time: create guardian user account and generate credentials
+                $usernameBase  = $this->buildUsernameBaseFromParent($parentLast, $parentFirst);
+                $username      = $this->uniqueUsername($usernameBase);
+                $passwordPlain = $this->buildPasswordFromParent($parentLast);
+
+                $user       = new User();
                 $user->name = $displayName;
-                if ($this->hasColumn('users', 'username'))
+
+                if ($this->hasColumn('users', 'username')) {
                     $user->username = $username;
-                if ($this->hasColumn('users', 'password'))
+                }
+                if ($this->hasColumn('users', 'password')) {
                     $user->password = Hash::make($passwordPlain);
-                if ($this->hasColumn('users', 'role'))
+                }
+                if ($this->hasColumn('users', 'role')) {
                     $user->role = 'guardian';
-                if ($this->hasColumn('users', 'email'))
+                }
+                if ($this->hasColumn('users', 'email')) {
                     $user->email = $emailTarget ?: null;
-                if ($this->hasColumn('users', 'guardian_id'))
+                }
+                if ($this->hasColumn('users', 'guardian_id')) {
                     $user->guardian_id = $guardian->id;
+                }
+
                 $user->save();
             }
 
             if ($emailTarget !== '') {
                 try {
-                    Mail::to($emailTarget)->send(new ParentAccountCredentials(
-                        guardianName: $displayName,
-                        studentName: trim(($student->s_firstname ?? '') . ' ' . ($student->s_lastname ?? '')),
-                        username: $username,
-                        password: $passwordPlain,
-                        appUrl: config('app.url')
+                    // Send credentials only if this is the first time (no existing user before)
+                    if (!$existingUser && $username && $passwordPlain) {
+                        Mail::to($emailTarget)->send(new ParentAccountCredentials(
+                            guardianName: $displayName,
+                            studentName: trim(($student->s_firstname ?? '') . ' ' . ($student->s_lastname ?? '')),
+                            username: $username,
+                            password: $passwordPlain,
+                            appUrl: config('app.url')
+                        ));
+                        $credentialsSent = true;
+                    }
+
+                    // COR email is always sent on enrollment
+                    Mail::to($emailTarget)->send(new StudentCorMail(
+                        $student,
+                        $guardian,
+                        $corBilling,
+                        $schoolYearStr,
+                        $semester,
+                        $courseYear,
+                        $registrationNo,
+                        $signerName,
+                        $corHtml
                     ));
+
                     $emailed = true;
                 } catch (\Throwable $e) {
                     Log::warning('Email send failed', ['error' => $e->getMessage(), 'guardian_id' => $guardian->id]);
                 }
             } else {
-                Log::info('No guardian email on file; skipping credentials email.', ['guardian_id' => $guardian->id]);
+                Log::info('No guardian email on file; skipping credentials/COR email.', ['guardian_id' => $guardian->id]);
             }
 
             DB::commit();
@@ -361,11 +491,19 @@ class StudentController extends Controller
             // Redirect to the proper list
             $role  = Auth::user()?->role;
             $route = $role === 'faculty' ? 'faculty.students' : 'admin.students.index';
-            return redirect()->route($route)->with(
-                'success',
-                ($type === 'old' ? 'Student updated. ' : 'Student saved. ')
-                . ($emailed ? 'Credentials emailed to parent/guardian.' : 'No email on file.')
-            );
+
+            $msg = $type === 'old' ? 'Student updated. ' : 'Student saved. ';
+            if ($emailed) {
+                if ($credentialsSent) {
+                    $msg .= 'Parent/guardian credentials and COR emailed.';
+                } else {
+                    $msg .= 'COR emailed to parent/guardian.';
+                }
+            } else {
+                $msg .= 'No email on file.';
+            }
+
+            return redirect()->route($route)->with('success', $msg);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Student store failed', ['error' => $e->getMessage()]);
@@ -468,8 +606,9 @@ class StudentController extends Controller
 
     private function resolveTuition(?string $gradeLevel): array
     {
-        if (!$gradeLevel)
+        if (!$gradeLevel) {
             return [null, 0];
+        }
 
         $t = Tuition::where('grade_level', $gradeLevel)
             ->orderByDesc('updated_at')
@@ -508,10 +647,10 @@ class StudentController extends Controller
 
     private function buildUsernameBaseFromParent(?string $last, ?string $first): string
     {
-        $last   = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $last));
-        $first  = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $first));
+        $last    = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $last));
+        $first   = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $first));
         $initial = $first !== '' ? substr($first, 0, 2) : 'xx'; // first 2 letters of first name, fallback 'xx'
-        return ($last !== '' ? $last : 'parent') . $initial; // e.g., davisjo
+        return ($last !== '' ? $last : 'parent') . $initial;   // e.g., davisjo
     }
 
     private function uniqueUsername(string $base): string
@@ -521,8 +660,9 @@ class StudentController extends Controller
         while (User::where('username', $u)->exists()) {
             $u = $base . $i;
             $i++;
-            if ($i > 9999)
+            if ($i > 9999) {
                 break;
+            }
         }
         return $u;
     }
@@ -531,6 +671,92 @@ class StudentController extends Controller
     {
         $last = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $last));
         return ($last !== '' ? $last : 'parent') . '123'; // e.g., davis123
+    }
+
+    /**
+     * Build the subjects array for COR from schedules, using
+     * the student's grade level and the given (or active) school year.
+     */
+    private function buildCorSubjectsForStudent(Student $student, ?string $schoolYearStr): array
+    {
+        // Resolve school year: use given or active
+        if (!$schoolYearStr) {
+            $schoolYearStr = Schoolyr::where('active', true)->value('school_year');
+        }
+        if (!$schoolYearStr) {
+            return [];
+        }
+
+        // Resolve grade name from student record, then map to Gradelvl.id
+        $gradeName = $student->s_gradelvl;
+        if (!$gradeName) {
+            return [];
+        }
+
+        $gradeLevelId = Gradelvl::where('grade_level', $gradeName)->value('id');
+        if (!$gradeLevelId) {
+            return [];
+        }
+
+        // Fetch schedules for this grade level in this school year
+        $schedules = Schedule::with(['subject', 'faculty'])
+            ->where('school_year', $schoolYearStr)
+            ->where('gradelvl_id', $gradeLevelId)
+            ->get();
+
+        if ($schedules->isEmpty()) {
+            return [];
+        }
+
+        // Group by subject so each COR row is one subject with combined days/times
+        return $schedules
+            ->groupBy('subject_id')
+            ->map(function ($rows) {
+                $first   = $rows->first();
+                $subject = $first->subject;
+                $faculty = $first->faculty;
+
+                // Subject code + title (code may be blank if not stored)
+                $code  = $subject->subject_code ?? '';
+                $title = $subject->subject_name ?? '';
+
+                // Combine days: e.g., "Monday/Wednesday/Friday"
+                $day = $rows->pluck('day')
+                    ->filter()
+                    ->unique()
+                    ->implode('/');
+
+                // Combine time ranges: e.g., "8:00 AM–9:00 AM, 1:00 PM–2:00 PM"
+                $time = $rows->map(function ($row) {
+                        if (!$row->class_start || !$row->class_end) {
+                            return null;
+                        }
+
+                        $st = date('g:i A', strtotime($row->class_start));
+                        $et = date('g:i A', strtotime($row->class_end));
+
+                        return "{$st}–{$et}";
+                    })
+                    ->filter()
+                    ->unique()
+                    ->implode(', ');
+
+                // Teacher name (supports first_name/last_name or f_firstname/f_lastname)
+                $teacherName = trim(
+                    ($faculty->first_name  ?? $faculty->f_firstname ?? '') . ' ' .
+                    ($faculty->last_name   ?? $faculty->f_lastname  ?? '')
+                );
+
+                return [
+                    'code'    => $code,
+                    'title'   => $title,
+                    'day'     => $day ?: '-',
+                    'time'    => $time ?: '-',
+                    'teacher' => $teacherName ?: '-',
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**

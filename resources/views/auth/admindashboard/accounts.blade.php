@@ -72,149 +72,161 @@
         </div>
     </div>
 
-    {{-- Faculty Accounts --}}
-    <div class="card mt-3 p-3">
-        <h5 class="mb-3">Faculty Accounts</h5>
-        <div class="table-responsive">
-            <table id="facultyTable" class="table table-bordered table-striped align-middle">
-                <thead class="table-primary">
-                <tr>
-                    <th>Full Name</th>
-                    <th>Contact</th>
-                    <th>Address</th>
-                    <th>Email</th>
-                    <th>Username</th>
-                    <th>Created At</th>
-                    <th style="width: 110px;">Tools</th>
-                </tr>
-                </thead>
-                <tbody>
-                @foreach($faculties as $f)
-                    <tr>
-                        <td>{{ $f->f_firstname }} {{ $f->f_middlename }} {{ $f->f_lastname }}</td>
-                        <td>{{ $f->f_contact ?? '—' }}</td>
-                        <td>{{ $f->f_address ?? '—' }}</td>
-                        <td>{{ $f->f_email ?? '—' }}</td>
-                        <td>{{ optional($f->user)->username ?? '—' }}</td>
-                        <td>{{ $f->created_at?->format('Y-m-d') }}</td>
-                        <td class="text-nowrap">
-                            <button class="btn btn-sm btn-warning"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#editFacultyModal"
-                                    data-id="{{ $f->id }}"
-                                    data-firstname="{{ $f->f_firstname }}"
-                                    data-middlename="{{ $f->f_middlename }}"
-                                    data-lastname="{{ $f->f_lastname }}"
-                                    data-contact="{{ $f->f_contact }}"
-                                    data-address="{{ $f->f_address }}"
-                                    data-email="{{ $f->f_email }}"
-                                    data-username="{{ optional($f->user)->username ?? '' }}">
-                                <i class="bi bi-pencil-square"></i>
-                            </button>
-                            <form action="{{ route('admin.faculties.destroy', $f->id) }}" method="POST" class="d-inline delete-form">
-                                @csrf @method('DELETE')
-                                <button type="button" class="btn btn-sm btn-danger delete-btn">
-                                    <i class="bi bi-archive"></i>
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                @endforeach
-                </tbody>
-            </table>
-        </div>
-    </div>
+    {{-- =========================
+         SIDE-BY-SIDE ACCOUNTS CARD
+    ========================== --}}
+    <div class="mt-3">
+        <div class="row g-3">
+            {{-- Faculty Accounts (left) --}}
+            <div class="col-12 col-lg-6">
+                <div class="card h-100 p-3">
+                    <h5 class="mb-3">Faculty Accounts</h5>
+                    <div class="table-responsive">
+                        <table id="facultyTable" class="table table-bordered table-striped align-middle">
+                            <thead class="table-primary">
+                            <tr>
+                                <th>Full Name</th>
+                                <th>Contact</th>
+                                <th>Address</th>
+                                <th>Email</th>
+                                <th>Username</th>
+                                <th>Created At</th>
+                                <th style="width: 110px;">Tools</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach($faculties as $f)
+                                <tr>
+                                    <td>{{ $f->f_firstname }} {{ $f->f_middlename }} {{ $f->f_lastname }}</td>
+                                    <td>{{ $f->f_contact ?? '—' }}</td>
+                                    <td>{{ $f->f_address ?? '—' }}</td>
+                                    <td>{{ $f->f_email ?? '—' }}</td>
+                                    <td>{{ optional($f->user)->username ?? '—' }}</td>
+                                    <td>{{ $f->created_at?->format('Y-m-d') }}</td>
+                                    <td class="text-nowrap">
+                                        <button class="btn btn-sm btn-warning"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#editFacultyModal"
+                                                data-id="{{ $f->id }}"
+                                                data-firstname="{{ $f->f_firstname }}"
+                                                data-middlename="{{ $f->f_middlename }}"
+                                                data-lastname="{{ $f->f_lastname }}"
+                                                data-contact="{{ $f->f_contact }}"
+                                                data-address="{{ $f->f_address }}"
+                                                data-email="{{ $f->f_email }}"
+                                                data-username="{{ optional($f->user)->username ?? '' }}">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                        <form action="{{ route('admin.faculties.destroy', $f->id) }}" method="POST" class="d-inline delete-form">
+                                            @csrf @method('DELETE')
+                                            <button type="button" class="btn btn-sm btn-danger delete-btn">
+                                                <i class="bi bi-archive"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
 
-    {{-- Guardian Accounts --}}
-    <div class="card mt-4 p-3">
-        <h5 class="mb-3">Guardian Accounts</h5>
-        <div class="table-responsive">
-            <table id="guardianTable" class="table table-bordered table-striped align-middle">
-                <thead class="table-success">
-                <tr>
-                    <th>Parents / Guardian</th>
-                    <th>Contact</th>
-                    <th>Address</th>
-                    <th>Email</th>
-                    <th>Username</th>
-                    <th>Created At</th>
-                    <th style="width: 110px;">Tools</th>
-                </tr>
-                </thead>
-                <tbody>
-                @foreach($guardians as $g)
-                    @php
-                        $motherFull = trim(collect([$g->m_firstname, $g->m_middlename, $g->m_lastname])->filter()->implode(' '));
-                        $fatherFull = trim(collect([$g->f_firstname, $g->f_middlename, $g->f_lastname])->filter()->implode(' '));
-                        $singleGuardianFull = trim(collect([
-                            $g->guardian_name ?? null,
-                            $g->g_firstname ?? null,
-                            $g->g_middlename ?? null,
-                            $g->g_lastname ?? null
-                        ])->filter()->implode(' '));
+            {{-- Guardian Accounts (right) --}}
+            <div class="col-12 col-lg-6">
+                <div class="card h-100 p-3">
+                    <h5 class="mb-3">Guardian Accounts</h5>
+                    <div class="table-responsive">
+                        <table id="guardianTable" class="table table-bordered table-striped align-middle">
+                            <thead class="table-success">
+                            <tr>
+                                <th>Parents / Guardian</th>
+                                <th>Contact</th>
+                                <th>Address</th>
+                                <th>Email</th>
+                                <th>Username</th>
+                                <th>Created At</th>
+                                <th style="width: 110px;">Tools</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach($guardians as $g)
+                                @php
+                                    $motherFull = trim(collect([$g->m_firstname, $g->m_middlename, $g->m_lastname])->filter()->implode(' '));
+                                    $fatherFull = trim(collect([$g->f_firstname, $g->f_middlename, $g->f_lastname])->filter()->implode(' '));
+                                    $singleGuardianFull = trim(collect([
+                                        $g->guardian_name ?? null,
+                                        $g->g_firstname ?? null,
+                                        $g->g_middlename ?? null,
+                                        $g->g_lastname ?? null
+                                    ])->filter()->implode(' '));
 
-                        $label = $motherFull && $fatherFull
-                                    ? ($motherFull.' & '.$fatherFull)
-                                    : ($motherFull ?: ($fatherFull ?: ($singleGuardianFull ?: 'Guardian #'.$g->id)));
+                                    $label = $motherFull && $fatherFull
+                                                ? ($motherFull.' & '.$fatherFull)
+                                                : ($motherFull ?: ($fatherFull ?: ($singleGuardianFull ?: 'Guardian #'.$g->id)));
 
-                        $displayContact = $g->g_contact ?: ($g->m_contact ?: ($g->f_contact ?: '—'));
-                        $displayEmail   = $g->g_email   ?: ($g->m_email   ?: ($g->f_email   ?: '—'));
-                        $address        = $g->g_address ?: '—';
-                        $username       = optional($g->user)->username ?? '—';
-                    @endphp
+                                    $displayContact = $g->g_contact ?: ($g->m_contact ?: ($g->f_contact ?: '—'));
+                                    $displayEmail   = $g->g_email   ?: ($g->m_email   ?: ($g->f_email   ?: '—'));
+                                    $address        = $g->g_address ?: '—';
+                                    $username       = optional($g->user)->username ?? '—';
+                                @endphp
 
-                    <tr>
-                        <td>
-                            <div class="fw-semibold">{{ $label }}</div>
-                            @if($motherFull || $fatherFull)
-                                <div class="small text-muted">
-                                    @if($motherFull) Mother: {{ $motherFull }}@endif
-                                    @if($motherFull && $fatherFull) &nbsp;|&nbsp; @endif
-                                    @if($fatherFull) Father: {{ $fatherFull }}@endif
-                                </div>
-                            @endif
-                        </td>
-                        <td>{{ $displayContact }}</td>
-                        <td>{{ $address }}</td>
-                        <td>{{ $displayEmail }}</td>
-                        <td>{{ $username }}</td>
-                        <td>{{ $g->created_at?->format('Y-m-d') }}</td>
-                        <td class="text-nowrap">
-                            {{-- dashed data-* so dataset.gFirstname works consistently --}}
-                            <button class="btn btn-sm btn-warning"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#editGuardianModal"
-                                    data-id="{{ $g->id }}"
-                                    data-g-firstname="{{ $g->g_firstname }}"
-                                    data-g-middlename="{{ $g->g_middlename }}"
-                                    data-g-lastname="{{ $g->g_lastname }}"
-                                    data-g-contact="{{ $g->g_contact }}"
-                                    data-g-address="{{ $g->g_address }}"
-                                    data-g-email="{{ $g->g_email }}"
-                                    data-m-firstname="{{ $g->m_firstname }}" data-m-middlename="{{ $g->m_middlename }}" data-m-lastname="{{ $g->m_lastname }}"
-                                    data-m-contact="{{ $g->m_contact }}" data-m-email="{{ $g->m_email }}"
-                                    data-f-firstname="{{ $g->f_firstname }}" data-f-middlename="{{ $g->f_middlename }}" data-f-lastname="{{ $g->f_lastname }}"
-                                    data-f-contact="{{ $g->f_contact }}" data-f-email="{{ $g->f_email }}"
-                                    data-username="{{ optional($g->user)->username ?? '' }}">
-                                <i class="bi bi-pencil-square"></i>
-                            </button>
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold">{{ $label }}</div>
+                                        @if($motherFull || $fatherFull)
+                                            <div class="small text-muted">
+                                                @if($motherFull) Mother: {{ $motherFull }}@endif
+                                                @if($motherFull && $fatherFull) &nbsp;|&nbsp; @endif
+                                                @if($fatherFull) Father: {{ $fatherFull }}@endif
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td>{{ $displayContact }}</td>
+                                    <td>{{ $address }}</td>
+                                    <td>{{ $displayEmail }}</td>
+                                    <td>{{ $username }}</td>
+                                    <td>{{ $g->created_at?->format('Y-m-d') }}</td>
+                                    <td class="text-nowrap">
+                                        {{-- dashed data-* so dataset.gFirstname works consistently --}}
+                                        <button class="btn btn-sm btn-warning"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#editGuardianModal"
+                                                data-id="{{ $g->id }}"
+                                                data-g-firstname="{{ $g->g_firstname }}"
+                                                data-g-middlename="{{ $g->g_middlename }}"
+                                                data-g-lastname="{{ $g->g_lastname }}"
+                                                data-g-contact="{{ $g->g_contact }}"
+                                                data-g-address="{{ $g->g_address }}"
+                                                data-g-email="{{ $g->g_email }}"
+                                                data-m-firstname="{{ $g->m_firstname }}" data-m-middlename="{{ $g->m_middlename }}" data-m-lastname="{{ $g->m_lastname }}"
+                                                data-m-contact="{{ $g->m_contact }}" data-m-email="{{ $g->m_email }}"
+                                                data-f-firstname="{{ $g->f_firstname }}" data-f-middlename="{{ $g->f_middlename }}" data-f-lastname="{{ $g->f_lastname }}"
+                                                data-f-contact="{{ $g->f_contact }}" data-f-email="{{ $g->f_email }}"
+                                                data-username="{{ optional($g->user)->username ?? '' }}">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
 
-                            <form action="{{ route('admin.guardians.destroy', $g->id) }}" method="POST" class="d-inline delete-form">
-                                @csrf @method('DELETE')
-                                <button type="button" class="btn btn-sm btn-danger delete-btn">
-                                    <i class="bi bi-archive"></i>
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                @endforeach
-                </tbody>
-            </table>
-        </div>
-    </div>
+                                        <form action="{{ route('admin.guardians.destroy', $g->id) }}" method="POST" class="d-inline delete-form">
+                                            @csrf @method('DELETE')
+                                            <button type="button" class="btn btn-sm btn-danger delete-btn">
+                            <i class="bi bi-archive"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div> {{-- /row --}}
+    </div> {{-- /mt-3 --}}
 </div>
 
-{{-- Add modals (keep your existing partial if you like) --}}
+{{-- Add modals --}}
 @includeIf('auth.admindashboard.partials.accounts-modals')
 
 {{-- =========================

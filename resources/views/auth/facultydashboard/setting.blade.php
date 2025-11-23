@@ -15,6 +15,8 @@
     $faculty = \App\Models\Faculty::find($auth->faculty_id);
 @endphp
 
+
+
 <div class="card p-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
         <h5 class="mb-0">Settings</h5>

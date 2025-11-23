@@ -10,27 +10,43 @@ return new class extends Migration {
         Schema::create('tuitions', function (Blueprint $table) {
             $table->id();
 
-            // Grade level stored as text (keeps your existing blades/controllers simple)
+            // Basic identification
             $table->string('grade_level');
 
-            // TUITION (split)
+            // Tuition (split)
             $table->decimal('tuition_monthly', 10, 2)->default(0);
-            $table->decimal('tuition_yearly', 10, 2)->default(0);  // should be monthly * 10
+            $table->decimal('tuition_yearly', 10, 2)->default(0);  // ~= monthly * 10
 
-            // FEES (split)
+            // Misc fees (split)
             $table->decimal('misc_monthly', 10, 2)->nullable();
-            $table->decimal('misc_yearly', 10, 2)->nullable();     // should mirror misc_monthly * 10
+            $table->decimal('misc_yearly', 10, 2)->nullable();
 
+            // Books
             $table->string('books_desc')->nullable();
             $table->decimal('books_amount', 10, 2)->nullable();
 
-            // Computed total (tuition_yearly + misc_yearly + books_amount + grade-level optional fees)
+            // Enrollment / registration fee (this is what the Blade calls "Enrollment Fee")
+            $table->decimal('registration_fee', 10, 2)->nullable();
+
+            // Computed total (tuition_yearly + misc_yearly + books_amount + registration_fee + grade-level optional fees)
             $table->decimal('total_yearly', 10, 2)->default(0);
 
-            // Keep school year as TEXT (YYYY-YYYY) to match your controllers and views today
-            $table->string('school_year', 9)->nullable(); // e.g. 2025-2026
+            // School year text (for display / simple select) e.g. "2025-2026"
+            $table->string('school_year', 9)->nullable();
+
+            // Normalized FK to schoolyrs (optional, matches your model)
+            $table->unsignedBigInteger('schoolyr_id')->nullable();
 
             $table->timestamps();
+            $table->softDeletes();
+
+            $table->index('grade_level');
+            $table->index('school_year');
+
+            $table->foreign('schoolyr_id')
+                ->references('id')
+                ->on('schoolyrs')
+                ->nullOnDelete();
         });
     }
 

@@ -1,17 +1,24 @@
 <?php
 
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Route;
+
+// ---------- Mailables ----------
+use App\Mail\ParentAccountCredentials;
 
 // ---------- Auth & Dashboards ----------
-use Illuminate\Support\Facades\Route;
-use App\Mail\ParentAccountCredentials;
 use App\Http\Controllers\GradesController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Guardian\CorController;
+
+// ---------- Shared / other controllers ----------
 use App\Http\Controllers\Auth\PaymentsController;
+use App\Http\Controllers\FacultyGradesController;
 
 // ---------- Admin CRUD (split controllers) ----------
-use App\Http\Controllers\FacultyGradesController;
+use App\Http\Controllers\FinancialReportController;
+use App\Http\Controllers\Admin\CurriculumController;
 use App\Http\Controllers\Admin\SchoolYearController;
 use App\Http\Controllers\EnrollmentReportController;
 use App\Http\Controllers\Admin\GradeQuarterController;
@@ -20,14 +27,12 @@ use App\Http\Controllers\Auth\FacultyDashboardController;
 use App\Http\Controllers\Auth\GuardianDashboardController;
 use App\Http\Controllers\Admin\FacultyController as AdminFacultyController;
 use App\Http\Controllers\Admin\SettingController as AdminSettingController;
-use App\Http\Controllers\Admin\CurriculumController;
-
-
-// ---------- Shared / other controllers ----------
 use App\Http\Controllers\Admin\SubjectController as AdminSubjectController;
 use App\Http\Controllers\Admin\TuitionController as AdminTuitionController;
 use App\Http\Controllers\Admin\GuardianController as AdminGuardianController;
 use App\Http\Controllers\Admin\ScheduleController as AdminScheduleController;
+
+// ---------- Guardian controllers ----------
 use App\Http\Controllers\Admin\OptionalFeeController as AdminOptionalFeeController;
 use App\Http\Controllers\Admin\AnnouncementController as AdminAnnouncementController;
 use App\Http\Controllers\Guardian\PaymentReceiptController as GuardianPaymentReceiptController;
@@ -67,11 +72,11 @@ Route::middleware(['auth', 'role:admin'])
             Route::put('/system', [AdminSettingController::class, 'updateSystem'])->name('system.update');
             Route::post('/admins', [AdminSettingController::class, 'storeAdmin'])->name('admins.store');
             Route::delete('/admins/{id}', [AdminSettingController::class, 'destroyAdmin'])->name('admins.destroy');
+
             Route::post('/school-year', [AdminSettingController::class, 'storeSchoolYear'])->name('schoolyear.store');
             Route::post('/gcash-qr', [AdminSettingController::class, 'uploadGcashQr'])->name('gcashqr.upload');
             Route::post('/school-year/{id}/proceed', [SchoolYearController::class, 'proceed'])->name('schoolyear.proceed');
-            Route::post('/school-year/{id}/revert', [SchoolYearController::class, 'revert'])
-                ->name('schoolyear.revert');
+            Route::post('/school-year/{id}/revert', [SchoolYearController::class, 'revert'])->name('schoolyear.revert');
         });
 
         // Students
@@ -81,6 +86,7 @@ Route::middleware(['auth', 'role:admin'])
             Route::post('/store', [StudentController::class, 'store'])->name('store');
             Route::put('/{lrn}', [StudentController::class, 'update'])->name('update');
             Route::delete('/{lrn}', [StudentController::class, 'destroy'])->name('destroy');
+
             // Clean endpoints used by JS
             Route::get('/search', [StudentController::class, 'search'])->name('search');         // admin.students.search
             Route::get('/prefill/{id}', [StudentController::class, 'prefill'])->name('prefill'); // admin.students.prefill
@@ -142,10 +148,17 @@ Route::middleware(['auth', 'role:admin'])
 
         // Reports (Admin)
         Route::prefix('reports')->name('reports.')->group(function () {
-            Route::get('/enrollments', [EnrollmentReportController::class, 'index'])->name('enrollments');
-            Route::get('/enrollments/print', [EnrollmentReportController::class, 'print'])->name('enrollments.print');
-            Route::get('/enrollments/students', [EnrollmentReportController::class, 'students'])->name('enrollments.students');
-            Route::get('/enrollments/export', [EnrollmentReportController::class, 'export'])->name('enrollments.export');
+            Route::get('/enrollments', [EnrollmentReportController::class, 'index'])
+                ->name('enrollments');                         // admin.reports.enrollments
+
+            Route::get('/enrollments/print', [EnrollmentReportController::class, 'print'])
+                ->name('enrollments.print');                   // admin.reports.enrollments.print
+
+            Route::get('/enrollments/students', [EnrollmentReportController::class, 'students'])
+                ->name('enrollments.students');                // admin.reports.enrollments.students
+
+            Route::get('/financial', [FinancialReportController::class, 'index'])
+                ->name('financial');                           // admin.reports.financial
         });
 
         // Subjects
@@ -157,22 +170,12 @@ Route::middleware(['auth', 'role:admin'])
 
         // Curriculum
         Route::prefix('curriculum')->name('curriculum.')->group(function () {
-        Route::get('/curriculum', [CurriculumController::class, 'index'])
-            ->name('index');
-
-        Route::post('/curriculum', [CurriculumController::class, 'store'])
-            ->name('store');
-
-        Route::patch('/curriculum/{curriculum}/status', [CurriculumController::class, 'updateStatus'])
-            ->name('updateStatus');
-
-        Route::get('/curriculum/{curriculum}/edit', [CurriculumController::class, 'edit'])
-            ->name('curriculum_edit');
-
-        Route::delete('/curriculum/{curriculum}', [CurriculumController::class, 'destroy'])
-            ->name('destroy');
+            Route::get('/curriculum', [CurriculumController::class, 'index'])->name('index');
+            Route::post('/curriculum', [CurriculumController::class, 'store'])->name('store');
+            Route::patch('/curriculum/{curriculum}/status', [CurriculumController::class, 'updateStatus'])->name('updateStatus');
+            Route::get('/curriculum/{curriculum}/edit', [CurriculumController::class, 'edit'])->name('curriculum_edit');
+            Route::delete('/curriculum/{curriculum}', [CurriculumController::class, 'destroy'])->name('destroy');
         });
-
 
         // Optional AJAX
         Route::get('/grades/report', [GradesController::class, 'reportAjax'])->name('grades.report');
@@ -189,8 +192,12 @@ Route::middleware(['auth', 'role:faculty'])
         Route::get('/dashboard', [FacultyDashboardController::class, 'index'])->name('dashboard');
 
         Route::get('/students', [FacultyDashboardController::class, 'students'])->name('students');
-        Route::get('/students/create', [StudentController::class, 'create'])->middleware('enrollment.open')->name('students.create');
-        Route::post('/students', [StudentController::class, 'store'])->middleware('enrollment.open')->name('students.store');
+        Route::get('/students/create', [StudentController::class, 'create'])
+            ->middleware('enrollment.open')
+            ->name('students.create');
+        Route::post('/students', [StudentController::class, 'store'])
+            ->middleware('enrollment.open')
+            ->name('students.store');
 
         Route::post('/announcements', [\App\Http\Controllers\Faculty\AnnouncementController::class, 'store'])->name('announcements.store');
         Route::put('/announcements/{id}', [\App\Http\Controllers\Faculty\AnnouncementController::class, 'update'])->name('announcements.update');
@@ -224,14 +231,21 @@ Route::middleware(['auth', 'role:guardian'])
         Route::match(['post', 'put'], '/self', [\App\Http\Controllers\Guardian\ProfileController::class, 'upsert'])->name('self.upsert');
         Route::put('/{id}', [\App\Http\Controllers\Guardian\ProfileController::class, 'update'])->name('self.update');
 
+        // Guardian payment receipts
         Route::prefix('payment-receipts')->name('payment-receipts.')->group(function () {
             Route::post('/', [GuardianPaymentReceiptController::class, 'store'])->name('store');
         });
 
+        // COR show page (for "View COR" button)
+        // Route name: guardians.cor.show
+        // URL: /guardians/cor/{cor}
+        Route::get('/cor/fetch/{cor}', [CorController::class, 'fetch'])->name('cor.fetch');
+        ;
+
         if (app()->environment('local')) {
             Route::get('/_test-mail', function () {
                 try {
-                    Mail::to('occ.davidkieth@gmail.com')->send(
+                    Mail::to('occ.puasan.davidkieth@gmail.com')->send(
                         new ParentAccountCredentials(
                             guardianName: 'Test Parent',
                             studentName: 'Test Student',
@@ -242,10 +256,8 @@ Route::middleware(['auth', 'role:guardian'])
                     );
                     return response('Mail dispatched OK.', 200);
                 } catch (\Throwable $e) {
-                    // Show the error right in the browser so you don't have to dig through logs
                     return response('MAIL ERROR: ' . $e->getMessage(), 500);
                 }
             })->name('_test-mail');
         }
     });
-

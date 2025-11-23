@@ -13,7 +13,17 @@
     $optionalFees = $optionalFees ?? collect();
     $schoolyrs    = $schoolyrs    ?? collect();
 
-    $latestUpdatedAt = optional($tuitions->sortByDesc('updated_at')->first())->updated_at?->format('Y-m-d') ?? '—';
+    // Get active school year from schoolyrs table (boolean "active" column)
+    $activeSchoolYear = optional($schoolyrs->firstWhere('active', true))->school_year;
+
+    // Show only tuitions for the active school year; if none active, show all
+    $filteredTuitions = $activeSchoolYear
+        ? $tuitions->where('school_year', $activeSchoolYear)
+        : $tuitions;
+
+    $latestUpdatedAt = optional(
+        $filteredTuitions->sortByDesc('updated_at')->first()
+    )->updated_at?->format('Y-m-d') ?? '—';
 @endphp
 
 <div class="card section p-4">
@@ -26,14 +36,20 @@
         <div class="intro rounded">
             <div>
                 <h5 class="mb-1">Payables</h5>
-                <div class="text-muted small">Tuition, optional fees, and payments overview.</div>
+                <div class="text-muted small">
+                    Tuition, optional fees, and payments overview
+                    @if($activeSchoolYear)
+                        (School Year: {{ $activeSchoolYear }})
+                    @endif
+                    .
+                </div>
             </div>
         </div>
 
         {{-- KPI strip --}}
         <div class="kpi-strip">
             <div class="kpi-card">
-                <div class="kpi-number">{{ $tuitions->count() }}</div>
+                <div class="kpi-number">{{ $filteredTuitions->count() }}</div>
                 <div class="kpi-label">Tuition per Grade</div>
             </div>
             <div class="kpi-card">
@@ -81,8 +97,14 @@
             </div>
         </div>
 
-        @if($tuitions->isEmpty())
-            <p class="text-muted">No tuition fees set yet.</p>
+        @if($filteredTuitions->isEmpty())
+            <p class="text-muted">
+                @if($activeSchoolYear)
+                    No tuition fees set yet for School Year {{ $activeSchoolYear }}.
+                @else
+                    No tuition fees set yet.
+                @endif
+            </p>
         @else
             <div class="table-responsive">
                 <table class="table table-bordered table-striped" id="tuitionTable">
@@ -94,6 +116,7 @@
                             <th>Misc (Monthly)</th>
                             <th>Misc (Yearly)</th>
                             <th>Books (₱)</th>
+                            <th>Enrollment Fee (₱)</th>
                             <th>Total (₱)</th>
                             <th>School Year</th>
                             <th>Updated</th>
@@ -101,7 +124,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                    @foreach($tuitions as $t)
+                    @foreach($filteredTuitions as $t)
                         <tr>
                             <td>{{ $t->grade_level }}</td>
                             <td>{{ number_format((float) $t->tuition_monthly, 2) }}</td>
@@ -109,6 +132,7 @@
                             <td>{{ $t->misc_monthly === null ? '—' : number_format((float) $t->misc_monthly, 2) }}</td>
                             <td>{{ $t->misc_yearly === null ? '—' : number_format((float) $t->misc_yearly, 2) }}</td>
                             <td>{{ $t->books_amount === null ? '—' : number_format((float) $t->books_amount, 2) }}</td>
+                            <td>{{ $t->registration_fee === null ? '—' : number_format((float) $t->registration_fee, 2) }}</td>
                             <td class="fw-semibold">{{ number_format((float) $t->total_yearly, 2) }}</td>
                             <td>{{ $t->school_year ?? '—' }}</td>
                             <td>{{ $t->updated_at?->format('Y-m-d') ?? '—' }}</td>
@@ -255,32 +279,32 @@
                             </div>
                         </div>
 
-                        {{-- Books --}}
+                        {{-- Books + Enrollment / Registration Fee --}}
                         <div class="row g-2 mt-2">
-                            <div class="col-5">
+                            <div class="col-6">
                                 <label class="form-label">Books Amount ₱ — optional</label>
                                 <input type="number" step="0.01" min="0" name="books_amount" id="add_books_amount"
                                        class="form-control">
                             </div>
+                            <div class="col-6">
+                                <label class="form-label">Enrollment / Registration Fee ₱</label>
+                                <input type="number" step="0.01" min="0" name="registration_fee" id="add_registration_fee"
+                                       class="form-control">
+                            </div>
                         </div>
 
-                        {{-- School Year --}}
-                        <div class="mb-3 mt-3">
-                            <label class="form-label">School Year (optional)</label>
-                            <select name="school_year" class="form-select">
-                                <option value="">— None —</option>
-                                @foreach($schoolyrs as $sy)
-                                    <option value="{{ $sy->school_year }}">{{ $sy->school_year }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                        {{-- School Year is not shown; it is set automatically to active school year --}}
+                        @if($activeSchoolYear)
+                            <input type="hidden" name="school_year" value="{{ $activeSchoolYear }}">
+                        @endif
 
                         {{-- Computed preview total --}}
-                        <div class="mb-2">
+                        <div class="mb-2 mt-3">
                             <label class="form-label">Computed Total (preview) ₱</label>
                             <input type="text" id="add_total_preview" class="form-control" readonly>
-                            <div class="form-text">= Tuition Yearly + Misc Yearly + Books</div>
+                            <div class="form-text">= Tuition Yearly + Misc Yearly + Books + Enrollment Fee</div>
                         </div>
+
                     </div>
 
                     <div class="modal-footer">
@@ -325,8 +349,8 @@
     @include('auth.admindashboard.partials.payment-modal')
 </div>
 
-{{-- EDIT TUITION MODALS --}}
-@foreach($tuitions as $t)
+{{-- EDIT TUITION MODALS (only for active school year records) --}}
+@foreach($filteredTuitions as $t)
     @include('auth.admindashboard.partials.edit-tuition-modal', [
         't' => $t,
         'schoolyrs' => $schoolyrs,
@@ -343,31 +367,31 @@
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
     {{-- SweetAlert2 --}}
-        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-        <script>
-            // Delete confirms (tuition + fees)
-            document.addEventListener('click', (e) => {
-                const btn = e.target.closest('.js-delete-btn');
-                if (!btn) return;
-                e.preventDefault();
-                const form = btn.closest('form.js-confirm-delete');
-                const msg  = form?.dataset?.confirm || "Delete this record?";
-                Swal.fire({
-                    title: 'Are you sure?',
-                    text: "You can't undo this action.",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    cancelButtonColor: '#3085d6',
-                    confirmButtonText: 'Yes, proceed',
-                    reverseButtons: true,
-                    background: '#fff',
-                    backdrop: false,
-                    allowOutsideClick: true,
-                    allowEscapeKey: true
-                }).then(res => { if (res.isConfirmed) form.submit(); });
-            });
-        </script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        // Delete confirms (tuition + fees)
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.js-delete-btn');
+            if (!btn) return;
+            e.preventDefault();
+            const form = btn.closest('form.js-confirm-delete');
+            const msg  = form?.dataset?.confirm || "Delete this record?";
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "You can't undo this action.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, proceed',
+                reverseButtons: true,
+                background: '#fff',
+                backdrop: false,
+                allowOutsideClick: true,
+                allowEscapeKey: true
+            }).then(res => { if (res.isConfirmed) form.submit(); });
+        });
+    </script>
 
     <script>
         // DataTables for Tuition & Fees tables
@@ -398,11 +422,12 @@
         // Interlinked Monthly/Yearly + total preview in Add Tuition modal
         document.addEventListener('DOMContentLoaded', function () {
             const MONTHS = 10;
-            const tMon = document.getElementById('add_tuition_monthly');
+            const tMon  = document.getElementById('add_tuition_monthly');
             const tYear = document.getElementById('add_tuition_yearly');
-            const mMon = document.getElementById('add_misc_monthly');
+            const mMon  = document.getElementById('add_misc_monthly');
             const mYear = document.getElementById('add_misc_yearly');
             const books = document.getElementById('add_books_amount');
+            const reg   = document.getElementById('add_registration_fee');
             const preview = document.getElementById('add_total_preview');
 
             function n(v) { const x = parseFloat(v); return isNaN(x) ? 0 : x; }
@@ -417,7 +442,8 @@
                 const ty = n(tYear.value);
                 const my = n(mYear.value);
                 const b  = n(books.value);
-                preview.value = (ty + my + b).toFixed(2);
+                const r  = n(reg.value);
+                preview.value = (ty + my + b + r).toFixed(2);
             }
 
             tMon?.addEventListener('input', fromTMon);
@@ -425,6 +451,8 @@
             mMon?.addEventListener('input', fromMMon);
             mYear?.addEventListener('input', fromMYear);
             books?.addEventListener('input', calc);
+            reg?.addEventListener('input', calc);
         });
     </script>
+
 @endpush

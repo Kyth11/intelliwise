@@ -25,16 +25,59 @@
     $pendingReceiptsCount = PaymentReceipt::where('status','Pending')->count();
 @endphp
 
+<div class="card mb-3 top-quick-actions px-3 py-2">
+            <div class="d-flex flex-column flex-lg-row align-items-stretch align-items-lg-center justify-content-between gap-3">
+                {{-- Left: label --}}
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-primary rounded-pill d-flex align-items-center justify-content-center" style="width:2rem;height:2rem;">
+                        <i class="bi bi-lightning-charge"></i>
+                    </span>
+                    <div>
+                        <h6 class="mb-0">Quick Actions</h6>
+                        <small class="text-muted">Jump directly to common admin tasks.</small>
+                    </div>
+                </div>
+
+{{-- Middle: search --}}
+<div class="flex-grow-1">
+    <div class="position-relative">
+        <span class="position-absolute top-50 start-0 translate-middle-y ms-2">
+            <i class="bi bi-search text-muted"></i>
+        </span>
+        <input type="text"
+               id="quickSearch"
+               class="form-control form-control-sm ps-5"
+               placeholder="Type e.g. “pay balance”, “settings”, “add subject”, “students”… then Enter">
+    </div>
+</div>
+
+                {{-- Right: buttons --}}
+                <div class="d-flex flex-wrap gap-2 justify-content-start justify-content-lg-end">
+                    <a href="{{ route('admin.finances') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-cash-coin me-1"></i> Finances
+                    </a>
+                    <a href="{{ route('admin.students.create') }}" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-person-plus me-1"></i> Enroll Student
+                    </a>
+                    <a href="{{ route('admin.curriculum.index') }}?tab=subjects" class="btn btn-sm btn-outline-dark">
+                        <i class="bi bi-journal-plus me-1"></i> Add Subject
+                    </a>
+                    <a href="{{ route('admin.settings.index') }}" class="btn btn-sm btn-outline-secondary" title="Settings">
+                        <i class="bi bi-gear"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
     <div class="card section p-4">
+
         <!-- =========================
-             Header: Intro | KPIs | Right: Quick Actions
+             Header: Intro | KPIs
         ========================== -->
         <div id="dashboard-header" class="mb-3">
             <!-- Intro -->
             <div class="intro">
                 <div>
                     <h5 class="mb-1">Welcome, {{ Auth::check() ? Auth::user()->name : 'Admin' }}!</h5>
-                    <div class="text-muted small">Here’s a quick system snapshot and your tools.</div>
                 </div>
             </div>
 
@@ -55,34 +98,6 @@
                 <div class="kpi-card">
                     <div class="kpi-number">{{ $announcements->count() }}</div>
                     <div class="kpi-label">Announcements</div>
-                </div>
-            </div>
-
-            <!-- Right: Quick Actions -->
-            <div class="right-stack">
-                <div class="card quick-actions p-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="mb-0">Quick Actions</h6>
-                        <a href="{{ route('admin.settings.index') }}" class="btn btn-sm btn-outline-secondary" title="Settings">
-                            <i class="bi bi-gear"></i>
-                        </a>
-                    </div>
-                    <div class="position-relative">
-                        <i class="bi bi-search icon-left"></i>
-                        <input type="text" id="quickSearch" class="form-control form-control-sm"
-                            placeholder="Type e.g. “pay balance”, “settings”, “add subject”, “students”… then Enter">
-                    </div>
-                    <div class="mt-2 d-flex gap-2 flex-wrap">
-                        <a href="{{ route('admin.finances') }}" class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-cash-coin me-1"></i> Finances
-                        </a>
-                        <a href="{{ route('admin.students.create') }}" class="btn btn-sm btn-outline-success">
-                            <i class="bi bi-person-plus me-1"></i> Enroll Student
-                        </a>
-                        <a href="{{ route('admin.settings.index') }}?tab=subjects" class="btn btn-sm btn-outline-dark">
-                            <i class="bi bi-journal-plus me-1"></i> Add Subject
-                        </a>
-                    </div>
                 </div>
             </div>
         </div>
@@ -201,7 +216,7 @@
         </div>
 
         <!-- =========================
-             Below Header: Left (charts + Announcements + Schedule) | Right (Recent Payments)
+             Below Header: Left (charts + Announcements) | Right (Recent Payments)
         ========================== -->
         @php
             $tuitionMap = collect($tuitions ?? collect())->keyBy('grade_level');
@@ -293,7 +308,7 @@
         @endphp
 
         <div class="below-header">
-            <!-- LEFT: charts + announcements + schedule -->
+            <!-- LEFT: charts + announcements -->
             <div class="left-stack">
                 <!-- Charts -->
                 <div class="card p-3">
@@ -399,6 +414,7 @@
                         </div>
                     </div>
                 </div>
+            </div> {{-- /left-stack --}}
 
             <!-- RIGHT: recent payments -->
             <div class="right-stack">
@@ -859,4 +875,64 @@
       });
     });
     </script>
+    <script>
+document.addEventListener('DOMContentLoaded', function () {
+    const qs = document.getElementById('quickSearch');
+    if (!qs) return;
+
+    qs.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+
+        const qRaw = this.value || '';
+        const q = qRaw.toLowerCase().trim();
+        if (!q) return;
+
+        // Finances / payments
+        if (q.includes('pay') || q.includes('balance') || q.includes('fee') || q.includes('financ') || q.includes('gcash')) {
+            window.location.href = "{{ route('admin.finances') }}";
+            return;
+        }
+
+        // Students
+        if (q.includes('student') || q.includes('enroll') || q.includes('enrol')) {
+            window.location.href = "{{ route('admin.students.index') }}";
+            return;
+        }
+
+        // Subjects / curriculum
+        if (q.includes('subject') || q.includes('curriculum') || q.includes('course')) {
+            window.location.href = "{{ route('admin.curriculum.index') }}?tab=subjects";
+            return;
+        }
+
+        // Settings
+        if (q.includes('setting') || q.includes('config') || q.includes('preference')) {
+            window.location.href = "{{ route('admin.settings.index') }}";
+            return;
+        }
+
+        // Announcements – scroll to section
+        if (q.includes('announce') || q.includes('event')) {
+            const sec = document.getElementById('announcements-section');
+            if (sec) {
+                sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                return;
+            }
+        }
+
+        // Schedule table – scroll if present
+        if (q.includes('schedule') || q.includes('timetable')) {
+            const tbl = document.getElementById('scheduleTable');
+            if (tbl) {
+                tbl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                return;
+            }
+        }
+
+        // Fallback: go to students list
+        window.location.href = "{{ route('admin.students.index') }}";
+    });
+});
+</script>
 @endpush

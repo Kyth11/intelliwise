@@ -29,6 +29,40 @@
         $psgcProvincesUrl = \Illuminate\Support\Facades\Route::has('api.psgc.provinces')
             ? route('api.psgc.provinces')
             : url('/api/psgc/provinces');
+
+        // Tuition + Optional fees for fee summary step
+        $tuitions = $tuitions ?? collect();
+        $optionalFees = $optionalFees ?? collect();
+        $currentSy = $current->school_year ?? null;
+
+        $tuitionForCurrentSy = $currentSy
+            ? $tuitions->where('school_year', $currentSy)
+            : $tuitions;
+
+        $tuitionMap = $tuitionForCurrentSy
+            ->keyBy('grade_level')
+            ->map(function ($t) {
+                return [
+                    'grade_level'      => $t->grade_level,
+                    'tuition_monthly'  => (float) ($t->tuition_monthly ?? 0),
+                    'tuition_yearly'   => (float) ($t->tuition_yearly ?? 0),
+                    'misc_monthly'     => (float) ($t->misc_monthly ?? 0),
+                    'misc_yearly'      => (float) ($t->misc_yearly ?? 0),
+                    'books_amount'     => (float) ($t->books_amount ?? 0),
+                    'registration_fee' => (float) ($t->registration_fee ?? 0),
+                    'total_yearly'     => (float) ($t->total_yearly ?? 0),
+                ];
+            })
+            ->toArray();
+
+        // Optional fees to show in enrollment form (per learner)
+        $enrollmentOptionalFees = $optionalFees->filter(function ($fee) {
+            // Show if:
+            //  - active is NULL (no column or not set), OR
+            //  - active is truthy (1 / true)
+            return ($fee->active === null || (int) $fee->active === 1)
+                && in_array($fee->scope ?? 'student', ['student', 'both', 'any']);
+        });
     @endphp
 
     <div class="container-fluid py-3">
@@ -91,7 +125,8 @@
                                 <select id="enroll_type" name="enroll_type" class="form-select" required>
                                     <option value="new" {{ old('enroll_type', 'new') === 'new' ? 'selected' : '' }}>New
                                         Enrollee (Default)</option>
-                                    <option value="old" {{ old('enroll_type') === 'old' ? 'selected' : '' }}>Old Student /
+                                    <option value="old" {{ old('enroll_type') === 'old' ? 'selected' : '' }}>Old Student
+                                        /
                                         Returnee</option>
                                     <option value="transferee" {{ old('enroll_type') === 'transferee' ? 'selected' : '' }}>
                                         Transferee</option>
@@ -103,7 +138,8 @@
                                 <label class="form-label fw-semibold">LRN (Learner Reference Number)</label>
                                 <input type="text" class="form-control" id="lrn" name="lrn" inputmode="numeric"
                                     pattern="\d{10,12}" maxlength="12" placeholder="Enter 10–12 digits"
-                                    value="{{ old('lrn') }}" required>
+                                    value="{{ old('lrn') }}" required
+                                    oninput="this.value = this.value.replace(/\D/g,'');">
                                 <div id="suggest_lrn" class="suggest-list d-none"></div>
                                 <div class="hint mt-1">LRN is required for ALL enrollment types.</div>
                                 @error('lrn')
@@ -146,8 +182,8 @@
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label fw-semibold">GWA (General Weighted Average)</label>
-                                <input type="number" class="form-control" id="prev_gwa" min="60" max="100" step="0.01"
-                                    placeholder="e.g., 84.5">
+                                <input type="number" class="form-control" id="prev_gwa" min="60" max="100"
+                                    step="0.01" placeholder="e.g., 84.5">
                                 <div class="hint mt-1">GWA ≥ 75 → proceed to next grade; GWA ≤ 74 → retained.</div>
                             </div>
                             <div class="col-12">
@@ -157,16 +193,18 @@
                     </div>
                     {{-- /Enrollment Type + LRN --}}
 
-<div class="mb-3">
-    <label class="form-label fw-semibold">School Year</label>
-    <input type="text" class="form-control" value="{{ $current->school_year ?? '' }}" disabled>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">School Year</label>
+                        <input type="text" id="school_year_display" class="form-control"
+                               value="{{ $current->school_year ?? '' }}" disabled>
 
-    @if($current)
-        {{-- These are actually submitted with the form --}}
-        <input type="hidden" name="schoolyr_id" value="{{ $current->id }}">
-        <input type="hidden" name="school_year" value="{{ $current->school_year }}">
-    @endif
-</div>
+                        @if ($current)
+                            {{-- These are actually submitted with the form --}}
+                            <input type="hidden" name="schoolyr_id" value="{{ $current->id }}">
+                            <input type="hidden" name="school_year" value="{{ $current->school_year }}">
+                        @endif
+                    </div>
+
                     {{-- Learner’s section --}}
                     <div class="row g-3">
                         <div class="col-12">
@@ -185,7 +223,8 @@
                                 </div>
                                 <div class="col-md-4 suggest-wrap">
                                     <input type="text" class="form-control" name="s_lastname" id="s_lastname"
-                                        placeholder="LAST NAME" value="{{ old('s_lastname') }}" required autocomplete="off">
+                                        placeholder="LAST NAME" value="{{ old('s_lastname') }}" required
+                                        autocomplete="off">
                                     <div id="suggest_last" class="suggest-list d-none"></div>
                                 </div>
                             </div>
@@ -197,8 +236,11 @@
                             <select class="form-select" name="s_gender" id="s_gender">
                                 <option value="">—</option>
                                 <option value="Male" {{ old('s_gender') === 'Male' ? 'selected' : '' }}>Male</option>
-                                <option value="Female" {{ old('s_gender') === 'Female' ? 'selected' : '' }}>Female</option>
-                                <option value="Prefer not to say" {{ old('s_gender') === 'Prefer not to say' ? 'selected' : '' }}>Prefer not to say</option>
+                                <option value="Female" {{ old('s_gender') === 'Female' ? 'selected' : '' }}>Female
+                                </option>
+                                <option value="Prefer not to say"
+                                    {{ old('s_gender') === 'Prefer not to say' ? 'selected' : '' }}>Prefer not to say
+                                </option>
                             </select>
                         </div>
 
@@ -274,8 +316,8 @@
 
                         <div class="col-md-3 old-hide">
                             <label class="form-label">Religion</label>
-                            <input type="text" class="form-control" name="s_religion" id="s_religion" list="religionsList"
-                                placeholder="Choose or type" value="{{ old('s_religion') }}">
+                            <input type="text" class="form-control" name="s_religion" id="s_religion"
+                                list="religionsList" placeholder="Choose or type" value="{{ old('s_religion') }}">
                             <datalist id="religionsList">
                                 <option value="Roman Catholic"></option>
                                 <option value="Protestant"></option>
@@ -302,6 +344,8 @@
                         <div class="col-md-3 old-hide">
                             <label class="form-label">Contact No. (optional)</label>
                             <input type="text" class="form-control" name="s_contact" id="s_contact"
+                                inputmode="numeric" pattern="\d*"
+                                oninput="this.value = this.value.replace(/\D/g,'');"
                                 value="{{ old('s_contact') }}">
                         </div>
 
@@ -312,15 +356,18 @@
                         </div>
 
                         <div class="col-md-6 old-hide">
-                            <label class="form-label">Does the learner have Special Education needs or disabilities?</label>
+                            <label class="form-label">Does the learner have Special Education needs or
+                                disabilities?</label>
                             <div class="input-group">
                                 <select class="form-select" id="sped_has" name="sped_has" aria-label="SPED has">
                                     <option value="">—</option>
                                     <option value="Yes" {{ old('sped_has') === 'Yes' ? 'selected' : '' }}>Yes</option>
-                                    <option value="No" {{ old('sped_has', 'No') === 'No' ? 'selected' : '' }}>No</option>
+                                    <option value="No" {{ old('sped_has', 'No') === 'No' ? 'selected' : '' }}>No
+                                    </option>
                                 </select>
                                 <input type="text" class="form-control" id="sped_desc" name="sped_desc"
-                                    placeholder="If yes, please specify." value="{{ old('sped_desc') }}" {{ old('sped_has', 'No') === 'Yes' ? '' : 'disabled' }}>
+                                    placeholder="If yes, please specify." value="{{ old('sped_desc') }}"
+                                    {{ old('sped_has', 'No') === 'Yes' ? '' : 'disabled' }}>
                             </div>
                         </div>
 
@@ -331,12 +378,15 @@
                                 <option value="">-</option>
                                 <option value="Nursery" {{ old('s_gradelvl') === 'Nursery' ? 'selected' : '' }}>Nursery
                                 </option>
-                                <option value="Kindergarten 1" {{ old('s_gradelvl') === 'Kindergarten 1' ? 'selected' : '' }}>
+                                <option value="Kindergarten 1"
+                                    {{ old('s_gradelvl') === 'Kindergarten 1' ? 'selected' : '' }}>
                                     Kindergarten 1</option>
-                                <option value="Kindergarten 2" {{ old('s_gradelvl') === 'Kindergarten 2' ? 'selected' : '' }}>
+                                <option value="Kindergarten 2"
+                                    {{ old('s_gradelvl') === 'Kindergarten 2' ? 'selected' : '' }}>
                                     Kindergarten 2</option>
                                 @for ($i = 1; $i <= 6; $i++)
-                                    <option value="Grade {{ $i }}" {{ old('s_gradelvl') === 'Grade ' . $i ? 'selected' : '' }}>
+                                    <option value="Grade {{ $i }}"
+                                        {{ old('s_gradelvl') === 'Grade ' . $i ? 'selected' : '' }}>
                                         Grade {{ $i }}
                                     </option>
                                 @endfor
@@ -351,27 +401,7 @@
                         </div>
                     </div> {{-- /row --}}
 
-                    {{-- Optional Fees --}}
-                    @if (!empty($optionalFees) && $optionalFees->count())
-                        <hr class="my-4 old-hide">
-                        <div class="old-hide" id="optionalFeesBlock">
-                            <label class="form-label fw-semibold">Optional Fees</label>
-                            <div class="row g-2">
-                                @foreach ($optionalFees as $fee)
-                                    <div class="col-md-6">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="opt_fee_{{ $fee->id }}"
-                                                name="student_optional_fee_ids[]" value="{{ $fee->id }}" {{ collect(old('student_optional_fee_ids', []))->contains($fee->id) ? 'checked' : '' }}>
-                                            <label class="form-check-label" for="opt_fee_{{ $fee->id }}">
-                                                {{ $fee->name }} — ₱{{ number_format($fee->amount, 2) }}
-                                            </label>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                            <div class="form-text">You can edit selected optional fees later from the student record.</div>
-                        </div>
-                    @endif
+                    {{-- Optional fees selection is handled in the Fees Summary modal. --}}
 
                     <hr class="my-4">
 
@@ -386,11 +416,13 @@
                             <select name="guardian_id" id="guardian_id" class="form-select" required>
                                 <option value="">— Select existing —</option>
                                 @foreach ($guardians as $g)
-                                    <option value="{{ $g->id }}" {{ old('guardian_id') == $g->id ? 'selected' : '' }}>
+                                    <option value="{{ $g->id }}"
+                                        {{ old('guardian_id') == $g->id ? 'selected' : '' }}>
                                         {{ $g->display_name }} — {{ $g->display_contact }}
                                     </option>
                                 @endforeach
-                                <option value="new" {{ old('guardian_id') === 'new' ? 'selected' : '' }}>➕ Add New Parents /
+                                <option value="new" {{ old('guardian_id') === 'new' ? 'selected' : '' }}>➕ Add New
+                                    Parents /
                                     Guardian</option>
                             </select>
                         </div>
@@ -413,16 +445,22 @@
                                 <h6 class="mt-3 mb-1">Mother</h6>
                             </div>
                             <div class="col-md-4"><input type="text" name="m_firstname" id="m_firstname"
-                                    class="form-control" value="{{ old('m_firstname') }}" placeholder="First Name"></div>
+                                    class="form-control" value="{{ old('m_firstname') }}" placeholder="First Name">
+                            </div>
                             <div class="col-md-4"><input type="text" name="m_middlename" id="m_middlename"
                                     class="form-control" value="{{ old('m_middlename') }}"
                                     placeholder="Middle Name (optional)"></div>
-                            <div class="col-md-4"><input type="text" name="m_lastname" id="m_lastname" class="form-control"
-                                    value="{{ old('m_lastname') }}" placeholder="Last Name"></div>
-                            <div class="col-md-6"><input type="text" name="m_contact" id="m_contact" class="form-control"
-                                    value="{{ old('m_contact') }}" placeholder="Contact"></div>
-                            <div class="col-md-6"><input type="email" name="m_email" id="m_email" class="form-control"
-                                    value="{{ old('m_email') }}" placeholder="Email (optional)"></div>
+                            <div class="col-md-4"><input type="text" name="m_lastname" id="m_lastname"
+                                    class="form-control" value="{{ old('m_lastname') }}" placeholder="Last Name"></div>
+                            <div class="col-md-6">
+                                <input type="text" name="m_contact" id="m_contact" class="form-control"
+                                    inputmode="numeric" pattern="\d*"
+                                    oninput="this.value = this.value.replace(/\D/g,'');" value="{{ old('m_contact') }}"
+                                    placeholder="Contact">
+                            </div>
+                            <div class="col-md-6"><input type="email" name="m_email" id="m_email"
+                                    class="form-control" value="{{ old('m_email') }}" placeholder="Email (optional)">
+                            </div>
                             <div class="col-md-6"><input type="text" name="m_occupation" id="m_occupation"
                                     class="form-control" value="{{ old('m_occupation') }}"
                                     placeholder="Occupation (print only)"></div>
@@ -432,16 +470,22 @@
                                 <h6 class="mt-3 mb-1">Father</h6>
                             </div>
                             <div class="col-md-4"><input type="text" name="f_firstname" id="f_firstname"
-                                    class="form-control" value="{{ old('f_firstname') }}" placeholder="First Name"></div>
+                                    class="form-control" value="{{ old('f_firstname') }}" placeholder="First Name">
+                            </div>
                             <div class="col-md-4"><input type="text" name="f_middlename" id="f_middlename"
                                     class="form-control" value="{{ old('f_middlename') }}"
                                     placeholder="Middle Name (optional)"></div>
-                            <div class="col-md-4"><input type="text" name="f_lastname" id="f_lastname" class="form-control"
-                                    value="{{ old('f_lastname') }}" placeholder="Last Name"></div>
-                            <div class="col-md-6"><input type="text" name="f_contact" id="f_contact" class="form-control"
-                                    value="{{ old('f_contact') }}" placeholder="Contact"></div>
-                            <div class="col-md-6"><input type="email" name="f_email" id="f_email" class="form-control"
-                                    value="{{ old('f_email') }}" placeholder="Email (optional)"></div>
+                            <div class="col-md-4"><input type="text" name="f_lastname" id="f_lastname"
+                                    class="form-control" value="{{ old('f_lastname') }}" placeholder="Last Name"></div>
+                            <div class="col-md-6">
+                                <input type="text" name="f_contact" id="f_contact" class="form-control"
+                                    inputmode="numeric" pattern="\d*"
+                                    oninput="this.value = this.value.replace(/\D/g,'');" value="{{ old('f_contact') }}"
+                                    placeholder="Contact">
+                            </div>
+                            <div class="col-md-6"><input type="email" name="f_email" id="f_email"
+                                    class="form-control" value="{{ old('f_email') }}" placeholder="Email (optional)">
+                            </div>
                             <div class="col-md-6"><input type="text" name="f_occupation" id="f_occupation"
                                     class="form-control" value="{{ old('f_occupation') }}"
                                     placeholder="Occupation (print only)"></div>
@@ -486,9 +530,10 @@
                         </div>
                     </div>
 
+                    {{-- STEP 1 ACTIONS: Next → open Fees Summary modal --}}
                     <div class="mt-4 d-flex gap-2 no-print">
-                        <button class="btn btn-success" type="submit">
-                            <i class="bi bi-check-circle me-1"></i> Save
+                        <button class="btn btn-success" type="button" id="nextToFeesBtn">
+                            <i class="bi bi-arrow-right-circle me-1"></i> Next: Fees
                         </button>
                         <button class="btn btn-outline-secondary" type="button" onclick="window.print()">
                             <i class="bi bi-printer me-1"></i> Print
@@ -499,6 +544,125 @@
             </div>
         </div>
     </div>
+{{-- FEES SUMMARY MODAL (Step 2 before final save) --}}
+<div class="modal fade" id="feesSummaryModal" tabindex="-1" aria-labelledby="feesSummaryModalLabel"
+     aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="feesSummaryModalLabel">Enrollment Fees Summary</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <p class="mb-3 small">
+                    Review and select tuition-related fees for this learner before saving the enrollment.
+                    You can go back to adjust any information if needed.
+                </p>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <h6>Learner</h6>
+                        <ul class="mb-0 small">
+                            <li><strong>Name:</strong> <span id="feeSumName">—</span></li>
+                            <li><strong>LRN:</strong> <span id="feeSumLrn">—</span></li>
+                            <li><strong>Grade Level:</strong> <span id="feeSumGrade">—</span></li>
+                            <li><strong>School Year:</strong> <span id="feeSumSy">—</span></li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Tuition &amp; Enrollment Fees</h6>
+                        <p class="small mb-0" id="feeSumTuition">
+                            —
+                        </p>
+                    </div>
+                </div>
+
+                <hr class="my-3">
+
+                @if($enrollmentOptionalFees->isNotEmpty())
+                    <div class="mb-3">
+                        <h6 class="mb-2">Optional Fees (select for this learner)</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle mb-0" id="modalOptionalFeesTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 60px;">Add</th>
+                                        <th>Name</th>
+                                        <th class="text-end">Amount (₱)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($enrollmentOptionalFees as $fee)
+                                        <tr>
+                                            <td class="text-center">
+                                                <input type="checkbox"
+                                                       class="form-check-input modal-opt-fee"
+                                                       id="modal_fee_{{ $fee->id }}"
+                                                       data-fee-id="{{ $fee->id }}"
+                                                       name="student_optional_fee_ids[]"
+                                                       value="{{ $fee->id }}"
+                                                       form="enrollForm"
+                                                       {{ collect(old('student_optional_fee_ids', []))->contains($fee->id) ? 'checked' : '' }}>
+                                            </td>
+                                            <td>
+                                                <label class="form-check-label" for="modal_fee_{{ $fee->id }}">
+                                                    {{ $fee->name }}
+                                                </label>
+                                            </td>
+                                            <td class="text-end">
+                                                ₱{{ number_format($fee->amount, 2) }}
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="form-text small">
+                            Tick only the optional fees that apply to this learner.
+                        </div>
+                    </div>
+                @else
+                    <div class="mb-3">
+                        <h6>Optional Fees</h6>
+                        <p class="small mb-0 text-muted">No optional fees are currently configured.</p>
+                    </div>
+                @endif
+
+                <hr class="my-3">
+
+                <div class="mb-2">
+                    <h6>Optional Fees Selected (summary)</h6>
+                    <ul class="small mb-2" id="feeSumOptionalList">
+                        <li>No optional fees selected.</li>
+                    </ul>
+                </div>
+
+                <div class="mt-3 d-flex justify-content-end">
+                    <div class="text-end">
+                        <div class="small text-muted">Estimated Total (Tuition + Optional fees)</div>
+                        <div class="fs-5 fw-semibold" id="feeSumTotal">₱0.00</div>
+                    </div>
+                </div>
+
+                <div class="mt-3 small text-muted">
+                    Note: This total is a preview based on the current tuition table for the selected grade level and
+                    the optional fees you select here. Billing can still be adjusted from the student's account later.
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    Back
+                </button>
+                <button type="button" class="btn btn-success" id="confirmSaveBtn">
+                    <i class="bi bi-check-circle me-1"></i> Confirm &amp; Save Enrollment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
     {{-- Loading overlay --}}
     <div id="loadingOverlay" class="loading-overlay no-print">
@@ -511,7 +675,10 @@
 
 @push('scripts')
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
+        // Tuition lookup for fees summary (grade-level → tuition row)
+        const tuitionMap = @json($tuitionMap);
+
+        document.addEventListener('DOMContentLoaded', function() {
             const form = document.querySelector('form.needs-validation');
             const errorBox = document.getElementById('formErrors');
             const errorList = errorBox?.querySelector('ul');
@@ -562,12 +729,44 @@
 
             const pickedStudentId = document.getElementById('picked_student_id');
 
+            const hiddenSchoolYearInput = document.querySelector('input[name="school_year"]');
+
             // Suggestions UI & endpoints
             const suggestFirstBox = document.getElementById('suggest_first');
             const suggestLastBox = document.getElementById('suggest_last');
             const suggestLrnBox = document.getElementById('suggest_lrn');
             const searchUrl = form.dataset.searchUrl || '';
             const prefillBase = (form.dataset.prefillBase || '').replace(/\/$/, '');
+
+            // Step 2 (fees summary) elements
+            const nextBtn = document.getElementById('nextToFeesBtn');
+            const feesModalEl = document.getElementById('feesSummaryModal');
+            const feeSumName = document.getElementById('feeSumName');
+            const feeSumLrn = document.getElementById('feeSumLrn');
+            const feeSumGrade = document.getElementById('feeSumGrade');
+            const feeSumSy = document.getElementById('feeSumSy');
+            const feeSumTuition = document.getElementById('feeSumTuition');
+            const feeSumOptionalList = document.getElementById('feeSumOptionalList');
+            const feeSumTotal = document.getElementById('feeSumTotal');
+            const confirmSaveBtn = document.getElementById('confirmSaveBtn');
+
+            let feesModal = null;
+            if (feesModalEl && window.bootstrap && window.bootstrap.Modal) {
+                feesModal = new bootstrap.Modal(feesModalEl);
+
+                // When modal opens, rebuild the fees summary based on current selections
+                feesModalEl.addEventListener('shown.bs.modal', () => {
+                    buildFeesSummary();
+                });
+            }
+
+            function fmtCurrency(value) {
+                const n = Number(value) || 0;
+                return n.toLocaleString('en-PH', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            }
 
             function showErrors(map) {
                 if (!errorBox || !errorList) return;
@@ -583,7 +782,10 @@
                 }
                 errorList.innerHTML = items.join('');
                 errorBox.classList.remove('d-none');
-                errorBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                errorBox.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
             }
 
             // ---------- Helpers
@@ -591,7 +793,6 @@
                 groupEls.forEach(el => {
                     el.classList.toggle('d-none', disabled);
                     el.querySelectorAll('input, select, textarea').forEach(ctrl => {
-                        // keep some controls enabled even when visually hidden
                         const keep = ctrl.dataset.keepEnabled === '1';
                         if (disabled && !keep) {
                             ctrl.setAttribute('data-prev-disabled', ctrl.disabled ? '1' : '');
@@ -607,9 +808,15 @@
             }
 
             function calcAge(isoDate) {
-                if (!isoDate) { sAge.value = ''; return; }
+                if (!isoDate) {
+                    sAge.value = '';
+                    return;
+                }
                 const b = new Date(isoDate);
-                if (isNaN(b.getTime())) { sAge.value = ''; return; }
+                if (isNaN(b.getTime())) {
+                    sAge.value = '';
+                    return;
+                }
                 const today = new Date();
                 let age = today.getFullYear() - b.getFullYear();
                 const m = today.getMonth() - b.getMonth();
@@ -617,7 +824,6 @@
                 sAge.value = age >= 0 ? age : '';
             }
 
-            // Compose full address from Province, City/Town, Barangay + details
             function assembleAddress() {
                 const prov = addrProvince?.options[addrProvince.selectedIndex]?.text || '';
                 const city = addrCity?.options[addrCity.selectedIndex]?.text || '';
@@ -657,41 +863,130 @@
                 return '';
             }
 
+            function validateStep1() {
+                if (!form) return false;
+                if (!form.checkValidity()) {
+                    form.classList.add('was-validated');
+                    const firstInvalid = form.querySelector(':invalid');
+                    if (firstInvalid) {
+                        try {
+                            firstInvalid.focus({ preventScroll: true });
+                        } catch (e) {}
+                        firstInvalid.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'center'
+                        });
+                    }
+                    return false;
+                }
+                return true;
+            }
+
+            function buildFeesSummary() {
+                if (!feeSumName || !feeSumLrn || !feeSumGrade || !feeSumSy ||
+                    !feeSumTuition || !feeSumOptionalList || !feeSumTotal) {
+                    return;
+                }
+
+                const fullName = [sFirst.value, sMiddle.value, sLast.value]
+                    .map(v => (v || '').trim())
+                    .filter(Boolean)
+                    .join(' ');
+                const lrnVal = (lrnInput.value || '').trim();
+                const gradeVal = sGradeSel.value || '';
+                const syVal = hiddenSchoolYearInput ? (hiddenSchoolYearInput.value || '') : '';
+
+                feeSumName.textContent = fullName || '—';
+                feeSumLrn.textContent = lrnVal || '—';
+                feeSumGrade.textContent = gradeVal || '—';
+                feeSumSy.textContent = syVal || '—';
+
+                let tuitionTotal = 0;
+
+                if (gradeVal && tuitionMap && Object.prototype.hasOwnProperty.call(tuitionMap, gradeVal)) {
+                    const t = tuitionMap[gradeVal] || {};
+                    const ty = Number(t.tuition_yearly || 0);
+                    const my = Number(t.misc_yearly || 0);
+                    const books = Number(t.books_amount || 0);
+                    const regFee = Number(t.registration_fee || 0);
+                    tuitionTotal = Number(t.total_yearly || (ty + my + books + regFee));
+
+                    feeSumTuition.textContent =
+                        `Tuition Yearly: ₱${fmtCurrency(ty)}; ` +
+                        `Misc Yearly: ₱${fmtCurrency(my)}; ` +
+                        `Books: ₱${fmtCurrency(books)}; ` +
+                        `Enrollment Fee: ₱${fmtCurrency(regFee)}; ` +
+                        `Subtotal: ₱${fmtCurrency(tuitionTotal)}`;
+                } else {
+                    feeSumTuition.textContent =
+                        'No tuition record found for the selected grade level and school year. ' +
+                        'The learner can still be saved; charges may need to be encoded later.';
+                }
+
+                // Optional fees (from modal checkboxes associated with the form)
+                feeSumOptionalList.innerHTML = '';
+                let optionalTotal = 0;
+                const checked = document.querySelectorAll('input[name="student_optional_fee_ids[]"]:checked');
+
+                if (!checked.length) {
+                    const li = document.createElement('li');
+                    li.textContent = 'No optional fees selected.';
+                    feeSumOptionalList.appendChild(li);
+                } else {
+                    checked.forEach(cb => {
+                        const row = cb.closest('tr');
+                        const labelEl = row ? row.querySelector('label') : null;
+                        const amountCell = row ? row.querySelector('td.text-end') : null;
+
+                        const label = labelEl ? (labelEl.textContent || '').trim() : 'Optional fee';
+                        let amountNum = 0;
+                        if (amountCell) {
+                            const raw = (amountCell.textContent || '').replace(/[₱,\s]/g, '');
+                            const parsed = parseFloat(raw);
+                            amountNum = isNaN(parsed) ? 0 : parsed;
+                        }
+                        optionalTotal += amountNum;
+
+                        const li = document.createElement('li');
+                        li.textContent = `${label}: ₱${fmtCurrency(amountNum)}`;
+                        feeSumOptionalList.appendChild(li);
+                    });
+                }
+
+                const grandTotal = tuitionTotal + optionalTotal;
+                feeSumTotal.textContent = `₱${fmtCurrency(grandTotal)}`;
+            }
+
             // ---------- Enrollment type toggle
             function updateEnrollTypeUI() {
                 const t = enrollTypeSel.value;
                 if (t === 'old') {
-                    // Old student:
                     oldHelper.classList.remove('d-none');
                     transfWrap.classList.add('d-none');
                     gradeBlock.classList.remove('d-none');
 
                     setDisabledGroup(oldHideEls, true);
-
-                    // Ensure s_address is included in submit even if block hidden
                     sAddressHidden.disabled = false;
 
                     sGradeSel.disabled = false;
-                    gradeHint.textContent = 'Returning student: search by name or LRN to autofill, then choose grade to re-enroll. Tick "retain same grade" if repeating.';
-                    oldEligibility.textContent = oldRetainChk?.checked
-                        ? 'Retain same grade checked: student will repeat the same grade level.'
-                        : 'Unchecked: set the next appropriate grade level in the selector.';
+                    gradeHint.textContent =
+                        'Returning student: search by name or LRN to autofill, then choose grade to re-enroll. Tick "retain same grade" if repeating.';
+                    oldEligibility.textContent = oldRetainChk?.checked ?
+                        'Retain same grade checked: student will repeat the same grade level.' :
+                        'Unchecked: set the next appropriate grade level in the selector.';
                 } else if (t === 'transferee') {
-                    // Transferee:
                     oldHelper.classList.add('d-none');
                     transfWrap.classList.remove('d-none');
-                    gradeBlock.classList.add('d-none'); // hidden per requirement
-                    setDisabledGroup(oldHideEls, false); // Collect complete data for transferees
+                    gradeBlock.classList.add('d-none');
+                    setDisabledGroup(oldHideEls, false);
 
                     sGradeSel.disabled = false;
                     gradeHint.textContent = '';
                     computeTransfereeTarget();
 
-                    // Clear any old-mode picks
                     pickedStudentId.value = '';
                     clearSuggestLists();
                 } else {
-                    // New
                     oldHelper.classList.add('d-none');
                     transfWrap.classList.add('d-none');
                     gradeBlock.classList.remove('d-none');
@@ -711,17 +1006,22 @@
                 const normalizedPrev = textToGradeValue(prevGradeText);
                 if (!normalizedPrev) {
                     transNote.className = 'note';
-                    transNote.textContent = 'Select the previous grade and (optionally) provide GWA to auto-suggest the target grade.';
+                    transNote.textContent =
+                        'Select the previous grade and (optionally) provide GWA to auto-suggest the target grade.';
                     return;
                 }
                 const isAdvance = !isNaN(gwa) ? (gwa >= 75) : true;
-                const mapOrder = ['Nursery', 'Kindergarten 1', 'Kindergarten 2', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6'];
+                const mapOrder = [
+                    'Nursery', 'Kindergarten 1', 'Kindergarten 2',
+                    'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6'
+                ];
                 const idx = mapOrder.indexOf(normalizedPrev);
                 let target = normalizedPrev;
                 if (isAdvance && idx >= 0 && idx < mapOrder.length - 1) {
                     target = mapOrder[idx + 1];
                     transNote.className = 'note success';
-                    transNote.textContent = `Eligible to advance based on provided GWA. Target grade set to ${target}.`;
+                    transNote.textContent =
+                        `Eligible to advance based on provided GWA. Target grade set to ${target}.`;
                 } else if (!isAdvance) {
                     transNote.className = 'note warn';
                     transNote.textContent = `GWA indicates retention. Target grade set to ${target}.`;
@@ -746,7 +1046,6 @@
                 newGuardFields.classList.toggle('d-none', !isNew);
             }
 
-            // Same address checkbox
             function syncGuardianAddress() {
                 if (sameAddrChk && gAddress && sameAddrChk.checked) {
                     gAddress.value = sAddressHidden.value || '';
@@ -759,34 +1058,45 @@
                 }
             }
 
-            // ---------- Suggestions (OLD students only) ----------
+            // ---------- Suggestions ----------
+            async function searchStudents(term) {
+                if (!searchUrl || !term || term.length < 2) return [];
+                const qs = new URLSearchParams({ q: term });
+                try {
+                    const res = await fetch(`${searchUrl}?${qs.toString()}`, {
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    if (!res.ok) return [];
+                    const data = await res.json();
+                    return Array.isArray(data) ? data : [];
+                } catch {
+                    return [];
+                }
+            }
+
             function buildSearchList(box, list) {
                 if (!box) return;
-                if (!Array.isArray(list) || !list.length) { box.classList.add('d-none'); box.innerHTML = ''; return; }
+                if (!Array.isArray(list) || !list.length) {
+                    box.classList.add('d-none');
+                    box.innerHTML = '';
+                    return;
+                }
                 box.innerHTML = list.map(item => {
                     const id = item.id || item.lrn || '';
-                    const name = item.name || [item.s_firstname, item.s_middlename, item.s_lastname].filter(Boolean).join(' ') || '';
+                    const name = item.name || [item.s_firstname, item.s_middlename, item.s_lastname]
+                        .filter(Boolean).join(' ') || '';
                     const label = [name, id ? `(LRN: ${id})` : ''].filter(Boolean).join(' ');
                     return `<div class="suggest-item" data-id="${String(id)}">${label}</div>`;
                 }).join('');
                 box.classList.remove('d-none');
             }
 
-            async function searchStudents(term) {
-                if (!searchUrl || !term || term.length < 2) return [];
-                const qs = new URLSearchParams({ q: term });
-                try {
-                    const res = await fetch(`${searchUrl}?${qs.toString()}`, { headers: { 'Accept': 'application/json' } });
-                    if (!res.ok) return [];
-                    const data = await res.json();
-                    return Array.isArray(data) ? data : [];
-                } catch { return []; }
-            }
-
             async function prefillStudentById(id) {
                 if (!id || !prefillBase) return;
                 try {
-                    const res = await fetch(`${prefillBase}/${encodeURIComponent(id)}`, { headers: { 'Accept': 'application/json' } });
+                    const res = await fetch(`${prefillBase}/${encodeURIComponent(id)}`, {
+                        headers: { 'Accept': 'application/json' }
+                    });
                     if (!res.ok) return;
                     const rec = await res.json();
 
@@ -796,10 +1106,12 @@
                     if (rec.s_lastname) sLast.value = rec.s_lastname;
                     if (rec.id) lrnInput.value = rec.id;
 
-                    if (rec.s_birthdate) { sBirth.value = (rec.s_birthdate || '').substring(0, 10); calcAge(sBirth.value); }
+                    if (rec.s_birthdate) {
+                        sBirth.value = (rec.s_birthdate || '').substring(0, 10);
+                        calcAge(sBirth.value);
+                    }
                     if (rec.s_gender) sGender.value = rec.s_gender;
 
-                    // Hidden/old-hide values (kept enabled for submit where needed)
                     if (rec.s_address) {
                         sAddressHidden.value = rec.s_address;
                         tryPrefillAddressFromFull(rec.s_address);
@@ -813,7 +1125,6 @@
                     if (rec.sped_desc) spedDesc.value = rec.sped_desc;
                     updateSped();
 
-                    // Grade level (user can still change it)
                     if (rec.s_gradelvl) {
                         const gv = textToGradeValue(rec.s_gradelvl);
                         if (gv) sGradeSel.value = gv;
@@ -825,6 +1136,16 @@
                     if (rec.guardian_id) {
                         guardianSel.value = String(rec.guardian_id);
                         updateGuardianUI();
+                    }
+
+                    // Optional fees: check the boxes that belong to this student
+                    if (Array.isArray(rec.student_optional_fee_ids)) {
+                        const selectedIds = rec.student_optional_fee_ids.map(String);
+                        document
+                            .querySelectorAll('input[name="student_optional_fee_ids[]"]')
+                            .forEach(cb => {
+                                cb.checked = selectedIds.includes(String(cb.value));
+                            });
                     }
 
                     pickedStudentId.value = rec.id || id;
@@ -842,7 +1163,6 @@
                     clearSuggestLists();
                     if (id) {
                         await prefillStudentById(id);
-                        // Focus next logical field
                         sBirth.focus();
                     }
                 });
@@ -862,11 +1182,20 @@
                             return data;
                         }
                     }
-                } catch { }
-                const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                } catch {}
+                const res = await fetch(url, {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
-                try { localStorage.setItem(k, JSON.stringify({ ts: Date.now(), data })); } catch { }
+                try {
+                    localStorage.setItem(k, JSON.stringify({
+                        ts: Date.now(),
+                        data
+                    }));
+                } catch {}
                 return data;
             }
 
@@ -874,7 +1203,8 @@
             const listCitiesMunsOfProvince = (provCode) =>
                 psgcCached(`prov_${provCode}_cm`, `${PSGC_API}/provinces/${provCode}/cities-municipalities/`);
             const listBarangaysOf = (code, isCity) =>
-                psgcCached(`${isCity ? 'city' : 'mun'}_${code}_brgys`, `${PSGC_API}/${isCity ? 'cities' : 'municipalities'}/${code}/barangays/`);
+                psgcCached(`${isCity ? 'city' : 'mun'}_${code}_brgys`,
+                    `${PSGC_API}/${isCity ? 'cities' : 'municipalities'}/${code}/barangays/`);
             const byName = (a, b) => a.name.localeCompare(b.name);
 
             const Address = {
@@ -962,7 +1292,10 @@
             };
 
             function tryPrefillAddressFromFull(full) {
-                if (!full) { assembleAddress(); return; }
+                if (!full) {
+                    assembleAddress();
+                    return;
+                }
                 const parts = full.split(',').map(s => s.trim()).filter(Boolean);
                 const provinceName = parts.length ? parts[parts.length - 1] : '';
                 const cityName = parts.length >= 2 ? parts[parts.length - 2] : '';
@@ -1003,6 +1336,11 @@
                 });
 
                 if (loadingOverlay) loadingOverlay.classList.remove('active');
+
+                // Clear optional fee selections in modal
+                document.querySelectorAll('input[name="student_optional_fee_ids[]"]').forEach(cb => {
+                    cb.checked = false;
+                });
             }
 
             const resetBtn = document.getElementById('resetFormBtn');
@@ -1016,16 +1354,18 @@
             enrollTypeSel.addEventListener('change', updateEnrollTypeUI);
             if (oldRetainChk) {
                 oldRetainChk.addEventListener('change', () => {
-                    oldEligibility.textContent = oldRetainChk.checked
-                        ? 'Retain same grade checked: student will repeat the same grade level.'
-                        : 'Unchecked: set the next appropriate grade level in the selector.';
+                    oldEligibility.textContent = oldRetainChk.checked ?
+                        'Retain same grade checked: student will repeat the same grade level.' :
+                        'Unchecked: set the next appropriate grade level in the selector.';
                 });
             }
 
             // Transferee fields
             prevGradeSel.addEventListener('change', computeTransfereeTarget);
             prevGwaInput.addEventListener('input', computeTransfereeTarget);
-            prevSchoolProxy.addEventListener('input', () => { previousSchool.value = prevSchoolProxy.value; });
+            prevSchoolProxy.addEventListener('input', () => {
+                previousSchool.value = prevSchoolProxy.value;
+            });
 
             // SPED
             spedHas.addEventListener('change', updateSped);
@@ -1060,7 +1400,7 @@
                             addrCity.appendChild(o);
                         });
                         addrCity.disabled = false;
-                    } catch (e) { }
+                    } catch (e) {}
                 });
             }
 
@@ -1082,7 +1422,7 @@
                             addrBarangay.appendChild(o);
                         });
                         addrBarangay.disabled = false;
-                    } catch (e) { }
+                    } catch (e) {}
                 });
             }
 
@@ -1094,26 +1434,34 @@
             }
 
             // ------- OLD student suggestions: FIRST / LAST / LRN inputs
-            let tFirst = 0, tLast = 0, tLrn = 0;
+            let tFirst = 0,
+                tLast = 0,
+                tLrn = 0;
 
             async function handleSuggest(inputEl, boxEl) {
                 const mode = enrollTypeSel.value;
-                if (mode !== 'old') { clearSuggestLists(); return; }
+                if (mode !== 'old') {
+                    clearSuggestLists();
+                    return;
+                }
                 const term = (inputEl.value || '').trim();
                 const list = await searchStudents(term);
                 buildSearchList(boxEl, list);
             }
 
             sFirst.addEventListener('input', () => {
-                clearTimeout(tFirst); pickedStudentId.value = '';
+                clearTimeout(tFirst);
+                pickedStudentId.value = '';
                 tFirst = setTimeout(() => handleSuggest(sFirst, suggestFirstBox), 180);
             });
             sLast.addEventListener('input', () => {
-                clearTimeout(tLast); pickedStudentId.value = '';
+                clearTimeout(tLast);
+                pickedStudentId.value = '';
                 tLast = setTimeout(() => handleSuggest(sLast, suggestLastBox), 180);
             });
             lrnInput.addEventListener('input', () => {
-                clearTimeout(tLrn); pickedStudentId.value = '';
+                clearTimeout(tLrn);
+                pickedStudentId.value = '';
                 tLrn = setTimeout(() => handleSuggest(lrnInput, suggestLrnBox), 180);
             });
 
@@ -1140,18 +1488,54 @@
                 }
             });
 
+            // ---------- Optional-fee selection (modal-only)
+            document.addEventListener('change', function (e) {
+                const modalCb = e.target.closest('.modal-opt-fee');
+                if (!modalCb) return;
+                buildFeesSummary();
+            });
+
+            // ---------- Step 1 → Step 2 (Next button opens fees summary)
+            if (nextBtn) {
+                nextBtn.addEventListener('click', () => {
+                    if (!validateStep1()) {
+                        return;
+                    }
+                    assembleAddress(); // ensure latest address into hidden field
+                    buildFeesSummary();
+
+                    if (feesModal) {
+                        feesModal.show();
+                    } else if (window.confirm('Proceed to save this enrollment with the current fee summary?')) {
+                        if (typeof form.requestSubmit === 'function') {
+                            form.requestSubmit();
+                        } else {
+                            form.submit();
+                        }
+                    }
+                });
+            }
+
+            if (confirmSaveBtn) {
+                confirmSaveBtn.addEventListener('click', () => {
+                    if (feesModal) {
+                        feesModal.hide();
+                    }
+                    if (typeof form.requestSubmit === 'function') {
+                        form.requestSubmit();
+                    } else {
+                        form.submit();
+                    }
+                });
+            }
+
             /* ======================
                Submit: AJAX then redirect to Students page
                ====================== */
-            form.addEventListener('submit', function (e) {
-                if (!form.checkValidity()) {
-                    e.preventDefault(); e.stopPropagation();
-                    form.classList.add('was-validated');
-                    const firstInvalid = form.querySelector(':invalid');
-                    if (firstInvalid) {
-                        firstInvalid.focus({ preventScroll: true });
-                        firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
+            form.addEventListener('submit', function(e) {
+                if (!validateStep1()) {
+                    e.preventDefault();
+                    e.stopPropagation();
                     return;
                 }
 
@@ -1171,14 +1555,14 @@
                 if (enrolledLrn) redirectUrl.searchParams.set('enrolled', enrolledLrn);
 
                 fetch(form.action, {
-                    method: 'POST',
-                    body: fd,
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    credentials: 'same-origin'
-                })
+                        method: 'POST',
+                        body: fd,
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'same-origin'
+                    })
                     .then(async (r) => {
                         if (r.ok) {
                             // Let overlay remain while page redirects
@@ -1187,7 +1571,9 @@
                         }
                         if (r.status === 422) {
                             const data = await r.json().catch(() => ({}));
-                            showErrors(data.errors || { error: ['Please correct the highlighted fields.'] });
+                            showErrors(data.errors || {
+                                error: ['Please correct the highlighted fields.']
+                            });
                             form.dataset.submitting = '';
                             if (loadingOverlay) loadingOverlay.classList.remove('active');
                             return;

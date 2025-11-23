@@ -32,6 +32,25 @@
     <!-- Local Bootstrap JS -->
     <script src="{{ asset('vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     <link rel="stylesheet" href="{{ asset('css/dash.css') }}">
+    <style>
+        .sidebar-submenu {
+            display: none;
+        }
+
+        .sidebar-submenu.show {
+            display: block;
+        }
+
+        .sidebar-sublink {
+            font-size: 0.9rem;
+            padding-left: 2.5rem;
+        }
+
+        .sidebar-link-toggle {
+            cursor: pointer;
+        }
+    </style>
+
 </head>
 
 <body class="{{ (session('theme') === 'dark') ? 'theme-dark' : '' }}">
@@ -60,7 +79,7 @@
                 class="sidebar-link {{ request()->routeIs('admin.settings') ? 'active' : '' }}">
                 <i class="bi bi-book"></i><span> Curriculum</span>
             </a>
-            
+
             {{-- Finances --}}
             <a href="{{ route('admin.finances') }}"
                 class="sidebar-link {{ request()->routeIs('admin.finances') ? 'active' : '' }}">
@@ -77,11 +96,28 @@
                 <i class="bi bi-journal-check"></i><span> Grades</span>
             </a>
 
-            {{-- NEW: Reports (Enrollment) --}}
-            <a href="{{ route('admin.reports.enrollments') }}"
-                class="sidebar-link {{ request()->routeIs('admin.reports.enrollments') ? 'active' : '' }}">
-                <i class="bi bi-table"></i><span> Reports</span>
-            </a>
+            {{-- Reports dropdown --}}
+            <div class="sidebar-group">
+                <button type="button"
+                    class="sidebar-link sidebar-link-toggle {{ request()->routeIs('admin.reports.*') ? 'active' : '' }}"
+                    data-submenu="reports-submenu" style="background:none;border:none;width:100%;text-align:left;">
+                    <i class="bi bi-table"></i><span> Reports</span>
+                    <i class="bi bi-chevron-down ms-auto small"></i>
+                </button>
+
+                <div id="reports-submenu"
+                    class="sidebar-submenu {{ request()->routeIs('admin.reports.*') ? 'show' : '' }}">
+                    <a href="{{ route('admin.reports.enrollments') }}"
+                        class="sidebar-link sidebar-sublink {{ request()->routeIs('admin.reports.enrollments') ? 'active' : '' }}">
+                        <span class="ms-4">Enrollment Report</span>
+                    </a>
+                    <a href="{{ route('admin.reports.financial') }}"
+                        class="sidebar-link sidebar-sublink {{ request()->routeIs('admin.reports.financial') ? 'active' : '' }}">
+                        <span class="ms-4">Financial Report</span>
+                    </a>
+                </div>
+            </div>
+
 
             <a href="{{ route('admin.settings.index') }}"
                 class="sidebar-link {{ request()->routeIs('admin.settings') ? 'active' : '' }}">
@@ -190,6 +226,20 @@
                 }
             });
         });
+                // Reports submenu toggle
+        document.addEventListener('click', function (e) {
+            const toggle = e.target.closest('.sidebar-link-toggle');
+            if (!toggle) return;
+
+            const submenuId = toggle.getAttribute('data-submenu');
+            if (!submenuId) return;
+
+            const submenu = document.getElementById(submenuId);
+            if (!submenu) return;
+
+            submenu.classList.toggle('show');
+        });
+
     </script>
 
     <!-- Auto-dismiss Flash Messages -->

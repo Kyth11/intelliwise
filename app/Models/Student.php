@@ -38,31 +38,49 @@ class Student extends Model
 
     protected $appends = ['full_name'];
 
-    public function guardian(): BelongsTo { return $this->belongsTo(Guardian::class, 'guardian_id'); }
-    public function gradelvl(): BelongsTo { return $this->belongsTo(Gradelvl::class, 'gradelvl_id'); }
-    public function tuition(): BelongsTo { return $this->belongsTo(Tuition::class, 'tuition_id'); }
+    public function guardian(): BelongsTo
+    {
+        return $this->belongsTo(Guardian::class, 'guardian_id');
+    }
+
+    public function gradelvl(): BelongsTo
+    {
+        return $this->belongsTo(Gradelvl::class, 'gradelvl_id');
+    }
+
+    public function tuition(): BelongsTo
+    {
+        return $this->belongsTo(Tuition::class, 'tuition_id');
+    }
 
     public function optionalFees(): BelongsToMany
     {
-        // Pivot now stores LRN in optional_fee_student.student_id
         return $this->belongsToMany(
             OptionalFee::class,
             'optional_fee_student',
-            'student_id',
-            'optional_fee_id'
+            'student_id',      // FK on pivot to students.lrn
+            'optional_fee_id'  // FK on pivot to optional_fees.id
         )->withTimestamps();
     }
-
+    /**
+     * Correct per-student payments:
+     * payments.student_id → students.lrn
+     */
     public function payments(): HasMany
     {
-        return $this->hasMany(Payments::class, 'tuition_id', 'tuition_id');
+        return $this->hasMany(Payments::class, 'student_id', 'lrn');
     }
 
     public function getFullNameAttribute(): string
     {
-        $mid = trim((string)($this->s_middlename ?? ''));
-        $name = trim(implode(' ', array_filter([$this->s_firstname ?? '', $mid, $this->s_lastname ?? ''])));
-        return $name !== '' ? $name : ('Student '.$this->lrn);
+        $mid  = trim((string) ($this->s_middlename ?? ''));
+        $name = trim(implode(' ', array_filter([
+            $this->s_firstname ?? '',
+            $mid,
+            $this->s_lastname ?? '',
+        ])));
+
+        return $name !== '' ? $name : ('Student ' . $this->lrn);
     }
 
     public function getBaseTuitionAttribute(): float
@@ -70,18 +88,26 @@ class Student extends Model
         if ($this->relationLoaded('tuition') && $this->tuition) {
             return (float) $this->tuition->total_yearly;
         }
+
         if (!empty($this->s_tuition_sum)) {
             return (float) preg_replace('/[^\d.]+/', '', (string) $this->s_tuition_sum);
         }
+
         $row = Tuition::where('grade_level', $this->s_gradelvl)
-                ->orderByDesc('updated_at')->orderByDesc('created_at')->first();
+            ->orderByDesc('updated_at')
+            ->orderByDesc('created_at')
+            ->first();
+
         return (float) ($row->total_yearly ?? 0);
     }
 
     public function getOptionalSumAttribute(): float
     {
-        $fees = $this->relationLoaded('optionalFees') ? $this->optionalFees : $this->optionalFees()->get();
-        return (float) $fees->sum(fn ($f) => (float) ($f->amount ?? 0));
+        $fees = $this->relationLoaded('optionalFees')
+            ? $this->optionalFees
+            : $this->optionalFees()->get();
+
+        return (float) $fees->sum(fn($f) => (float) ($f->amount ?? 0));
     }
 
     public function getTotalDueAttribute(): float
@@ -91,10 +117,15 @@ class Student extends Model
 
     public function getComputedBalanceAttribute(): float
     {
+        // Now uses per-student payments, not shared tuition payments
         $paid = (float) ($this->payments()->sum('amount') ?? 0);
         $bal  = ($this->base_tuition + $this->optional_sum) - $paid;
+
         return $bal > 0 ? round($bal, 2) : 0.0;
     }
 
-    public function schoolyr(): BelongsTo { return $this->belongsTo(Schoolyr::class, 'schoolyr_id'); }
+    public function schoolyr(): BelongsTo
+    {
+        return $this->belongsTo(Schoolyr::class, 'schoolyr_id');
+    }
 }

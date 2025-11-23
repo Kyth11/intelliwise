@@ -1,4 +1,3 @@
-{{-- resources/views/auth/admindashboard/reports.blade.php --}}
 @extends('layouts.admin')
 
 @section('title', 'Enrollment Reports')
@@ -17,32 +16,17 @@
         .report-meta .kv { display:flex; gap:.5rem; }
         .report-meta .k { min-width:120px; color:#64748b; font-weight:600; }
         .report-meta .v { white-space:pre-wrap; }
-        .money-row { display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:.75rem; margin-top:.75rem; }
-        .money-box { border:1px dashed #cbd5e1; border-radius:.5rem; padding:.5rem .75rem; background:#f8fafc; }
-        .money-box .label { font-size:.8rem; color:#64748b; }
-        .money-box .amt { font-weight:700; font-size:1rem; }
-        .payments-section { margin-top:.75rem; border:1px solid #e2e8f0; border-radius:.5rem; background:#fafafa; }
-        .payments-title { padding:.5rem .75rem; border-bottom:1px solid #e2e8f0; background:#eef5ff; }
-        .payments-scroll { max-height:220px; overflow:auto; }
-        .payments-table { width:100%; border-collapse:collapse; font-size:.9rem; }
-        .payments-table th, .payments-table td { border:1px solid #e5e7eb; padding:.4rem .5rem; }
-        .payments-table thead th { background:#eef5ff; }
-        .payments-footer { padding:.5rem .75rem; border-top:1px solid #e2e8f0; background:#fff; }
-        .btn-print-card { white-space:nowrap; }
         .totals-row td { font-weight:600; border-top:2px solid #ddd; }
         @media (max-width:992px){
             .report-meta { grid-template-columns: 1fr 1fr; }
-            .money-row { grid-template-columns: 1fr 1fr; }
         }
         @media (max-width:576px){
             .report-meta { grid-template-columns: 1fr; }
-            .money-row { grid-template-columns: 1fr; }
         }
         @media print {
             .no-print { display: none !important; }
             @page { size: A4 portrait; margin: 14mm 12mm; }
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .payments-scroll { max-height: none !important; overflow: visible !important; }
         }
     </style>
 @endpush
@@ -57,7 +41,6 @@
     $gradelvl_id = $gradelvl_id ?? request('gradelvl_id');
     $grouped     = $grouped     ?? collect();
     $enrollments = $enrollments ?? null;
-    $pageTotals  = $pageTotals  ?? ['tuition'=>0,'optional'=>0,'total_due'=>0,'paid'=>0,'balance'=>0];
 @endphp
 
 <div class="container-fluid py-3 students-page">
@@ -85,7 +68,6 @@
         <div class="col-auto">
             <label class="form-label">School Year</label>
             <select name="sy_id" id="sySelect" class="form-select">
-                <option value="">All</option>
                 @foreach ($schoolyrs as $sy)
                     <option value="{{ $sy->id }}" @selected((int) $sy_id === (int) $sy->id)>{{ $sy->school_year }}</option>
                 @endforeach
@@ -113,26 +95,16 @@
             <select id="studentSelect" class="form-select">
                 <option value="">— All Students —</option>
             </select>
-            <input type="hidden" name="student_lrn" id="studentIdInput" value="{{ $student_id }}">
+            <input type="hidden" name="student_id" id="studentIdInput" value="{{ $student_id }}">
         </div>
 
         {{-- Client-only filters --}}
         <div class="col-auto">
             <label class="form-label">Enroll Status</label>
-            <select class="form-select" id="statusSelect">
+            <select class="form-select" id="statusSelect" name="status">
                 <option value="">All</option>
-                <option>Enrolled</option>
-                <option>Not Enrolled</option>
-            </select>
-        </div>
-
-        <div class="col-auto">
-            <label class="form-label">Pay Status</label>
-            <select class="form-select" id="payStatusSelect">
-                <option value="">All</option>
-                <option>Paid</option>
-                <option>Partial</option>
-                <option>Unpaid</option>
+                <option value="Enrolled" @selected(request('status') === 'Enrolled')>Enrolled</option>
+                <option value="Not Enrolled" @selected(request('status') === 'Not Enrolled')>Not Enrolled</option>
             </select>
         </div>
     </form>
@@ -155,37 +127,6 @@
                         $s = $en->student ?? null;
                         $g = ($en->guardian ?? null) ?: ($s?->guardian);
                         $syText = $en->schoolyr?->school_year ?? '—';
-
-                        // Money math
-                        $base = 0;
-                        if (optional($s->tuition)->total_yearly !== null) {
-                            $base = (float) $s->tuition->total_yearly;
-                        } elseif ($s?->s_tuition_sum !== null && $s?->s_tuition_sum !== '') {
-                            $base = (float) $s->s_tuition_sum;
-                        }
-
-                        $optCollection = collect($s->optionalFees ?? []);
-                        $filtered = $optCollection->filter(function ($f) {
-                            $scopeOk = !isset($f->scope) || in_array($f->scope, ['student', 'both']);
-                            $activeOk = !property_exists($f, 'active') || (bool) $f->active;
-                            return $scopeOk && $activeOk;
-                        });
-                        $optional = (float) $filtered->sum(function($f){
-                            $amt = $f->pivot->amount_override ?? $f->amount;
-                            return (float) $amt;
-                        });
-
-                        $total = $base + $optional;
-
-                        $paidRecords = (float) ($s?->payments()->sum('amount') ?? 0);
-                        if ($s?->s_total_due !== null && $s?->s_total_due !== '') {
-                            $balance = max(0, (float) $s->s_total_due);
-                            $paid    = max($total - $balance, 0);
-                        } else {
-                            $paid    = min($paidRecords, $total);
-                            $balance = max(0, round($total - $paid, 2));
-                        }
-                        $derivedPay = $balance <= 0.01 ? 'Paid' : ($paid > 0 ? 'Partial' : 'Unpaid');
 
                         // Names / contacts
                         $mFirst = trim(collect([data_get($g,'m_firstname'), data_get($g,'m_middlename')])->filter()->implode(' '));
@@ -216,7 +157,6 @@
                     <article class="report-card searchable-card"
                              id="{{ $cardId }}"
                              data-id="{{ $en->id }}"
-                             data-paystatus="{{ $derivedPay }}"
                              data-enrollstatus="{{ $enrollStatus }}">
                         <div class="report-card-header">
                             <div>
@@ -228,10 +168,6 @@
                                     @else
                                         <span class="badge bg-secondary badge-pill">Not Enrolled</span>
                                     @endif
-
-                                    <span class="badge {{ $derivedPay === 'Paid' ? 'bg-success' : ($derivedPay === 'Partial' ? 'bg-warning text-dark' : 'bg-danger') }} badge-pill">
-                                        {{ $derivedPay }}
-                                    </span>
 
                                     <span class="badge bg-light text-dark border">{{ $syText }}</span>
                                 </div>
@@ -262,44 +198,6 @@
                                 </button>
                             </div>
                         </div>
-
-                        <div class="money-row">
-                            <div class="money-box"><div class="label">Tuition</div><div class="amt">{{ number_format($base, 2) }}</div></div>
-                            <div class="money-box"><div class="label">Optional</div><div class="amt">{{ number_format($optional, 2) }}</div></div>
-                            <div class="money-box"><div class="label">Total Due</div><div class="amt">{{ number_format($total, 2) }}</div></div>
-                            <div class="money-box"><div class="label">Balance</div>
-                                <div class="amt {{ $balance > 0 ? 'text-danger' : 'text-success' }}">{{ number_format($balance, 2) }}</div>
-                            </div>
-                        </div>
-
-                        <section class="payments-section">
-                            <div class="payments-title">
-                                <div class="fw-semibold">Payments ({{ $s?->payments->count() ?? 0 }})</div>
-                            </div>
-                            <div class="payments-scroll">
-                                @if(($s?->payments && $s->payments->count()))
-                                    <table class="payments-table">
-                                        <thead><tr><th style="width:110px">Date</th><th>Method</th><th>Status</th><th class="text-end" style="width:140px">Amount</th></tr></thead>
-                                        <tbody>
-                                            @foreach ($s->payments->sortBy('created_at') as $p)
-                                                <tr>
-                                                    <td>{{ optional($p->created_at)->format('Y-m-d') }}</td>
-                                                    <td>{{ $p->payment_method }}</td>
-                                                    <td>{{ $p->payment_status }}</td>
-                                                    <td class="text-end">{{ number_format($p->amount, 2) }}</td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                @else
-                                    <div class="text-muted small">No payments recorded.</div>
-                                @endif
-                            </div>
-                            <div class="payments-footer">
-                                <strong>Total Paid:</strong> {{ number_format($paid, 2) }} |
-                                <strong>Remaining:</strong> {{ number_format($balance, 2) }}
-                            </div>
-                        </section>
                     </article>
                 @endforeach
             </div>
@@ -308,26 +206,19 @@
         <div class="card mt-3 p-3"><p class="text-muted mb-0">No enrollments found.</p></div>
     @endforelse
 
-    {{-- PAGE TOTALS --}}
+    {{-- PAGE SUMMARY (no financial totals) --}}
     <div class="card mt-3 p-3">
-        <div class="table-responsive">
-            <table class="table table-sm mb-0">
-                <tbody>
-                    <tr class="totals-row">
-                        <td class="text-end" style="width:70%"><strong>Page Totals:</strong></td>
-                        <td class="text-end"><strong>Tuition:</strong> {{ number_format($pageTotals['tuition'] ?? 0, 2) }}</td>
-                        <td class="text-end"><strong>Optional:</strong> {{ number_format($pageTotals['optional'] ?? 0, 2) }}</td>
-                        <td class="text-end"><strong>Total Due:</strong> {{ number_format($pageTotals['total_due'] ?? 0, 2) }}</td>
-                        <td class="text-end"><strong>Paid:</strong> {{ number_format($pageTotals['paid'] ?? 0, 2) }}</td>
-                        <td class="text-end"><strong>Balance:</strong> {{ number_format($pageTotals['balance'] ?? 0, 2) }}</td>
-                    </tr>
-                </tbody>
-            </table>
+        <div class="d-flex flex-wrap justify-content-between align-items-center">
+            <div>
+                <strong>Total enrollments on this page:</strong>
+                {{ $enrollments ? $enrollments->count() : 0 }}
+            </div>
+            @if($enrollments && method_exists($enrollments, 'links'))
+                <div class="mt-2">
+                    {{ $enrollments->links() }}
+                </div>
+            @endif
         </div>
-
-        @if($enrollments && method_exists($enrollments, 'links'))
-            <div class="mt-2">{{ $enrollments->links() }}</div>
-        @endif
     </div>
 
 </div>
@@ -345,7 +236,6 @@ function getSelectedGradeLabel() {
 /* ===== Client filters (instant) ===== */
 function applyClientFilters() {
     const q   = (document.getElementById('pageSearch')?.value || '').toLowerCase();
-    const pay = document.getElementById('payStatusSelect')?.value || '';
     const enr = document.getElementById('statusSelect')?.value || '';
 
     const chosenGradeLabel = getSelectedGradeLabel();
@@ -354,9 +244,8 @@ function applyClientFilters() {
     const cards = Array.from(document.querySelectorAll('.report-card'));
     cards.forEach(card => {
         const textOk   = !q   || card.innerText.toLowerCase().includes(q);
-        const payOk    = !pay || (card.dataset.paystatus === pay);
         const enrollOk = !enr || (card.dataset.enrollstatus === enr);
-        card.style.display = (textOk && payOk && enrollOk) ? '' : 'none';
+        card.style.display = (textOk && enrollOk) ? '' : 'none';
     });
 
     // section visibility (grade match + has visible cards)
@@ -371,7 +260,6 @@ function applyClientFilters() {
 
 // Wire client filters
 document.getElementById('pageSearch')?.addEventListener('input', applyClientFilters);
-document.getElementById('payStatusSelect')?.addEventListener('change', applyClientFilters);
 document.getElementById('statusSelect')?.addEventListener('change', applyClientFilters);
 
 /* ===== Server bits: School Year change submits immediately ===== */
@@ -401,7 +289,7 @@ document.getElementById('statusSelect')?.addEventListener('change', applyClientF
         studentSel.appendChild(makeOpt('', '— All Students —', !preId));
 
         try {
-            const base = @json(route('admin.reports.enrollments.students')); // <-- fixed
+            const base = @json(route('admin.reports.enrollments.students'));
             const url = new URL(base, window.location.origin);
             if (gradeId) url.searchParams.set('gradelvl_id', gradeId);
             const res = await fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
@@ -420,13 +308,13 @@ document.getElementById('statusSelect')?.addEventListener('change', applyClientF
         form.requestSubmit();
     });
 
-    // When Grade changes: reload Student list; also submit if you want server to filter by grade immediately.
+    // When Grade changes: reload Student list; also submit so server applies grade filter
     gradeSel.addEventListener('change', function () {
         const gid = gradeSel.value || '';
         studentSel.value = '';
         studentHidden.value = '';
         loadStudents(gid, '');
-        form.requestSubmit(); // submit so server applies grade filter
+        form.requestSubmit();
         if (typeof applyClientFilters === 'function') applyClientFilters();
     });
 
@@ -479,8 +367,7 @@ function printHTML(html) {
         const now=new Date().toLocaleString();
         const content=cardEl.cloneNode(true);
         content.querySelectorAll('.btn-print-card').forEach(b => b.remove());
-        const scroll=content.querySelector('.payments-scroll');
-        if (scroll){ scroll.style.maxHeight='none'; scroll.style.overflow='visible'; }
+
         const css=`
             @page { size: A4 portrait; margin: 16mm 14mm; }
             * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -488,11 +375,7 @@ function printHTML(html) {
             h1 { margin: 0 0 6px 0; font-size: 18px; color: #1f2937; }
             .sub { color: #6b7280; margin-bottom: 12px; }
             .report-card { border: 1px solid #ddd; border-radius: 8px; padding: 14px; box-shadow:none; }
-            .money-row { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:10px; }
-            .money-box { border:1px dashed #ccc; border-radius:8px; padding:8px; background:#f8fafc; }
-            .payments-table { width:100%; border-collapse:collapse; font-size:12px; }
-            .payments-table th,.payments-table td { border:1px solid #e5e7eb; padding:6px 8px; }
-            .payments-table thead th { background:#eef5ff; }
+            .report-meta { margin-top: 8px; }
         `;
         return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>${css}</style></head>
         <body>
@@ -524,7 +407,6 @@ function printHTML(html) {
         const clones=cards.map(c=>{
             const x=c.cloneNode(true);
             x.querySelectorAll('.btn-print-card').forEach(b => b.remove());
-            const scr=x.querySelector('.payments-scroll'); if(scr){ scr.style.maxHeight='none'; scr.style.overflow='visible'; }
             return `<div class="card-wrap">${x.outerHTML}</div>`;
         }).join('');
 
@@ -536,11 +418,6 @@ function printHTML(html) {
             .sub { color:#6b7280; margin-bottom: 12px; }
             .card-wrap { break-inside: avoid; page-break-inside: avoid; margin: 0 0 10px; }
             .report-card { border:1px solid #ddd; border-radius:8px; padding:12px; box-shadow:none; }
-            .money-row { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:10px; }
-            .money-box { border:1px dashed #ccc; border-radius:8px; padding:8px; background:#f8fafc; }
-            .payments-table { width:100%; border-collapse:collapse; font-size:12px; }
-            .payments-table th,.payments-table td { border:1px solid #e5e7eb; padding:6px 8px; }
-            .payments-table thead th { background:#eef5ff; }
         `;
 
         return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>${css}</style></head>
